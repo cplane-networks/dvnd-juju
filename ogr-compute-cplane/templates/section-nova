@@ -1,0 +1,6 @@
+[nova]
+auth_section = keystone_authtoken
+{% if use_internal_endpoints -%}
+endpoint_type = internal
+{% endif %}
+

@@ -1,0 +1,44 @@
+options:
+  cplane-controller_ip:
+    type: string
+    default: "192.168.4.154"
+    description: "IP of the Cplane controller"
+  cplane-controller_port:
+    type: int
+    default: 8080
+    description: "Cplane controller port"
+  rabbit-user:
+    type: string
+    default: "neutron"
+    description: "Neutron rabbit user name"
+  rabbit-vhost:
+    type: string
+    default: "openstack"
+    description: "Rabbit vhost"
+  nova-database-user:
+    type: string
+    default: "neutron"
+    description: "Neutron databse user"
+  nova-database:
+    type: string
+    default: "neutron"
+    description: "Neutron databasee"
+  vlan-ranges:
+    type: string
+    default: "1000:2000"
+    description: |
+      Space-delimited list of Neutron network-provider & vlan-id-ranges using
+      the following format "<provider>:<start>:<end> ...".
+  overlay-network-type:
+    default: gre vxlan
+    type: string
+    description: |
+      Overlay network types to use, valid options include:
+        gre
+        vxlan
+      Multiple types can be provided - field is space delimited.
+  security-groups:
+    default: True 
+    type: boolean
+    description: Enable cplane  managed security groups.
+

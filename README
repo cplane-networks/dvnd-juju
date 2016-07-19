@@ -1,0 +1,88 @@
+=============================================================
+2016-05-24
+=============================================================
+This is the initial version of the neutro-api-cplane and 
+neutron-openvswitch-cplane charm. The teting of the charms with 
+openstach bundle is not done yet, but verified all the 
+configuration that needs to be done in the neutron and nova
+files are verified.
+
+
+=============================================================
+2016-05-26
+=============================================================
+This contain the fix for juju-upgrade issue for neutron-openvswicth-cplane
+charm. The issue was, at the time of deploying a br-ext interface is created.
+But during upgrade its trying to create it again and it fails there.
+So before upgrade it should clear the br-ext interface and then upgrade the
+charm.
+
+Also the new configuration that needs to be added to the nova-compute node
+is implemented.
+
+#Add the following lines to /etc/sysctl.conf
+net.ipv4.conf.all.rp_filter = 0
+net.ipv4.ip_forward = 1
+net.ipv4.conf.default.rp_filter = 0
+net.bridge.bridge-nf-call-iptables = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+ 
+#run command to load kernel values
+sudo sysctl -p
+
+
+=============================================================
+2016-06-14
+=============================================================
+Added the OGR compute charm and modified the bundle file to include this charm 
+and add the relations.
+Also moddified some of the hooks name in neutron-api-cplane and neutron-openvswitch-plane
+charms.
+
+
+=============================================================
+2016-06-22
+=============================================================
+Added the support for generating the interface file in the OVS.
+
+
+=============================================================
+2016-06-24
+=============================================================
+Enable the security-group in the configuration file for neutron-api-cplane.
+Added the code for db migration after installation of Cplane neutron plugin
+
+
+=============================================================
+2016-06-30
+=============================================================
+Added a new yaml file for bundle deployment "ceph_controller_cumpute_nodes.yaml"
+command: juju deploy ceph_controller_cumpute_nodes.yaml
+
+This bundle deployment file will deploy the ceph related service in one nodes, compute
+services in another nodes and all other Openstack related service like neutron
+glance, keystone etc in a separate node.
+
+=============================================================
+2016-07-06
+=============================================================
+Modified the content of the Copyright and README file. Also ran a charm-proof command 
+to verified the charms before submitting it to canonical
+
+charm-proof's output
+     rebaca@juju:~/charms/trusty$
+     rebaca@juju:~/charms/trusty$ charm-proof neutron-api-cplane/
+     I: missing recommended hook start
+     I: missing recommended hook stop
+     rebaca@juju:~/charms/trusty$ charm-proof neutron-openvswitch-cplane/
+     I: missing recommended hook start
+     I: missing recommended hook stop
+     rebaca@juju:~/charms/trusty$ charm-proof ogr-compute-cplane/
+     I: missing recommended hook start
+     I: missing recommended hook stop
+     I: config.yaml: option flat-network-providers has no default value
+     
+=============================================================
+2016-07-18
+=============================================================
+Modified the charms as per Charles review. 

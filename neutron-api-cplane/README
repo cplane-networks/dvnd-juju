@@ -1,0 +1,35 @@
+# Overview
+
+This charm provides the Cplane neutron plugin for OpenStack clouds.
+
+CPLANE's software-only solution automates creation of WAN and LAN network services with a highly intelligent SDN platform. Through advanced discovery, modeling and service orchestration, CPLANE automates not only the low-level infrastructure configuration and management of data center and wide area networks, but also the higher-level, value-add functions such as network virtualization, routing, policy and QoS.   CPLANE delivers network services faster and more reliably on existing network infrastructure. Since CPLANE is a software-only solution with no vendor-specific dependencies, it offers the added advantage of providing a path to new network architectures and technologies, and away from vendor lock-in.
+
+CPlane is an extremely lightweight Neutron plugin for Openstack
+For more information see [http://www.cplanenetworks.com/]
+
+# Usage
+
+This charm is subordinate to the **neutron-api** charm.  It also requires the deployment of the **neutron-openvswitch-cplane** charm which is again a subordinate to **nova-compute** charm and the **cplane-controller ** charm. It eliminates the need of the neutron-gateway charm as L3 routing agent since this is now handled by the compute tier.
+
+The neutron-api-cplane charm has several core functions:
+
+ - Install CPlane Mechanism Driver and L3 Service Plugin.
+ - Configure the core Neutron components.
+ - Manage the configuration of these resources in the neutron-openvswitch-cplane service.
+
+Instruction for deploying the CPlane openstack bundle is as follows:
+Note: This bundle will install some components of Openstack as well as CPlane charms.
+
+    juju deploy cplane_openstack.yaml
+
+# Configuration
+
+ - ***cplane-controller_ip***: Configures the CPlane-controller node IP, but this value will be overwritten if a cplane-controller charm is deployed.
+   
+ - ***cplane-controller_port***: Configures the CPlane-controller node PORT, again this value will be overwritten if a cplane-controller charm is
+   deployed.
+
+# Contact Information
+
+www.cplanenetworks.com
+info@cplanenetworks.com

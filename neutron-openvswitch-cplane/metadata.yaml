@@ -1,0 +1,25 @@
+name: neutron-openvswitch-cplane
+summary: Cplane openvswitch for Openstack 
+maintainer: amarendra <info@cplanenetworks.com>
+description: |
+      The cplane-agent is a daemon that resides on compute nodes and other remotely managed endpoints. Cplane-agent is part of CPLANE NETWORKS’ Distributed Control 
+      Software-Defined Networking infrastructure orchestration and management platform.  
+
+tags:
+  - openstack
+  - networking
+subordinate: true
+provides:
+  neutron-plugin:
+    interface: neutron-plugin
+    scope: container
+requires:
+  container:
+    interface: juju-info
+    scope: container
+  cplane-neutron:
+    interface: cplane-neutron
+  cplane-controller:
+    interface: cplane-controller
+  amqp:
+    interface: rabbitmq

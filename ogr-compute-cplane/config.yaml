@@ -1,0 +1,113 @@
+options:
+  debug:
+    default: False
+    type: boolean
+    description: Enable debug logging.
+  verbose:
+    default: False
+    type: boolean
+    description: Enable verbose logging.
+  rabbit-user:
+    type: string
+    default: "nova"
+    description: "Nova rabbit user name"
+  rabbit-vhost:
+    type: string
+    default: "openstack"
+    description: "Nova rabbit vhost"
+  neutron-user:
+    type: string
+    default: "neutron"
+    description: "Neutron user"
+  neutron-password:
+    type: string
+    default: "neutron"
+    description: "Neutron password"
+  nova-user:
+    type: string
+    default: "nova"
+    description: "Nova user"
+  nova-password:
+    type: string
+    default: "openstack"
+    description: "Nova password"
+  openstack-controller-ip:
+    type: string
+    default: "192.168.5.22"
+    description: "Cplane-nutron IP"
+  region:
+    type: string
+    default: "RegionOne"
+    description: "Openstack region"
+  neutron-plugin:
+    default: ovs
+    type: string
+    description: |
+      Neutron plugin to use for network management; supports
+      .
+        ovs - OpenvSwitch Plugin
+        vsp - Nuage Networks VSP
+        nsx - VMWare NSX
+        Calico - Project Calico Networking
+      .
+  overlay-network-type:
+    default: gre
+    type: string
+    description: |
+      Overlay network types to use, valid options include:
+      .
+        gre
+        vxlan
+      .
+      Multiple types can be provided - field is space delimited. 
+  l2-population:
+    type: boolean
+    default: True
+    description: |
+      Populate the forwarding tables of virtual switches (LinuxBridge or OVS),
+      to decrease broadcast traffics inside the physical networks fabric while
+      using overlays networks (VXLan, GRE).
+  enable-l3ha:
+    default: False
+    type: boolean
+    description: |
+      Enable L3 HA (juno and above).
+  enable-dvr:
+    default: False
+    type: boolean
+    description: |
+      Enable Distributed Virtual Routing (juno and above).
+  neutron-security-groups:
+    type: boolean
+    default: False 
+    description: |
+      Use quantum for security group management.
+  neutron-external-network:
+    type: string
+    default: ext_net
+    description: |
+      Name of the external network for floating IP addresses provided by
+      Neutron.
+  flat-network-providers:
+    type: string
+    default:
+    description: |
+      Space-delimited list of Neutron flat network providers.
+  vlan-ranges:
+    type: string
+    default: "physnet1:1000:2000"
+    description: |
+      Space-delimited list of <physical_network>:<vlan_min>:<vlan_max> or
+      <physical_network> specifying physical_network names usable for VLAN
+      provider and tenant networks, as well as ranges of VLAN tags on each
+      available for allocation to tenant networks.
+  database-user:
+    default: neutron
+    type: string
+    description: Username for Neutron database access (if enabled)
+  database:
+    default: neutron
+    type: string
+    description: |
+      Database name for Neutron (if enabled)
+

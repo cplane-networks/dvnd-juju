@@ -1,0 +1,58 @@
+options:
+  mgmt-int:
+    type: string
+    default: "br-eth0"
+    description: "Management interface for Cplane controller"
+  cp-controller-mport:
+    type: int
+    default: 1901 
+    description: "Cplane controller multicast port"
+  cp-controller-uport:
+    type: int
+    default: 1902
+    description: "Cplane controller unicast port"
+  rabbit-user:
+    type: string
+    default: "nova"
+    description: "Nova rabbit user name"
+  rabbit-vhost:
+    type: string
+    default: "openstack"
+    description: "Nova rabbit vhost"
+  admin-user:
+    type: string
+    default: "nova"
+    description: "Admin user"
+  admin-password:
+    type: string
+    default: "nova"
+    description: "Admin password"
+  openstack-controller-ip:
+    type: string
+    default: "192.168.5.22"
+    description: "Cplane-nutron IP"
+  cplane-controller-ip:
+    type: string
+    default: "192.168.4.154"
+    description: "Cplane-Controller IP"
+  region:
+    type: string
+    default: "RegionOne"
+    description: "Openstack region"
+  data-interface:
+    type: string
+    default: "br-eth1"
+    description: "Data interface to create the bridge network"
+  tun-interface:
+    type: string
+    default: "br-eth2"
+    description: "Interface to create the br-tun bridge"
+  fip-interface:
+    type: string
+    default: "br-eth3"
+    description: "Interface to create the br-fip bridge"
+  cp-agent-log-level:
+    type: string
+    default: "dbg"
+    description: "Log level for CP agent dbg,info"
+

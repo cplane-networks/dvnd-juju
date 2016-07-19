@@ -1,0 +1,78 @@
+import json
+import netaddr
+import os
+import subprocess
+import time
+
+from collections import OrderedDict
+from charmhelpers.contrib.openstack.utils import os_release, remote_restart
+from charmhelpers.contrib.openstack import context, templating
+from charmhelpers.core.hookenv import (
+    config,
+    log as juju_log,
+    relation_ids,
+    relation_get,
+    relation_get,
+    related_units,
+    unit_private_ip,
+)
+
+from charmhelpers.contrib.openstack.utils import (
+    git_install_requested,
+    git_clone_and_install,
+    git_pip_venv_dir,
+)
+
+from charmhelpers.fetch import (
+    apt_install,
+    apt_update,
+)
+
+
+PACKAGES = ['sysfsutils', 'neutron-metadata-agent', 'python-neutronclient', 'crudini', 'conntrack', 'neutron-plugin-ml2', 'neutron-plugin-linuxbridge-agent']
+
+METADATA_AGENT_INI = '/etc/neutron/metadata_agent.ini'
+NEUTRON_CONF_DIR = "/etc/neutron"
+NEUTRON_CONF = '%s/neutron.conf' % NEUTRON_CONF_DIR
+
+metadata_agent_config = OrderedDict([
+            ('auth_url', 'http://'+ config('openstack-controller-ip') + ':5000/v2.0'),
+            ('auth_region', config('region')),
+            ('admin_tenant_name', 'service'),
+            ('admin_user', config('admin-user')),
+            ('admin_password', config('admin-password')),
+            ('nova_metadata_ip', config('openstack-controller-ip')),
+            ('metadata_proxy_shared_secret', 'secret'),
+])
+
+def api_ready(relation, key):
+    ready = 'no'
+    for rid in relation_ids(relation):
+        for unit in related_units(rid):
+            ready = relation_get(attribute=key, unit=unit, rid=rid)
+    return ready == 'yes'
+
+
+def is_neutron_api_ready():
+    return api_ready('neutron-plugin-api-subordinate', 'neutron-api-ready')
+
+def determine_packages():
+    return PACKAGES
+
+
+def crudini_set(_file, section, key, value):
+    option = '--set'
+    cmd = ['crudini', option, _file, section, key, value ]
+    subprocess.check_call(cmd)
+
+def cplane_config(data, config_file, section):
+    for key, value in data.items():
+       crudini_set(config_file, section, key, value)
+
+def restart_services():
+    cmd = ['service', 'nova-compute', 'restart']
+    subprocess.check_call(cmd)
+
+def remmove_sql_lite():
+    cmd = ['rm', '-f', '/var/lib/nova/nova.sqlite']
+    subprocess.check_call(cmd)
