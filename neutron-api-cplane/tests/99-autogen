@@ -44,7 +44,8 @@ class TestDeployment(unittest.TestCase):
         #     https://jujucharms.com/docs/stable/tools-amulet
         pass
     
-        def validate_neutron_server_status(self):
+    def validate_neutron_server_status(self):
+        pass
 
 
 if __name__ == '__main__':

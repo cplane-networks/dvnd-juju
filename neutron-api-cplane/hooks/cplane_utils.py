@@ -38,20 +38,20 @@ CHARM_LIB_DIR = os.environ.get('CHARM_DIR', '') + "/lib/"
 ML2_CONFIG = '/etc/neutron/plugins/ml2/ml2_conf.ini'
 
 neutron_config = {
-                         "neutron.ml2.mechanism_drivers":{
-                             "cplane_mech":"neutron.plugins.ml2.drivers.cplane.mechanism_cplane:CPlaneMechanism"
-                         },
-                         "neutron.service_plugins":{
-                             "cplane_l3":"neutron.services.l3_router.cplane.l3_router_plugin:CPlaneServicePlugin"
-                         },
-                         "neutron.core_plugins":{
-                             "cplane_core_plugin":"neutron.plugins.cplane.cplane_plugin:CPlaneNeutronPlugin",
-                             "cplane_ml2":"neutron.plugins.ml2.cplane.cplane_ml2_plugin:CPlaneML2Plugin"
-                         },
-                         "neutron.ml2.extension_drivers":{
-                             "cplane_qos":"neutron.plugins.ml2.extensions.cplane_qos:CpQosExtensionDriver"
-                         }
+                     "neutron.ml2.mechanism_drivers": {
+                         "cplane_mech": "neutron.plugins.ml2.drivers.cplane.mechanism_cplane:CPlaneMechanism"
+                     },
+                     "neutron.service_plugins": {
+                         "cplane_l3": "neutron.services.l3_router.cplane.l3_router_plugin:CPlaneServicePlugin"
+                     },
+                     "neutron.core_plugins": {
+                         "cplane_core_plugin":"neutron.plugins.cplane.cplane_plugin:CPlaneNeutronPlugin",
+                         "cplane_ml2": "neutron.plugins.ml2.cplane.cplane_ml2_plugin:CPlaneML2Plugin"
+                     },
+                     "neutron.ml2.extension_drivers": {
+                         "cplane_qos": "neutron.plugins.ml2.extensions.cplane_qos:CpQosExtensionDriver"
                      }
+                 }
 
 cplane_packages = OrderedDict([
             ('python-cplane-neutron-plugin' ,439 ),
@@ -69,8 +69,8 @@ def determine_packages():
 def register_configs(release=None):
     resources = OrderedDict([
         (ML2_CONFIG, {
-            'services': [ 'neutron-server' ],
-            'contexts': [ cplane_context.CplaneMl2Context(), ]
+            'services': ['neutron-server'],
+            'contexts': [cplane_context.CplaneMl2Context(), ]
         })
     ])
     release = os_release('neutron-common')
@@ -110,7 +110,7 @@ def install_cplane_packages():
     for key, value in cplane_packages.items():
         filename = cp_package.download_package(key, value)
         if key == "neutronclient":
-            cmd = ['tar', '-xvf', filename, '-C', '/usr/lib/python2.7/dist-packages/'] 
+            cmd = ['tar', '-xvf', filename, '-C', '/usr/lib/python2.7/dist-packages/']
             subprocess.check_call(cmd)
         else:
             cmd = ['dpkg', '-i', filename]

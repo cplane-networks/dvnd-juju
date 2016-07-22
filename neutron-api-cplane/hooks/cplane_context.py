@@ -41,9 +41,8 @@ class CplaneMl2Context(context.OSContextGenerator):
 
         log('Cplane controller relation data incomplete/relation not set, get data from config')
 
-        ctxt = {}
-        ctxt['controller_ip'] = config('cplane-controller_ip') 
-        ctxt['controller_port'] = config('cplane-controller_port')
+        ctxt = {'controller_ip': config('cplane-controller_ip'),
+                'controller_port': config('cplane-controller_port')}
         return ctxt
 
     def __call__(self):
