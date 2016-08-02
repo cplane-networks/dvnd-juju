@@ -88,7 +88,7 @@ def amqp_joined(relation_id=None):
 
 @hooks.hook('config-changed')
 def config_changed():
-    cplane_config(metadata_agent_config, METADATA_AGENT_INI, 'DEFAULT')    
+    cplane_config(metadata_agent_config, METADATA_AGENT_INI, 'DEFAULT')
     restart_services()
     set_cp_agent()
     cplane_config(system_config, SYSTEM_CONF, '')

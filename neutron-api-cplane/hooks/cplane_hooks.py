@@ -43,9 +43,11 @@ def config_changed():
     configs = register_configs()
     configs.write_all()
     import pkg_resources
-    NEUTRON_ENTRY_POINT= "/usr/lib/python2.7/dist-packages/neutron-" + pkg_resources.get_distribution('neutron').version + ".egg-info/entry_points.txt"
+    NEUTRON_ENTRY_POINT = "/usr/lib/python2.7/dist-packages/neutron-" + \
+                          pkg_resources.get_distribution('neutron').version + \
+                          ".egg-info/entry_points.txt"
     cplane_config(neutron_config, NEUTRON_ENTRY_POINT)
-    
+
 @hooks.hook('cplane-controller-relation-changed')
 def cplane_controller_relation_changed():
     configs = register_configs()
@@ -53,13 +55,13 @@ def cplane_controller_relation_changed():
 
 @hooks.hook('shared-db-relation-changed')
 def share_db_relation_changed():
-    migrate_db();
+    migrate_db()
 
 @hooks.hook('amqp-relation-joined')
 def amqp_joined(relation_id=None):
     relation_set(relation_id=relation_id,
                  username=config('rabbit-user'),
-                 vhost=config('rabbit-vhost'))    
+                 vhost=config('rabbit-vhost'))
 
 @hooks.hook('neutron-plugin-api-subordinate-relation-joined')
 def neutron_api_joined(rid=None):

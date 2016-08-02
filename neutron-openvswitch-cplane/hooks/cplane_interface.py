@@ -39,11 +39,11 @@ class UbuntuIntfMgmt(object):
 
         # setup regex for checking of interface names.
         is_iface_stanza = 0
-        re_comment = re.compile("^#")
-        re_empty = re.compile("^\s*$")
-        re_iface_stz = re.compile("^iface.*{name}(?!\.)".format(name=ifname))
-        re_new_stz = re.compile("^iface|^mapping|^auto|^allow|^source")
-        re_ifname = re.compile(".*(?<!vlan-raw-device\s){name}(?!\.).*".format(name=ifname))
+        re_comment = re.compile(r"^#")
+        re_empty = re.compile(r"^\s*$")
+        re_iface_stz = re.compile(r"^iface.*{name}(?!\.)".format(name=ifname))
+        re_new_stz = re.compile(r"^iface|^mapping|^auto|^allow|^source")
+        re_ifname = re.compile(r".*(?<!vlan-raw-device\s){name}(?!\.).*".format(name=ifname))
 
         fp_read = open(src_file, "r")
         fp_bak = open(back_file, "w")

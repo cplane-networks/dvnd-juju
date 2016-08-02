@@ -15,7 +15,7 @@ class CPlanePackageManager:
         self._create_log()
         self.package_url = url
         if self.package_url.endswith(".json"):
-            self.package_url = self.package_url + "?dl=1"
+            self.package_url += "?dl=1"
         self.package_data = {}
         self._get_pkg_json()
 
@@ -74,7 +74,7 @@ class CPlanePackageManager:
         else:
             logging.info("Package %s downloaded, but checksum mismatch" % dwnld_package_name)
 
-        return dwnld_package_name 
+        return dwnld_package_name
 
 def get_opts_and_args(args):
     """
