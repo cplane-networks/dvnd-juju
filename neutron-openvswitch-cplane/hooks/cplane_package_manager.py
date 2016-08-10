@@ -1,14 +1,13 @@
-import os, sys, datetime
+import os
 import logging
 from optparse import OptionParser
-import urllib, json
+import urllib
+import json
 import hashlib
 import urlparse
-from charmhelpers.core.hookenv import (
-    Hooks,
-)
 
 CHARM_LIB_DIR = os.environ.get('CHARM_DIR', '') + "/lib/"
+
 
 class CPlanePackageManager:
     def __init__(self, url):
@@ -20,8 +19,10 @@ class CPlanePackageManager:
         self._get_pkg_json()
 
     def _create_log(self):
-        log_file = os.path.join(os.path.abspath(os.path.dirname(__file__)), "cp-package-manager.log")
-        logging.basicConfig(filename=log_file, format='%(asctime)s %(message)s',
+        log_file = os.path.join(os.path.abspath(os.path.dirname(__file__)),
+                                "cp-package-manager.log")
+        logging.basicConfig(filename=log_file,
+                            format='%(asctime)s %(message)s',
                             datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO)
         logging.info("Writing to log file : %s" % log_file)
 
@@ -30,7 +31,10 @@ class CPlanePackageManager:
         response = urllib.urlopen(url)
         logging.info("Package url:%s" % url)
         data = json.loads(response.read())
-        self.package_data = data.get("1.3.5", {}).get("ubuntu", {}).get("14.04", {}).get("liberty")
+        self.package_data = data.get("1.3.5",
+                                     {}).get("ubuntu",
+                                             {}).get("14.04",
+                                                     {}).get("liberty")
 
     def verify_file_checksum(self, file_name, file_md5sum):
         hash_md5 = hashlib.md5()
@@ -62,19 +66,24 @@ class CPlanePackageManager:
                 break
 
         if not version_exist:
-            logging.error("Version %d doesn't exist for package %s" % (version, package_name))
+            logging.error("Version %d doesn't exist for package %s"
+                          % (version, package_name))
             return
 
         filename = urlparse.urlsplit(package_dwnld_link).path
-        dwnld_package_name = os.path.join(CHARM_LIB_DIR, os.path.basename(filename))
+        dwnld_package_name = os.path.join(CHARM_LIB_DIR,
+                                          os.path.basename(filename))
         urllib.urlretrieve(package_dwnld_link, dwnld_package_name)
 
         if self.verify_file_checksum(dwnld_package_name, file_checksum):
-            logging.info("Package %s downloaded successfully" % dwnld_package_name)
+            logging.info("Package %s downloaded successfully"
+                         % dwnld_package_name)
         else:
-            logging.info("Package %s downloaded, but checksum mismatch" % dwnld_package_name)
+            logging.info("Package %s downloaded, but checksum mismatch"
+                         % dwnld_package_name)
 
         return dwnld_package_name
+
 
 def get_opts_and_args(args):
     """
@@ -84,9 +93,7 @@ def get_opts_and_args(args):
     parser = OptionParser()
     parser.add_option('-u', '--url',
                       action='store', dest='url',
-                      help='JSON web page url'
-                      )
+                      help='JSON web page url')
 
     options, args = parser.parse_args()
     return options, args
-

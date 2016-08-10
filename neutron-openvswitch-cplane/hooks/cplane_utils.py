@@ -1,30 +1,16 @@
-import json
-import netaddr
-import os
 import subprocess
-import time
 
 from collections import OrderedDict
-from charmhelpers.contrib.openstack.utils import os_release, remote_restart
-from charmhelpers.contrib.openstack import context, templating
 from charmhelpers.core.hookenv import (
     config,
     log as juju_log,
     relation_ids,
     relation_get,
-    relation_get,
     related_units,
-)
-
-from charmhelpers.contrib.openstack.utils import (
-    git_install_requested,
-    git_clone_and_install,
-    git_pip_venv_dir,
 )
 
 from charmhelpers.fetch import (
     apt_install,
-    apt_update,
 )
 
 
@@ -46,10 +32,13 @@ cplane_packages = OrderedDict([
 ])
 
 
-PACKAGES = ['neutron-metadata-agent', 'neutron-plugin-ml2', 'crudini', 'dkms', 'iputils-arping', 'dnsmasq']
+PACKAGES = ['neutron-metadata-agent', 'neutron-plugin-ml2', 'crudini',
+            'dkms', 'iputils-arping', 'dnsmasq']
 
 METADATA_AGENT_INI = '/etc/neutron/metadata_agent.ini'
-CPLANE_URL = "https://www.dropbox.com/s/h2edle1o0jj1btt/cplane_metadata.json?dl=1"
+
+CPLANE_URL = "https://www.dropbox.com/s/h2edle1o0jj1btt/ \
+              cplane_metadata.json?dl=1"
 
 metadata_agent_config = OrderedDict([
     ('auth_url', 'http://' + config('openstack-controller-ip') + ':5000/v2.0'),
@@ -70,6 +59,7 @@ system_config = OrderedDict([
     ('net.bridge.bridge-nf-call-ip6tables', '1'),
 ])
 
+
 def api_ready(relation, key):
     ready = 'no'
     for rid in relation_ids(relation):
@@ -81,8 +71,10 @@ def api_ready(relation, key):
 def is_neutron_api_ready():
     return api_ready('neutron-plugin-api-subordinate', 'neutron-api-ready')
 
+
 def determine_packages():
     return PACKAGES
+
 
 def disable_neutron_agent():
     cmd = ['service', 'neutron-plugin-openvswitch-agent', 'stop']
@@ -91,14 +83,17 @@ def disable_neutron_agent():
     cmd = ['update-rc.d', 'neutron-plugin-openvswitch-agent', 'disable']
     subprocess.check_call(cmd)
 
+
 def crudini_set(_file, section, key, value):
     option = '--set'
     cmd = ['crudini', option, _file, section, key, value]
     subprocess.check_call(cmd)
 
+
 def cplane_config(data, config_file, section):
     for key, value in data.items():
         crudini_set(config_file, section, key, value)
+
 
 def install_cplane_packages():
 
@@ -110,6 +105,7 @@ def install_cplane_packages():
         options = "--fix-broken"
         apt_install(options, fatal=True)
 
+
 def manage_fip():
     for rid in relation_ids('cplane-controller-ovs'):
         for unit in related_units(rid):
@@ -118,7 +114,8 @@ def manage_fip():
                 if check_interface(config('fip-interface')):
                     add_bridge('br-fip', config('fip-interface'))
                 else:
-                    juju_log('Fip interface doesnt exist, and will be used by default by Cplane controller')
+                    juju_log('Fip interface doesnt exist, and \
+                    will be used by default by Cplane controller')
 
 
 def set_cp_agent():
@@ -128,7 +125,7 @@ def set_cp_agent():
             mport = relation_get(attribute='mport', unit=unit, rid=rid)
             cplane_controller = relation_get('private-address')
             if mport:
-                key = 'mcast-port='+ mport
+                key = 'mcast-port=' + mport
                 cmd = ['cp-agentd', 'set-config', key]
                 subprocess.check_call(cmd)
                 key = 'mgmt-iface=' + config('mgmt-int')
@@ -144,7 +141,7 @@ def set_cp_agent():
                 cmd = ['cp-agentd', 'set-config', key]
                 subprocess.check_call(cmd)
                 return
-    key = 'mcast-port='+ str(config('cp-controller-mport'))
+    key = 'mcast-port=' + str(config('cp-controller-mport'))
     cmd = ['cp-agentd', 'set-config', key]
     subprocess.check_call(cmd)
     key = 'mgmt-iface=' + config('mgmt-int')
@@ -160,6 +157,7 @@ def set_cp_agent():
     cmd = ['cp-agentd', 'set-config', key]
     subprocess.check_call(cmd)
 
+
 def restart_services():
     cmd = ['service', 'neutron-metadata-agent', 'restart']
     subprocess.check_call(cmd)
@@ -172,4 +170,3 @@ def restart_services():
 
     cmd = ['update-rc.d', 'cp-agentd', 'enable']
     subprocess.check_call(cmd)
-

@@ -3,24 +3,19 @@ from test_utils import CharmTestCase, unittest
 import cplane_context
 import charmhelpers
 
-import json
-from mock import MagicMock, patch, call
-
+from mock import patch
 
 TO_PATCH = [
     'config',
     'log',
     'os_release',
-    'relation_get',
-    'relation_ids',
-    'related_units',
 ]
+
 
 class GeneralTest(CharmTestCase):
 
     def setUp(self):
         super(GeneralTest, self).setUp(cplane_context, TO_PATCH)
-        self.relation_get.side_effect = self.test_relation.get
         self.config.side_effect = self.test_config.get
 
     def tearDown(self):
@@ -29,12 +24,12 @@ class GeneralTest(CharmTestCase):
     def test_get_overlay_network_type(self):
         self.test_config.set('overlay-network-type', 'gre')
         self.assertEquals(cplane_context.get_overlay_network_type(), 'gre')
-    
+
     def test_get_l3ha(self):
         self.test_config.set('enable-l3ha', True)
         self.test_config.set('l2-population', False)
         self.os_release.return_value = 'juno'
-        self.assertEquals(cplane_context.get_l3ha(), True) 
+        self.assertEquals(cplane_context.get_l3ha(), True)
 
     def test_get_l3ha_prejuno(self):
         self.test_config.set('enable-l3ha', True)
@@ -124,11 +119,11 @@ class GeneralTest(CharmTestCase):
         self.os_release.return_value = 'juno'
         self.assertEquals(cplane_context.get_dvr(), False)
 
+
 class IdentityServiceContext(CharmTestCase):
 
     def setUp(self):
         super(IdentityServiceContext, self).setUp(cplane_context, TO_PATCH)
-        self.relation_get.side_effect = self.test_relation.get
         self.config.side_effect = self.test_config.get
         self.test_config.set('region', 'region457')
 
@@ -164,12 +159,10 @@ class IdentityServiceContext(CharmTestCase):
         self.assertEquals(ids_ctxt(), None)
 
 
-
 class NeutronCCContextTest(CharmTestCase):
 
     def setUp(self):
         super(NeutronCCContextTest, self).setUp(cplane_context, TO_PATCH)
-        self.relation_get.side_effect = self.test_relation.get
         self.config.side_effect = self.test_config.get
         self.test_config.set('neutron-plugin', 'ovs')
         self.test_config.set('neutron-security-groups', True)

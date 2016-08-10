@@ -13,6 +13,7 @@ VXLAN = 'vxlan'
 GRE = 'gre'
 OVERLAY_NET_TYPES = [VXLAN, GRE]
 
+
 def get_overlay_network_type():
     overlay_networks = config('overlay-network-type').split()
     for overlay_net in overlay_networks:
@@ -20,6 +21,7 @@ def get_overlay_network_type():
             raise ValueError('Unsupported overlay-network-type %s'
                              % overlay_net)
     return ','.join(overlay_networks)
+
 
 class CplaneMl2Context(context.OSContextGenerator):
     interfaces = ['cp_controller']
@@ -29,6 +31,7 @@ class CplaneMl2Context(context.OSContextGenerator):
         'overlay_network_type',
         'security_groups',
     ]
+
     def _cplane_context(self):
         for rid in relation_ids('cp_controller'):
             for unit in related_units(rid):
@@ -39,7 +42,8 @@ class CplaneMl2Context(context.OSContextGenerator):
                 if None not in ctxt.values():
                     return ctxt
 
-        log('Cplane controller relation data incomplete/relation not set, get data from config')
+        log('Cplane controller relation data incomplete/relation not set, \
+             get data from config')
 
         ctxt = {'controller_ip': config('cplane-controller_ip'),
                 'controller_port': config('cplane-controller_port')}
@@ -51,6 +55,5 @@ class CplaneMl2Context(context.OSContextGenerator):
             return {}
         ctxt['vlan_ranges'] = config('vlan-ranges')
         ctxt['overlay_network_type'] = get_overlay_network_type()
-        ctxt['security_groups'] = config('security-groups') 
+        ctxt['security_groups'] = config('security-groups')
         return ctxt
-

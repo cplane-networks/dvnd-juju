@@ -1,39 +1,23 @@
-import json
-import netaddr
-import os
 import subprocess
-import time
 
 from copy import deepcopy
 from collections import OrderedDict
-from charmhelpers.contrib.openstack.utils import os_release, remote_restart
+from charmhelpers.contrib.openstack.utils import os_release
 from charmhelpers.contrib.openstack import context, templating
 from charmhelpers.core.hookenv import (
     config,
-    log,
-    log as juju_log,
     relation_ids,
     relation_get,
-    relation_get,
     related_units,
-    unit_private_ip,
 )
 
-from charmhelpers.contrib.openstack.utils import (
-    git_install_requested,
-    git_clone_and_install,
-    git_pip_venv_dir,
-)
-
-from charmhelpers.fetch import (
-    apt_install,
-    apt_update,
-)
 import cplane_context
 
 TEMPLATES = 'templates/'
 
-PACKAGES = ['sysfsutils', 'neutron-metadata-agent', 'python-neutronclient', 'crudini', 'conntrack', 'neutron-plugin-ml2', 'neutron-plugin-linuxbridge-agent']
+PACKAGES = ['sysfsutils', 'neutron-metadata-agent', 'python-neutronclient',
+            'crudini', 'conntrack', 'neutron-plugin-ml2',
+            'neutron-plugin-linuxbridge-agent']
 
 METADATA_AGENT_INI = '/etc/neutron/metadata_agent.ini'
 NEUTRON_CONF_DIR = "/etc/neutron"
@@ -61,18 +45,20 @@ BASE_RESOURCE_MAP = OrderedDict([
     (METADATA_AGENT_INI, {
         'services': ['metadata-agent'],
         'contexts': [cplane_context.IdentityServiceContext(
-                         service='neutron',
-                         service_user='neutron')],
+                     service='neutron',
+                     service_user='neutron')],
     }),
 
 ])
 
 
 metadata_agent_config = OrderedDict([
-            ('auth_region', config('region')),
-            ('nova_metadata_ip', config('openstack-controller-ip')),
-            ('metadata_proxy_shared_secret', 'secret'),
-])
+                                    ('auth_region', config('region')),
+                                    ('nova_metadata_ip',
+                                     config('openstack-controller-ip')),
+                                    ('metadata_proxy_shared_secret',
+                                     'secret')])
+
 
 def api_ready(relation, key):
     ready = 'no'
@@ -85,26 +71,31 @@ def api_ready(relation, key):
 def is_neutron_api_ready():
     return api_ready('neutron-plugin-api-subordinate', 'neutron-api-ready')
 
+
 def determine_packages():
     return PACKAGES
 
 
 def crudini_set(_file, section, key, value):
     option = '--set'
-    cmd = ['crudini', option, _file, section, key, value ]
+    cmd = ['crudini', option, _file, section, key, value]
     subprocess.check_call(cmd)
+
 
 def cplane_config(data, config_file, section):
     for key, value in data.items():
-       crudini_set(config_file, section, key, value)
+        crudini_set(config_file, section, key, value)
+
 
 def restart_services():
     cmd = ['service', 'nova-compute', 'restart']
     subprocess.check_call(cmd)
 
+
 def remmove_sql_lite():
     cmd = ['rm', '-f', '/var/lib/nova/nova.sqlite']
     subprocess.check_call(cmd)
+
 
 def register_configs(release=None):
     release = release or os_release('neutron-common')
@@ -114,6 +105,7 @@ def register_configs(release=None):
         configs.register(cfg, rscs['contexts'])
     return configs
 
+
 def resource_map(release=None):
     '''
     Dynamically generate a map of resources that will be managed for a single
@@ -122,4 +114,3 @@ def resource_map(release=None):
     release = release or os_release('neutron-common')
     resource_map = deepcopy(BASE_RESOURCE_MAP)
     return resource_map
-

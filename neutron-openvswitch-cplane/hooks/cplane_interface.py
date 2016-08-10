@@ -7,6 +7,7 @@ import shutil
 
 logger = logging.getLogger(__name__)
 
+
 class UbuntuIntfMgmt(object):
     def __init__(self):
         self.iface_params = {}
@@ -43,7 +44,8 @@ class UbuntuIntfMgmt(object):
         re_empty = re.compile(r"^\s*$")
         re_iface_stz = re.compile(r"^iface.*{name}(?!\.)".format(name=ifname))
         re_new_stz = re.compile(r"^iface|^mapping|^auto|^allow|^source")
-        re_ifname = re.compile(r".*(?<!vlan-raw-device\s){name}(?!\.).*".format(name=ifname))
+        re_ifname = re.compile(r".*(?<!vlan-raw-device\s){name}(?!\.).*"
+                               .format(name=ifname))
 
         fp_read = open(src_file, "r")
         fp_bak = open(back_file, "w")
@@ -125,18 +127,23 @@ class UbuntuIntfMgmt(object):
                 fp_o.write("    gateway {gw}\n".format(gw=gw))
             fp_o.write("    cp_gateway {gw}\n".format(gw=gw))
             fp_o.write("    ovs_type OVSBridge\n")
-            fp_o.write("    ovs_ports {ports}\n".format(ports=kwargs['source_intf']))
+            fp_o.write("    ovs_ports {ports}\n"
+                       .format(ports=kwargs['source_intf']))
             for key, value in kwargs.iteritems():
-                if key != 'intf_file' and key != 'source_intf' and key != 'defroute' and key != 'inet_type':
+                if key != 'intf_file' and key != 'source_intf' and \
+                   key != 'defroute' and key != 'inet_type':
                     if key == 'gateway' and not defroute:
                         continue
                     if type(value) is list:
-                        fp_o.write("    {key} {value}\n".format(key=key, value=" ".join(value)))
+                        fp_o.write("    {key} {value}\n"
+                                   .format(key=key, value=" ".join(value)))
                     elif type(value) is str:
-                        fp_o.write("    {key} {value}\n".format(key=key, value=value))
+                        fp_o.write("    {key} {value}\n".format(key=key,
+                                                                value=value))
 
     def _write_net_config_bridged_iface_br(self, ifname, **kwargs):
-        """ write the configuration bridged interface for native juju Linux bridge
+        """ write the configuration bridged interface for native juju
+        Linux bridge
         kwargs {"defroute" : T|F",
                 "bridge_name: "bridge name",
                }
@@ -149,18 +156,20 @@ class UbuntuIntfMgmt(object):
         with open(op_file, "a+") as fp_o:
             fp_o.write("\n")
             fp_o.write("# Interface {name}\n".format(name=ifname))
-            fp_o.write("allow-{bridge_name} {name} \n".format(bridge_name=kwargs['bridge_name'],
-                                                              name=ifname))
+            fp_o.write("allow-{bridge_name} {name} \n"
+                       .format(bridge_name=kwargs['bridge_name'], name=ifname))
             fp_o.write("iface {name} inet manual\n".format(name=ifname))
             fp_o.write("    ovs_type OVSPort\n")
-            fp_o.write("    ovs_bridge {bridge}\n".format(bridge=kwargs['bridge_name']))
+            fp_o.write("    ovs_bridge {bridge}\n"
+                       .format(bridge=kwargs['bridge_name']))
             for key, value in kwargs.iteritems():
                 if key != 'inet_type' and key != 'address':
                     if type(value) is list:
-                        fp_o.write("    {key} {value}\n".format(key=key, value=" ".join(value)))
+                        fp_o.write("    {key} {value}\n"
+                                   .format(key=key, value=" ".join(value)))
                     elif type(value) is str:
-                        fp_o.write("    {key} {value}\n".format(key=key, value=value))
-
+                        fp_o.write("    {key} {value}\n"
+                                   .format(key=key, value=value))
 
     def write_net_config(self, iftype, ifname, addr, mask, gw, **kwargs):
         if iftype == "bridge":
@@ -168,13 +177,15 @@ class UbuntuIntfMgmt(object):
         elif iftype == "iface":
             self._write_net_config_iface(ifname, addr, mask, gw, **kwargs)
         elif iftype == "bridged_iface":
-            self._write_net_config_bridged_iface(ifname, addr, mask, gw, **kwargs)
+            self._write_net_config_bridged_iface(ifname, addr, mask, gw,
+                                                 **kwargs)
 
     def del_net_config(self, ifname):
         """ Delete the configuration for the specified intf. """
         self.extract_net_config(ifname, backup=False)
 
-    def _write_net_config_bridged_iface(self, ifname, addr, mask, gw, **kwargs):
+    def _write_net_config_bridged_iface(self, ifname, addr, mask, gw,
+                                        **kwargs):
         """ write the configuration bridged interface
         kwargs {"defroute" : T|F",
                 "bridge_name: "bridge name",
@@ -196,19 +207,23 @@ class UbuntuIntfMgmt(object):
         with open(op_file, "a+") as fp_o:
             fp_o.write("\n")
             fp_o.write("# Interface {name}\n".format(name=ifname))
-            fp_o.write("allow-{bridge_name} {name} \n".format(bridge_name=kwargs['bridge_name'],
-                                                              name=ifname))
+            fp_o.write("allow-{bridge_name} {name} \n"
+                       .format(bridge_name=kwargs['bridge_name'], name=ifname))
             fp_o.write("iface {name} inet manual\n".format(name=ifname))
             fp_o.write("    ovs_type OVSPort\n")
-            fp_o.write("    ovs_bridge {bridge}\n".format(bridge=kwargs['bridge_name']))
+            fp_o.write("    ovs_bridge {bridge}\n"
+                       .format(bridge=kwargs['bridge_name']))
             for key, value in kwargs.iteritems():
-                if key != 'intf_file' and key != 'source_intf' and key != 'defroute' and key != 'inet_type':
+                if key != 'intf_file' and key != 'source_intf' and \
+                   key != 'defroute' and key != 'inet_type':
                     if key == 'gateway' and not defroute:
                         continue
                     if type(value) is list:
-                        fp_o.write("    {key} {value}\n".format(key=key, value=" ".join(value)))
+                        fp_o.write("    {key} {value}\n"
+                                   .format(key=key, value=" ".join(value)))
                     elif type(value) is str:
-                        fp_o.write("    {key} {value}\n".format(key=key, value=value))
+                        fp_o.write("    {key} {value}\n"
+                                   .format(key=key, value=value))
 
     def _write_net_config_iface(self, ifname, addr, mask, gw, **kwargs):
         """ write the configuration bridged interface
@@ -233,8 +248,8 @@ class UbuntuIntfMgmt(object):
             fp_o.write("\n")
             fp_o.write("# Interface {name}\n".format(name=ifname))
             fp_o.write("auto {name} \n".format(name=ifname))
-            fp_o.write("iface {name} inet {inet_type}\n".format(name=ifname,
-                                                                inet_type=kwargs['inet_type']))
+            fp_o.write("iface {name} inet {inet_type}\n"
+                       .format(name=ifname, inet_type=kwargs['inet_type']))
             fp_o.write("    cp_gateway {gw}\n".format(gw=gw))
             if kwargs['inet_type'] == 'static':
                 fp_o.write("    address {addr}\n".format(addr=addr))
@@ -242,10 +257,13 @@ class UbuntuIntfMgmt(object):
                 if defroute is True:
                     fp_o.write("    gateway {gw}\n".format(gw=gw))
                 for key, value in kwargs.iteritems():
-                    if key != 'intf_file' and key != 'source_intf' and key != 'defroute' and key != 'inet_type':
+                    if key != 'intf_file' and key != 'source_intf' and \
+                       key != 'defroute' and key != 'inet_type':
                         if key == 'gateway' and not defroute:
                             continue
                         if type(value) is list:
-                            fp_o.write("    {key} {value}\n".format(key=key, value=" ".join(value)))
+                            fp_o.write("    {key} {value}\n"
+                                       .format(key=key, value=" ".join(value)))
                         elif type(value) is str:
-                            fp_o.write("    {key} {value}\n".format(key=key, value=value))
+                            fp_o.write("    {key} {value}\n"
+                                       .format(key=key, value=value))

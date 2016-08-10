@@ -1,19 +1,13 @@
 #!/usr/bin/env python
 
-import sys
-
-from apt_pkg import version_compare
-
 from charmhelpers.core.hookenv import (
     Hooks,
     UnregisteredHookError,
+    log as juju_log,
     config,
-    log,
-    relation_get,
     relation_set
 )
 import json
-import subprocess
 import sys
 import uuid
 
@@ -23,7 +17,6 @@ from charmhelpers.fetch import (
 )
 
 from cplane_utils import (
-    is_neutron_api_ready,
     register_configs,
     determine_packages,
     install_cplane_packages,
@@ -48,20 +41,24 @@ def config_changed():
                           ".egg-info/entry_points.txt"
     cplane_config(neutron_config, NEUTRON_ENTRY_POINT)
 
+
 @hooks.hook('cplane-controller-relation-changed')
 def cplane_controller_relation_changed():
     configs = register_configs()
     configs.write_all()
 
+
 @hooks.hook('shared-db-relation-changed')
 def share_db_relation_changed():
     migrate_db()
+
 
 @hooks.hook('amqp-relation-joined')
 def amqp_joined(relation_id=None):
     relation_set(relation_id=relation_id,
                  username=config('rabbit-user'),
                  vhost=config('rabbit-vhost'))
+
 
 @hooks.hook('neutron-plugin-api-subordinate-relation-joined')
 def neutron_api_joined(rid=None):
@@ -85,6 +82,7 @@ def neutron_api_joined(rid=None):
     }
     relation_set(relation_settings=relation_info)
 
+
 @hooks.hook('install')
 def install():
     apt_update(fatal=True)
@@ -94,7 +92,6 @@ def install():
     python_intall("bitarray")
     create_link()
     restart_service()
-
 
 
 def main():

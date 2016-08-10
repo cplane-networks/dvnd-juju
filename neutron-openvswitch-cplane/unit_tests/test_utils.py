@@ -3,11 +3,12 @@ import logging
 import unittest
 import os
 import yaml
-from mock import patch, MagicMock
+from mock import patch
+
 
 def load_config():
     '''
-    Check if the config.yaml file exists 
+    Check if the config.yaml file exists
     '''
     config = None
     f = __file__
@@ -60,6 +61,7 @@ class CharmTestCase(unittest.TestCase):
         for method in self.patches:
             setattr(self, method, self.patch(method))
 
+
 class TestConfig(object):
 
     def __init__(self):
@@ -80,6 +82,7 @@ class TestConfig(object):
             if attr not in self.config:
                 raise KeyError
             self.config[attr] = value
+
 
 class TestRelation(object):
 

@@ -1,20 +1,18 @@
 #!/usr/bin/python
 from mock import MagicMock, patch, call
-from collections import OrderedDict 
 from test_utils import CharmTestCase, unittest
-import charmhelpers.core.hookenv as hookenv
-import charmhelpers
-charmhelpers.core.hookenv.config = MagicMock()
+from charmhelpers.core import hookenv
+hookenv.config = MagicMock()
 import cplane_utils
 import charmhelpers.contrib.openstack.templating as templating
 templating.OSConfigRenderer = MagicMock()
 
 TO_PATCH = [
     'config',
-    'apt_install',
     'os_release',
 
 ]
+
 
 class CplaneUtilsTest(CharmTestCase):
 
@@ -27,13 +25,19 @@ class CplaneUtilsTest(CharmTestCase):
 
     def test_determine_packages(self):
         self.assertEqual(cplane_utils.determine_packages(),
-              ['sysfsutils', 'neutron-metadata-agent', 'python-neutronclient', 'crudini', 'conntrack', 'neutron-plugin-ml2', 'neutron-plugin-linuxbridge-agent'])
+                         ['sysfsutils', 'neutron-metadata-agent',
+                          'python-neutronclient', 'crudini', 'conntrack',
+                          'neutron-plugin-ml2',
+                          'neutron-plugin-linuxbridge-agent'])
 
-    def test_crudini_set(self):
-        call(["echo", "[DEFAULT]", ">", "/tmp/cplane.init"])
-        call(["echo", "TEST = TEST", ">>", "/tmp/cplane.init"]) 
-        cplane_utils.crudini_set('/tmp/cplane.ini', 'DEFAULT', 'TEST', 'CPLANE')
-        self.assertEqual('TEST = CPLANE' in open('/tmp/cplane.ini').read(), True)
+    @patch("subprocess.check_call")
+    def test_crudini_set(self, m_check_call):
+        cplane_utils.crudini_set('/tmp/cplane.ini', 'DEFAULT', 'TEST',
+                                 'CPLANE')
+        self.assertEqual(m_check_call.call_args,
+                         call(['crudini', '--set',
+                               '/tmp/cplane.ini',
+                               'DEFAULT', 'TEST', 'CPLANE']))
 
     def test_register_configs(self):
         class _mock_OSConfigRenderer():
@@ -48,18 +52,21 @@ class CplaneUtilsTest(CharmTestCase):
         self.os_release.return_value = 'liberty'
         templating.OSConfigRenderer.side_effect = _mock_OSConfigRenderer
         _regconfs = cplane_utils.register_configs()
-        confs = ['/etc/neutron/neutron.conf', '/etc/neutron/metadata_agent.ini']
+        confs = ['/etc/neutron/neutron.conf',
+                 '/etc/neutron/metadata_agent.ini']
         self.assertItemsEqual(_regconfs.configs, confs)
 
     @patch("subprocess.check_call")
     def test_restart_services(self, m_check_call):
         cplane_utils.restart_services()
-        self.assertEqual(m_check_call.call_args, call(['service', 'nova-compute', 'restart']))
+        self.assertEqual(m_check_call.call_args,
+                         call(['service', 'nova-compute', 'restart']))
 
     @patch("subprocess.check_call")
     def test_remmove_sql_lite(self, m_check_call):
         cplane_utils.remmove_sql_lite()
-        self.assertEqual(m_check_call.call_args, call(['rm', '-f', '/var/lib/nova/nova.sqlite']))
+        self.assertEqual(m_check_call.call_args,
+                         call(['rm', '-f', '/var/lib/nova/nova.sqlite']))
 
     def test_resource_map(self):
         self.os_release.return_value = 'liberty'
@@ -71,4 +78,3 @@ class CplaneUtilsTest(CharmTestCase):
 
 suite = unittest.TestLoader().loadTestsFromTestCase(CplaneUtilsTest)
 unittest.TextTestRunner(verbosity=2).run(suite)
-

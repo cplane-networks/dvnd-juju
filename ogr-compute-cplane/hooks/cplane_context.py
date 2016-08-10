@@ -1,14 +1,8 @@
 from charmhelpers.core.hookenv import (
     config,
-    relation_ids,
-    related_units,
-    relation_get,
     log,
 )
 from charmhelpers.contrib.openstack import context
-from charmhelpers.contrib.hahelpers.cluster import (
-    determine_api_port,
-)
 from charmhelpers.contrib.openstack.utils import (
     os_release,
 )

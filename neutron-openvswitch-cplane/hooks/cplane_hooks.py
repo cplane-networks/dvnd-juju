@@ -1,9 +1,4 @@
 #!/usr/bin/env python
-
-import sys
-
-from apt_pkg import version_compare
-
 from charmhelpers.core.hookenv import (
     Hooks,
     UnregisteredHookError,
@@ -15,7 +10,6 @@ from charmhelpers.core.hookenv import (
 import json
 import subprocess
 import sys
-import uuid
 
 from charmhelpers.fetch import (
     apt_install,
@@ -23,9 +17,7 @@ from charmhelpers.fetch import (
 )
 
 from cplane_utils import (
-    is_neutron_api_ready,
     determine_packages,
-    disable_neutron_agent,
     install_cplane_packages,
     cplane_config,
     metadata_agent_config,
@@ -44,6 +36,7 @@ from cplane_network import (
 
 hooks = Hooks()
 
+
 @hooks.hook('cplane-controller-relation-changed')
 def cplane_controller_relation_changed():
     set_cp_agent()
@@ -56,8 +49,10 @@ def cplane_neutron_relation_changed():
     controller = relation_get('private-address')
     if controller:
         metadata_agent_config.update({'nova_metadata_ip': controller})
-        metadata_agent_config.update({'auth_url': 'http://'+ controller + ':5000/v2.0'})
+        metadata_agent_config.update({'auth_url': 'http://' + controller +
+                                      ':5000/v2.0'})
         cplane_config(metadata_agent_config, METADATA_AGENT_INI, 'DEFAULT')
+
 
 @hooks.hook('neutron-plugin-relation-joined')
 def neutron_plugin_relation_joined(rid=None):
@@ -66,8 +61,8 @@ def neutron_plugin_relation_joined(rid=None):
             '/etc/nova/nova.conf': {
                 'sections': {
                     'DEFAULT': [
-                      ('allow_resize_to_same_host', 'True'),
-                      ('resize_confirm_window', '1'),
+                        ('allow_resize_to_same_host', 'True'),
+                        ('resize_confirm_window', '1'),
                     ],
                 }
             }
@@ -80,11 +75,13 @@ def neutron_plugin_relation_joined(rid=None):
     relation_set(relation_settings=relation_info)
     restart_services()
 
+
 @hooks.hook('amqp-relation-joined')
 def amqp_joined(relation_id=None):
     relation_set(relation_id=relation_id,
                  username=config('rabbit-user'),
                  vhost=config('rabbit-vhost'))
+
 
 @hooks.hook('config-changed')
 def config_changed():
@@ -92,12 +89,12 @@ def config_changed():
     restart_services()
     set_cp_agent()
     cplane_config(system_config, SYSTEM_CONF, '')
-    cmd = ['sysctl', '-p' ]
+    cmd = ['sysctl', '-p']
     subprocess.check_call(cmd)
     restart_services()
 
-@hooks.hook('upgrade-charm')
 
+@hooks.hook('upgrade-charm')
 @hooks.hook('install')
 def install():
     apt_update(fatal=True)
@@ -109,7 +106,8 @@ def install():
     if check_interface(config('tun-interface')):
         add_bridge('br-tun', config('tun-interface'))
     else:
-        juju_log('Tunnel interface doesnt exist, and will be used by default by Cplane controller')
+        juju_log('Tunnel interface doesnt exist, and will be \
+                 used by default by Cplane controller')
 
 
 def main():
