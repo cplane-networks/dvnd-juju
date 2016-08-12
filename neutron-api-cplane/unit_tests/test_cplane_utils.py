@@ -52,18 +52,20 @@ class CplaneUtilsTest(CharmTestCase):
                                '/tmp/cplane.ini',
                                'DEFAULT', 'TEST', 'CPLANE']))
 
-# The actual file doesnt exist, so it should fail and is considered as
-# negetive test
-    def test_create_link(self):
-        self.assertRaises(cplane_utils.subprocess.CalledProcessError,
-                          lambda: list(cplane_utils.create_link()))
+    @patch("subprocess.check_call")
+    def test_create_link(self, m_check_call):
+        cplane_utils.create_link()
+        calls = [call(['rm', '-f', '/etc/neutron/plugin.ini']),
+                 call(['ln', '-s', '/etc/neutron/plugins/ml2/ml2_conf.ini',
+                       '/etc/neutron/plugin.ini'])]
+        m_check_call.assert_has_calls(calls)
 
-# The actual process doesnt exist, so it should fail and is considered as
-# negetive test
-# This test may ask for the password as there is a service restart command
-    def test_restart_service(self):
-        self.assertRaises(cplane_utils.subprocess.CalledProcessError,
-                          lambda: list(cplane_utils.restart_service()))
+    @patch("subprocess.check_call")
+    def test_restart_service(self, m_check_call):
+        cplane_utils.restart_service()
+        m_check_call.assert_called_with(['service',
+                                         'neutron-server',
+                                         'restart'])
 
 suite = unittest.TestLoader().loadTestsFromTestCase(CplaneUtilsTest)
 unittest.TextTestRunner(verbosity=2).run(suite)
