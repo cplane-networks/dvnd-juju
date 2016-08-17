@@ -26,19 +26,19 @@ CHARM_LIB_DIR = os.environ.get('CHARM_DIR', '') + "/lib/"
 ML2_CONFIG = '/etc/neutron/plugins/ml2/ml2_conf.ini'
 
 neutron_config = {"neutron.ml2.mechanism_drivers":
-                  {"cplane_mech": "neutron.plugins.ml2.drivers. \
-                     cplane.mechanism_cplane:CPlaneMechanism"},
+                  {"cplane_mech": ("neutron.plugins.ml2.drivers."
+                                   "cplane.mechanism_cplane:CPlaneMechanism")},
                   "neutron.service_plugins":
-                  {"cplane_l3": "neutron.services.l3_router.cplane. \
-                     l3_router_plugin:CPlaneServicePlugin"},
+                  {"cplane_l3": ("neutron.services.l3_router.cplane."
+                                 "l3_router_plugin:CPlaneServicePlugin")},
                   "neutron.core_plugins":
-                  {"cplane_core_plugin": "neutron.plugins.cplane. \
-                     cplane_plugin:CPlaneNeutronPlugin",
-                   "cplane_ml2": "neutron.plugins.ml2.cplane. \
-                     cplane_ml2_plugin:CPlaneML2Plugin"},
+                  {"cplane_core_plugin": ("neutron.plugins.cplane."
+                                          "cplane_plugin:CPlaneNeutronPlugin"),
+                   "cplane_ml2": ("neutron.plugins.ml2.cplane."
+                                  "cplane_ml2_plugin:CPlaneML2Plugin")},
                   "neutron.ml2.extension_drivers":
-                  {"cplane_qos": "neutron.plugins.ml2.extensions. \
-                     cplane_qos:CpQosExtensionDriver"}}
+                  {"cplane_qos": ("neutron.plugins.ml2.extensions."
+                                  "cplane_qos:CpQosExtensionDriver")}}
 
 cplane_packages = OrderedDict([('python-cplane-neutron-plugin', 439),
                                ('neutronclient', 0)])
@@ -46,8 +46,8 @@ cplane_packages = OrderedDict([('python-cplane-neutron-plugin', 439),
 
 PACKAGES = ['neutron-plugin-ml2', 'crudini', 'python-dev']
 
-CPLANE_URL = "https://www.dropbox.com/s/h2edle1o0jj1btt/ \
-              cplane_metadata.json?dl=1"
+CPLANE_URL = ("https://www.dropbox.com/s/h2edle1o0jj1btt/"
+              "cplane_metadata.json?dl=1")
 
 
 def determine_packages():
