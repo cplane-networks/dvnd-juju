@@ -37,8 +37,7 @@ PACKAGES = ['neutron-metadata-agent', 'neutron-plugin-ml2', 'crudini',
 
 METADATA_AGENT_INI = '/etc/neutron/metadata_agent.ini'
 
-CPLANE_URL = ("https://www.dropbox.com/s/h2edle1o0jj1btt/"
-              "cplane_metadata.json?dl=1")
+CPLANE_URL = config('cp-package-url')
 
 metadata_agent_config = OrderedDict([
     ('auth_url', 'http://' + config('openstack-controller-ip') + ':5000/v2.0'),

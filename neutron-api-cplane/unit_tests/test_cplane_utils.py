@@ -1,9 +1,11 @@
 #!/usr/bin/python
 from test_utils import CharmTestCase, unittest
-import cplane_utils
 
 from mock import MagicMock, call, patch
 import charmhelpers.contrib.openstack.templating as templating
+from charmhelpers.core import hookenv
+hookenv.config = MagicMock()
+import cplane_utils
 
 templating.OSConfigRenderer = MagicMock()
 
@@ -11,6 +13,7 @@ templating.OSConfigRenderer = MagicMock()
 TO_PATCH = [
     'apt_install',
     'os_release',
+    'config'
 ]
 
 

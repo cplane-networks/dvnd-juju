@@ -41,4 +41,10 @@ options:
     default: True 
     type: boolean
     description: Enable cplane  managed security groups.
+  cp-package-url:
+    default: "https://www.dropbox.com/s/h2edle1o0jj1btt/cplane_metadata.json?dl=1"
+    type: string
+    description: |
+      URL for cplane packages
+      if from local repo then "http://xx.xx.xx.xx/cplane_metadata.json" 
 

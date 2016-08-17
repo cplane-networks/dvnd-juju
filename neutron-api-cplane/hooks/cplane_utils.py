@@ -5,6 +5,7 @@ from collections import OrderedDict
 from charmhelpers.contrib.openstack.utils import os_release
 from charmhelpers.contrib.openstack import templating
 from charmhelpers.core.hookenv import (
+    config,
     relation_ids,
     relation_get,
     related_units,
@@ -46,8 +47,7 @@ cplane_packages = OrderedDict([('python-cplane-neutron-plugin', 439),
 
 PACKAGES = ['neutron-plugin-ml2', 'crudini', 'python-dev']
 
-CPLANE_URL = ("https://www.dropbox.com/s/h2edle1o0jj1btt/"
-              "cplane_metadata.json?dl=1")
+CPLANE_URL = config('cp-package-url')
 
 
 def determine_packages():
