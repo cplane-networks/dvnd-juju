@@ -6,6 +6,10 @@ import json
 import hashlib
 import urlparse
 
+from charmhelpers.core.host import (
+    mkdir,
+)
+
 CHARM_LIB_DIR = os.environ.get('CHARM_DIR', '') + "/lib/"
 
 
@@ -70,6 +74,7 @@ class CPlanePackageManager:
                           % (version, package_name))
             return
 
+        mkdir(CHARM_LIB_DIR)
         filename = urlparse.urlsplit(package_dwnld_link).path
         dwnld_package_name = os.path.join(CHARM_LIB_DIR,
                                           os.path.basename(filename))
