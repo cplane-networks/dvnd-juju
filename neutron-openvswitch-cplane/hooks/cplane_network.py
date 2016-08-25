@@ -4,9 +4,17 @@ import netifaces as ni
 import subprocess
 from cplane_interface import UbuntuIntfMgmt
 
+from charmhelpers.core.hookenv import (
+    status_set,
+)
+
+
+class InterfaceConfigurationException(Exception):
+    pass
+
 
 def create_br_ext(interface):
-    data = ni.ifaddresses(interface)[AF_INET]
+    data = get_int_config(interface)
     netmask = data[0]['netmask']
     addr = data[0]['addr']
     gateway = ni.gateways()
@@ -25,7 +33,7 @@ def create_br_ext(interface):
 
 
 def delete_br_ext(interface):
-    data = ni.ifaddresses('br-ext')[AF_INET]
+    data = get_int_config('br-ext')
     netmask = data[0]['netmask']
     addr = data[0]['addr']
     gateway = ni.gateways()
@@ -48,7 +56,7 @@ def add_bridge(name, interface):
 
     if check_interface(name):
         return
-    data = ni.ifaddresses(interface)[AF_INET]
+    data = get_int_config(interface)
     netmask = data[0]['netmask']
     addr = data[0]['addr']
     gateway = ni.gateways()
@@ -84,3 +92,20 @@ def check_interface(interface):
         return True
     else:
         return False
+
+
+def get_int_config(interface, af=AF_INET):
+    interface_list = ni.interfaces()
+    if interface in interface_list:
+        data = ni.ifaddresses(interface).get(AF_INET)
+        if data:
+            return data
+        else:
+            msg = ("Interface {} does not have an address in the address "
+                   "family {}".format(interface, af))
+            status_set("blocked", msg)
+            raise InterfaceConfigurationException(msg)
+    else:
+        msg = "Interface {} does not exist.".format(interface)
+        status_set("blocked", msg)
+        raise InterfaceConfigurationException(msg)
