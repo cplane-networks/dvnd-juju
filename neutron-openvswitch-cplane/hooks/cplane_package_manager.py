@@ -6,7 +6,19 @@ import json
 import hashlib
 import urlparse
 
+from charmhelpers.core.host import (
+    mkdir,
+)
+
+from charmhelpers.core.hookenv import (
+    status_set,
+)
+
 CHARM_LIB_DIR = os.environ.get('CHARM_DIR', '') + "/lib/"
+
+
+class JsonException(Exception):
+    pass
 
 
 class CPlanePackageManager:
@@ -26,11 +38,19 @@ class CPlanePackageManager:
                             datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO)
         logging.info("Writing to log file : %s" % log_file)
 
+    def _validate_json(self, data):
+        try:
+            return json.loads(data)
+        except ValueError as e:
+            msg = "JSON Error: {}".format(e.message)
+            status_set('blocked', msg)
+            raise JsonException(msg)
+
     def _get_pkg_json(self):
         url = self.package_url
         response = urllib.urlopen(url)
         logging.info("Package url:%s" % url)
-        data = json.loads(response.read())
+        data = self._validate_json(response.read())
         self.package_data = data.get("1.3.5",
                                      {}).get("ubuntu",
                                              {}).get("14.04",
@@ -70,6 +90,7 @@ class CPlanePackageManager:
                           % (version, package_name))
             return
 
+        mkdir(CHARM_LIB_DIR)
         filename = urlparse.urlsplit(package_dwnld_link).path
         dwnld_package_name = os.path.join(CHARM_LIB_DIR,
                                           os.path.basename(filename))
