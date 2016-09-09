@@ -5,7 +5,7 @@ from charmhelpers.core.hookenv import (
     config,
     log as juju_log,
     relation_get,
-    relation_set
+    relation_set,
 )
 import json
 import subprocess
@@ -27,6 +27,9 @@ from cplane_utils import (
     restart_services,
     system_config,
     SYSTEM_CONF,
+    get_shared_secret,
+    NEUTRON_CONF,
+    neutron_config,
 )
 
 from cplane_network import (
@@ -46,12 +49,27 @@ def cplane_controller_relation_changed():
 
 @hooks.hook('cplane-neutron-relation-changed')
 def cplane_neutron_relation_changed():
-    controller = relation_get('private-address')
-    if controller:
-        metadata_agent_config.update({'nova_metadata_ip': controller})
-        metadata_agent_config.update({'auth_url': 'http://' + controller +
-                                      ':5000/v2.0'})
-        cplane_config(metadata_agent_config, METADATA_AGENT_INI, 'DEFAULT')
+    pass
+
+
+@hooks.hook('neutron-plugin-api-relation-changed')
+def neutron_plugin_api_changed():
+    if not relation_get('neutron-api-ready'):
+        juju_log('Relationship with neutron-api not yet complete')
+        return
+    metadata_agent_config.update({'auth_url': relation_get('auth_protocol') +
+                                  '://' + relation_get('auth_host') + ':' +
+                                  relation_get('service_port') + '/v2.0'})
+    metadata_agent_config.update({'metadata_proxy_shared_secret':
+                                  get_shared_secret()})
+    metadata_agent_config.update({'admin_user':
+                                  relation_get('service_username')})
+    metadata_agent_config.update({'admin_password':
+                                  relation_get('service_password')})
+    metadata_agent_config.update({'admin_tenant_name':
+                                  relation_get('service_tenant')})
+    cplane_config(metadata_agent_config, METADATA_AGENT_INI, 'DEFAULT')
+    restart_services()
 
 
 @hooks.hook('neutron-plugin-relation-joined')
@@ -71,6 +89,7 @@ def neutron_plugin_relation_joined(rid=None):
     relation_info = {
         'neutron-plugin': 'cplane',
         'subordinate_configuration': json.dumps(principle_config),
+        'metadata-shared-secret': get_shared_secret(),
     }
     relation_set(relation_settings=relation_info)
     restart_services()
@@ -81,6 +100,15 @@ def amqp_joined(relation_id=None):
     relation_set(relation_id=relation_id,
                  username=config('rabbit-user'),
                  vhost=config('rabbit-vhost'))
+
+
+@hooks.hook('amqp-relation-changed')
+def amqp_changed(relation_id=None):
+    if relation_get('password'):
+        neutron_config.update({'rabbit_password': relation_get('password')})
+        neutron_config.update({'rabbit_host': relation_get('hostname')})
+        cplane_config(neutron_config, NEUTRON_CONF, 'oslo_messaging_rabbit')
+        restart_services()
 
 
 @hooks.hook('config-changed')

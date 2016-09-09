@@ -1,4 +1,6 @@
 import subprocess
+import os
+import uuid
 
 from collections import OrderedDict
 from charmhelpers.core.hookenv import (
@@ -31,6 +33,14 @@ cplane_packages = OrderedDict([
     ('cp-agentd', 396),
 ])
 
+neutron_config = {
+    'rabbit_userid': config('rabbit-user'),
+    'rabbit_virtual_host': config('rabbit-vhost'),
+    'rabbit_password': 'password',
+    'rabbit_host': 'localhost',
+}
+
+NEUTRON_CONF = '/etc/neutron/neutron.conf'
 
 PACKAGES = ['neutron-metadata-agent', 'neutron-plugin-ml2', 'crudini',
             'dkms', 'iputils-arping', 'dnsmasq']
@@ -45,7 +55,6 @@ metadata_agent_config = OrderedDict([
     ('admin_tenant_name', 'service'),
     ('admin_user', config('admin-user')),
     ('admin_password', config('admin-password')),
-    ('nova_metadata_ip', config('openstack-controller-ip')),
     ('metadata_proxy_shared_secret', 'secret'),
 ])
 
@@ -57,6 +66,8 @@ system_config = OrderedDict([
     ('net.bridge.bridge-nf-call-iptables', '1'),
     ('net.bridge.bridge-nf-call-ip6tables', '1'),
 ])
+
+SHARED_SECRET = "/var/lib/juju/metadata-secret"
 
 
 def api_ready(relation, key):
@@ -169,3 +180,15 @@ def restart_services():
 
     cmd = ['update-rc.d', 'cp-agentd', 'enable']
     subprocess.check_call(cmd)
+
+
+def get_shared_secret():
+    secret = None
+    if not os.path.exists(SHARED_SECRET):
+        secret = str(uuid.uuid4())
+        with open(SHARED_SECRET, 'w') as secret_file:
+            secret_file.write(secret)
+    else:
+        with open(SHARED_SECRET, 'r') as secret_file:
+            secret = secret_file.read().strip()
+    return secret

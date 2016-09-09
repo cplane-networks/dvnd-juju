@@ -75,10 +75,10 @@ relations:
   - rabbitmq-server:amqp
 - - neutron-openvswitch-cplane:neutron-plugin
   - nova-compute:neutron-plugin
+- - neutron-openvswitch-cplane:neutron-plugin-api
+  - nova-compute:neutron-plugin-api
 - - neutron-openvswitch-cplane:amqp
   - rabbitmq-server:amqp
-- - neutron-openvswitch-cplane:cplane-neutron
-  - neutron-api-cplane:cplane-neutron
 - - neutron-api-cplane:shared-db
   - mysql:shared-db
 
