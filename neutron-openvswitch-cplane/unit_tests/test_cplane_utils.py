@@ -106,6 +106,12 @@ class CplaneUtilsTest(CharmTestCase):
         self.assertEqual(m_check_call.call_args, call(['update-rc.d',
                                                        'cp-agentd', 'enable']))
 
+    @patch("subprocess.check_call")
+    def test_restart_metadata_agent(self, m_check_call):
+        cplane_utils.restart_metadata_agent()
+        self.assertEqual(m_check_call.call_args,
+                         call(['service', 'neutron-metadata-agent',
+                               'restart']))
 
 suite = unittest.TestLoader().loadTestsFromTestCase(CplaneUtilsTest)
 unittest.TextTestRunner(verbosity=2).run(suite)

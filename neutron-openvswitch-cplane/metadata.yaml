@@ -8,6 +8,10 @@ description: |
 tags:
   - openstack
   - networking
+extra-bindings:
+  public:
+  admin:
+  internal:
 subordinate: true
 provides:
   neutron-plugin:
@@ -17,9 +21,9 @@ requires:
   container:
     interface: juju-info
     scope: container
-  cplane-neutron:
-    interface: cplane-neutron
   cplane-controller:
     interface: cplane-controller
   amqp:
     interface: rabbitmq
+  identity-service:
+    interface: keystone

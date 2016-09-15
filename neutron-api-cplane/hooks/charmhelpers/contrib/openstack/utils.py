@@ -1,18 +1,16 @@
 # Copyright 2014-2015 Canonical Limited.
 #
-# This file is part of charm-helpers.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# charm-helpers is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Lesser General Public License version 3 as
-# published by the Free Software Foundation.
+#  http://www.apache.org/licenses/LICENSE-2.0
 #
-# charm-helpers is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 # Common python helper functions used for OpenStack charms.
 from collections import OrderedDict
@@ -25,6 +23,7 @@ import sys
 import re
 import itertools
 import functools
+import shutil
 
 import six
 import tempfile
@@ -46,9 +45,11 @@ from charmhelpers.core.hookenv import (
     charm_dir,
     DEBUG,
     INFO,
+    ERROR,
     related_units,
     relation_ids,
     relation_set,
+    service_name,
     status_set,
     hook_name
 )
@@ -82,6 +83,7 @@ from charmhelpers.core.host import (
 from charmhelpers.fetch import apt_install, apt_cache, install_remote
 from charmhelpers.contrib.storage.linux.utils import is_block_device, zap_disk
 from charmhelpers.contrib.storage.linux.loopback import ensure_loopback_device
+from charmhelpers.contrib.openstack.exceptions import OSContextError
 
 CLOUD_ARCHIVE_URL = "http://ubuntu-cloud.archive.canonical.com/ubuntu"
 CLOUD_ARCHIVE_KEY_ID = '5EDB1B62EC4926EA'
@@ -100,6 +102,8 @@ UBUNTU_OPENSTACK_RELEASE = OrderedDict([
     ('vivid', 'kilo'),
     ('wily', 'liberty'),
     ('xenial', 'mitaka'),
+    ('yakkety', 'newton'),
+    ('zebra', 'ocata'),  # TODO: upload with real Z name
 ])
 
 
@@ -114,6 +118,8 @@ OPENSTACK_CODENAMES = OrderedDict([
     ('2015.1', 'kilo'),
     ('2015.2', 'liberty'),
     ('2016.1', 'mitaka'),
+    ('2016.2', 'newton'),
+    ('2017.1', 'ocata'),
 ])
 
 # The ugly duckling - must list releases oldest to newest
@@ -138,47 +144,86 @@ SWIFT_CODENAMES = OrderedDict([
         ['2.3.0', '2.4.0', '2.5.0']),
     ('mitaka',
         ['2.5.0', '2.6.0', '2.7.0']),
+    ('newton',
+        ['2.8.0', '2.9.0']),
 ])
 
 # >= Liberty version->codename mapping
 PACKAGE_CODENAMES = {
     'nova-common': OrderedDict([
-        ('12.0', 'liberty'),
-        ('13.0', 'mitaka'),
+        ('12', 'liberty'),
+        ('13', 'mitaka'),
+        ('14', 'newton'),
+        ('15', 'ocata'),
     ]),
     'neutron-common': OrderedDict([
-        ('7.0', 'liberty'),
-        ('8.0', 'mitaka'),
+        ('7', 'liberty'),
+        ('8', 'mitaka'),
+        ('9', 'newton'),
+        ('10', 'ocata'),
     ]),
     'cinder-common': OrderedDict([
-        ('7.0', 'liberty'),
-        ('8.0', 'mitaka'),
+        ('7', 'liberty'),
+        ('8', 'mitaka'),
+        ('9', 'newton'),
+        ('10', 'ocata'),
     ]),
     'keystone': OrderedDict([
-        ('8.0', 'liberty'),
-        ('8.1', 'liberty'),
-        ('9.0', 'mitaka'),
+        ('8', 'liberty'),
+        ('9', 'mitaka'),
+        ('10', 'newton'),
+        ('11', 'ocata'),
     ]),
     'horizon-common': OrderedDict([
-        ('8.0', 'liberty'),
-        ('9.0', 'mitaka'),
+        ('8', 'liberty'),
+        ('9', 'mitaka'),
+        ('10', 'newton'),
+        ('11', 'ocata'),
     ]),
     'ceilometer-common': OrderedDict([
-        ('5.0', 'liberty'),
-        ('6.0', 'mitaka'),
+        ('5', 'liberty'),
+        ('6', 'mitaka'),
+        ('7', 'newton'),
+        ('8', 'ocata'),
     ]),
     'heat-common': OrderedDict([
-        ('5.0', 'liberty'),
-        ('6.0', 'mitaka'),
+        ('5', 'liberty'),
+        ('6', 'mitaka'),
+        ('7', 'newton'),
+        ('8', 'ocata'),
     ]),
     'glance-common': OrderedDict([
-        ('11.0', 'liberty'),
-        ('12.0', 'mitaka'),
+        ('11', 'liberty'),
+        ('12', 'mitaka'),
+        ('13', 'newton'),
+        ('14', 'ocata'),
     ]),
     'openstack-dashboard': OrderedDict([
-        ('8.0', 'liberty'),
-        ('9.0', 'mitaka'),
+        ('8', 'liberty'),
+        ('9', 'mitaka'),
+        ('10', 'newton'),
+        ('11', 'ocata'),
     ]),
+}
+
+GIT_DEFAULT_REPOS = {
+    'requirements': 'git://github.com/openstack/requirements',
+    'cinder': 'git://github.com/openstack/cinder',
+    'glance': 'git://github.com/openstack/glance',
+    'horizon': 'git://github.com/openstack/horizon',
+    'keystone': 'git://github.com/openstack/keystone',
+    'networking-hyperv': 'git://github.com/openstack/networking-hyperv',
+    'neutron': 'git://github.com/openstack/neutron',
+    'neutron-fwaas': 'git://github.com/openstack/neutron-fwaas',
+    'neutron-lbaas': 'git://github.com/openstack/neutron-lbaas',
+    'neutron-vpnaas': 'git://github.com/openstack/neutron-vpnaas',
+    'nova': 'git://github.com/openstack/nova',
+}
+
+GIT_DEFAULT_BRANCHES = {
+    'liberty': 'stable/liberty',
+    'mitaka': 'stable/mitaka',
+    'master': 'master',
 }
 
 DEFAULT_LOOPBACK_SIZE = '5G'
@@ -253,6 +298,7 @@ def get_os_version_codename_swift(codename):
 def get_swift_codename(version):
     '''Determine OpenStack codename that corresponds to swift version.'''
     codenames = [k for k, v in six.iteritems(SWIFT_CODENAMES) if version in v]
+
     if len(codenames) > 1:
         # If more than one release codename contains this version we determine
         # the actual codename based on the highest available install source.
@@ -264,6 +310,16 @@ def get_swift_codename(version):
                 return codename
     elif len(codenames) == 1:
         return codenames[0]
+
+    # NOTE: fallback - attempt to match with just major.minor version
+    match = re.match('^(\d+)\.(\d+)', version)
+    if match:
+        major_minor_version = match.group(0)
+        for codename, versions in six.iteritems(SWIFT_CODENAMES):
+            for release_version in versions:
+                if release_version.startswith(major_minor_version):
+                    return codename
+
     return None
 
 
@@ -302,10 +358,13 @@ def get_os_codename_package(package, fatal=True):
     if match:
         vers = match.group(0)
 
+    # Generate a major version number for newer semantic
+    # versions of openstack projects
+    major_vers = vers.split('.')[0]
     # >= Liberty independent project versions
     if (package in PACKAGE_CODENAMES and
-            vers in PACKAGE_CODENAMES[package]):
-        return PACKAGE_CODENAMES[package][vers]
+            major_vers in PACKAGE_CODENAMES[package]):
+        return PACKAGE_CODENAMES[package][major_vers]
     else:
         # < Liberty co-ordinated project versions
         try:
@@ -354,7 +413,8 @@ def os_release(package, base='essex'):
     global os_rel
     if os_rel:
         return os_rel
-    os_rel = (get_os_codename_package(package, fatal=False) or
+    os_rel = (git_os_codename_install_source(config('openstack-origin-git')) or
+              get_os_codename_package(package, fatal=False) or
               get_os_codename_install_source(config('openstack-origin')) or
               base)
     return os_rel
@@ -465,6 +525,9 @@ def configure_installation_source(rel):
             'mitaka': 'trusty-updates/mitaka',
             'mitaka/updates': 'trusty-updates/mitaka',
             'mitaka/proposed': 'trusty-proposed/mitaka',
+            'newton': 'xenial-updates/newton',
+            'newton/updates': 'xenial-updates/newton',
+            'newton/proposed': 'xenial-proposed/newton',
         }
 
         try:
@@ -657,7 +720,86 @@ def git_install_requested():
     return config('openstack-origin-git') is not None
 
 
-requirements_dir = None
+def git_os_codename_install_source(projects_yaml):
+    """
+    Returns OpenStack codename of release being installed from source.
+    """
+    if git_install_requested():
+        projects = _git_yaml_load(projects_yaml)
+
+        if projects in GIT_DEFAULT_BRANCHES.keys():
+            if projects == 'master':
+                return 'newton'
+            return projects
+
+        if 'release' in projects:
+            if projects['release'] == 'master':
+                return 'newton'
+            return projects['release']
+
+    return None
+
+
+def git_default_repos(projects_yaml):
+    """
+    Returns default repos if a default openstack-origin-git value is specified.
+    """
+    service = service_name()
+    core_project = service
+
+    for default, branch in GIT_DEFAULT_BRANCHES.iteritems():
+        if projects_yaml == default:
+
+            # add the requirements repo first
+            repo = {
+                'name': 'requirements',
+                'repository': GIT_DEFAULT_REPOS['requirements'],
+                'branch': branch,
+            }
+            repos = [repo]
+
+            # neutron-* and nova-* charms require some additional repos
+            if service in ['neutron-api', 'neutron-gateway',
+                           'neutron-openvswitch']:
+                core_project = 'neutron'
+                if service == 'neutron-api':
+                    repo = {
+                        'name': 'networking-hyperv',
+                        'repository': GIT_DEFAULT_REPOS['networking-hyperv'],
+                        'branch': branch,
+                    }
+                    repos.append(repo)
+                for project in ['neutron-fwaas', 'neutron-lbaas',
+                                'neutron-vpnaas', 'nova']:
+                    repo = {
+                        'name': project,
+                        'repository': GIT_DEFAULT_REPOS[project],
+                        'branch': branch,
+                    }
+                    repos.append(repo)
+
+            elif service in ['nova-cloud-controller', 'nova-compute']:
+                core_project = 'nova'
+                repo = {
+                    'name': 'neutron',
+                    'repository': GIT_DEFAULT_REPOS['neutron'],
+                    'branch': branch,
+                }
+                repos.append(repo)
+            elif service == 'openstack-dashboard':
+                core_project = 'horizon'
+
+            # finally add the current service's core project repo
+            repo = {
+                'name': core_project,
+                'repository': GIT_DEFAULT_REPOS[core_project],
+                'branch': branch,
+            }
+            repos.append(repo)
+
+            return yaml.dump(dict(repositories=repos, release=default))
+
+    return projects_yaml
 
 
 def _git_yaml_load(projects_yaml):
@@ -668,6 +810,9 @@ def _git_yaml_load(projects_yaml):
         return None
 
     return yaml.load(projects_yaml)
+
+
+requirements_dir = None
 
 
 def git_clone_and_install(projects_yaml, core_project):
@@ -717,6 +862,7 @@ def git_clone_and_install(projects_yaml, core_project):
         pip_install(p, upgrade=True, proxy=http_proxy,
                     venv=os.path.join(parent_dir, 'venv'))
 
+    constraints = None
     for p in projects['repositories']:
         repo = p['repository']
         branch = p['branch']
@@ -728,10 +874,19 @@ def git_clone_and_install(projects_yaml, core_project):
                                                      parent_dir, http_proxy,
                                                      update_requirements=False)
             requirements_dir = repo_dir
+            constraints = os.path.join(repo_dir, "upper-constraints.txt")
+            # upper-constraints didn't exist until after icehouse
+            if not os.path.isfile(constraints):
+                constraints = None
+            # use constraints unless project yaml sets use_constraints to false
+            if 'use_constraints' in projects.keys():
+                if not projects['use_constraints']:
+                    constraints = None
         else:
             repo_dir = _git_clone_and_install_single(repo, branch, depth,
                                                      parent_dir, http_proxy,
-                                                     update_requirements=True)
+                                                     update_requirements=True,
+                                                     constraints=constraints)
 
     os.environ = old_environ
 
@@ -753,6 +908,8 @@ def _git_validate_projects_yaml(projects, core_project):
     if projects['repositories'][-1]['name'] != core_project:
         error_out('{} git repo must be specified last'.format(core_project))
 
+    _git_ensure_key_exists('release', projects)
+
 
 def _git_ensure_key_exists(key, keys):
     """
@@ -763,7 +920,7 @@ def _git_ensure_key_exists(key, keys):
 
 
 def _git_clone_and_install_single(repo, branch, depth, parent_dir, http_proxy,
-                                  update_requirements):
+                                  update_requirements, constraints=None):
     """
     Clone and install a single git repository.
     """
@@ -786,9 +943,10 @@ def _git_clone_and_install_single(repo, branch, depth, parent_dir, http_proxy,
 
     juju_log('Installing git repo from dir: {}'.format(repo_dir))
     if http_proxy:
-        pip_install(repo_dir, proxy=http_proxy, venv=venv)
+        pip_install(repo_dir, proxy=http_proxy, venv=venv,
+                    constraints=constraints)
     else:
-        pip_install(repo_dir, venv=venv)
+        pip_install(repo_dir, venv=venv, constraints=constraints)
 
     return repo_dir
 
@@ -855,6 +1013,85 @@ def git_yaml_value(projects_yaml, key):
         return projects[key]
 
     return None
+
+
+def git_generate_systemd_init_files(templates_dir):
+    """
+    Generate systemd init files.
+
+    Generates and installs systemd init units and script files based on the
+    *.init.in files contained in the templates_dir directory.
+
+    This code is based on the openstack-pkg-tools package and its init
+    script generation, which is used by the OpenStack packages.
+    """
+    for f in os.listdir(templates_dir):
+        # Create the init script and systemd unit file from the template
+        if f.endswith(".init.in"):
+            init_in_file = f
+            init_file = f[:-8]
+            service_file = "{}.service".format(init_file)
+
+            init_in_source = os.path.join(templates_dir, init_in_file)
+            init_source = os.path.join(templates_dir, init_file)
+            service_source = os.path.join(templates_dir, service_file)
+
+            init_dest = os.path.join('/etc/init.d', init_file)
+            service_dest = os.path.join('/lib/systemd/system', service_file)
+
+            shutil.copyfile(init_in_source, init_source)
+            with open(init_source, 'a') as outfile:
+                template = '/usr/share/openstack-pkg-tools/init-script-template'
+                with open(template) as infile:
+                    outfile.write('\n\n{}'.format(infile.read()))
+
+            cmd = ['pkgos-gen-systemd-unit', init_in_source]
+            subprocess.check_call(cmd)
+
+            if os.path.exists(init_dest):
+                os.remove(init_dest)
+            if os.path.exists(service_dest):
+                os.remove(service_dest)
+            shutil.copyfile(init_source, init_dest)
+            shutil.copyfile(service_source, service_dest)
+            os.chmod(init_dest, 0o755)
+
+    for f in os.listdir(templates_dir):
+        # If there's a service.in file, use it instead of the generated one
+        if f.endswith(".service.in"):
+            service_in_file = f
+            service_file = f[:-3]
+
+            service_in_source = os.path.join(templates_dir, service_in_file)
+            service_source = os.path.join(templates_dir, service_file)
+            service_dest = os.path.join('/lib/systemd/system', service_file)
+
+            shutil.copyfile(service_in_source, service_source)
+
+            if os.path.exists(service_dest):
+                os.remove(service_dest)
+            shutil.copyfile(service_source, service_dest)
+
+    for f in os.listdir(templates_dir):
+        # Generate the systemd unit if there's no existing .service.in
+        if f.endswith(".init.in"):
+            init_in_file = f
+            init_file = f[:-8]
+            service_in_file = "{}.service.in".format(init_file)
+            service_file = "{}.service".format(init_file)
+
+            init_in_source = os.path.join(templates_dir, init_in_file)
+            service_in_source = os.path.join(templates_dir, service_in_file)
+            service_source = os.path.join(templates_dir, service_file)
+            service_dest = os.path.join('/lib/systemd/system', service_file)
+
+            if not os.path.exists(service_in_source):
+                cmd = ['pkgos-gen-systemd-unit', init_in_source]
+                subprocess.check_call(cmd)
+
+                if os.path.exists(service_dest):
+                    os.remove(service_dest)
+                shutil.copyfile(service_source, service_dest)
 
 
 def os_workload_status(configs, required_interfaces, charm_func=None):
@@ -1573,3 +1810,82 @@ def pausable_restart_on_change(restart_map, stopstart=False,
                 restart_functions)
         return wrapped_f
     return wrap
+
+
+def config_flags_parser(config_flags):
+    """Parses config flags string into dict.
+
+    This parsing method supports a few different formats for the config
+    flag values to be parsed:
+
+      1. A string in the simple format of key=value pairs, with the possibility
+         of specifying multiple key value pairs within the same string. For
+         example, a string in the format of 'key1=value1, key2=value2' will
+         return a dict of:
+
+             {'key1': 'value1',
+              'key2': 'value2'}.
+
+      2. A string in the above format, but supporting a comma-delimited list
+         of values for the same key. For example, a string in the format of
+         'key1=value1, key2=value3,value4,value5' will return a dict of:
+
+             {'key1', 'value1',
+              'key2', 'value2,value3,value4'}
+
+      3. A string containing a colon character (:) prior to an equal
+         character (=) will be treated as yaml and parsed as such. This can be
+         used to specify more complex key value pairs. For example,
+         a string in the format of 'key1: subkey1=value1, subkey2=value2' will
+         return a dict of:
+
+             {'key1', 'subkey1=value1, subkey2=value2'}
+
+    The provided config_flags string may be a list of comma-separated values
+    which themselves may be comma-separated list of values.
+    """
+    # If we find a colon before an equals sign then treat it as yaml.
+    # Note: limit it to finding the colon first since this indicates assignment
+    # for inline yaml.
+    colon = config_flags.find(':')
+    equals = config_flags.find('=')
+    if colon > 0:
+        if colon < equals or equals < 0:
+            return yaml.safe_load(config_flags)
+
+    if config_flags.find('==') >= 0:
+        juju_log("config_flags is not in expected format (key=value)",
+                 level=ERROR)
+        raise OSContextError
+
+    # strip the following from each value.
+    post_strippers = ' ,'
+    # we strip any leading/trailing '=' or ' ' from the string then
+    # split on '='.
+    split = config_flags.strip(' =').split('=')
+    limit = len(split)
+    flags = {}
+    for i in range(0, limit - 1):
+        current = split[i]
+        next = split[i + 1]
+        vindex = next.rfind(',')
+        if (i == limit - 2) or (vindex < 0):
+            value = next
+        else:
+            value = next[:vindex]
+
+        if i == 0:
+            key = current
+        else:
+            # if this not the first entry, expect an embedded key.
+            index = current.rfind(',')
+            if index < 0:
+                juju_log("Invalid config value(s) at index %s" % (i),
+                         level=ERROR)
+                raise OSContextError
+            key = current[index + 1:]
+
+        # Add to collection.
+        flags[key.strip(post_strippers)] = value.rstrip(post_strippers)
+
+    return flags

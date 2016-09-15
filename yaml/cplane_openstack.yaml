@@ -1,0 +1,296 @@
+machines:
+  '0':
+    constraints: arch=amd64
+    series: trusty
+  '1':
+    constraints: arch=amd64
+    series: trusty
+  '2':
+    constraints: arch=amd64
+    series: trusty
+  '3':
+    constraints: arch=amd64
+    series: trusty
+relations:
+- - nova-compute:amqp
+  - rabbitmq-server:amqp
+- - keystone:shared-db
+  - mysql:shared-db
+- - nova-cloud-controller:identity-service
+  - keystone:identity-service
+- - glance:identity-service
+  - keystone:identity-service
+- - neutron-api:identity-service
+  - keystone:identity-service
+- - neutron-api:shared-db
+  - mysql:shared-db
+- - neutron-api:amqp
+  - rabbitmq-server:amqp
+- - glance:shared-db
+  - mysql:shared-db
+- - glance:amqp
+  - rabbitmq-server:amqp
+- - nova-cloud-controller:image-service
+  - glance:image-service
+- - nova-compute:image-service
+  - glance:image-service
+- - nova-cloud-controller:cloud-compute
+  - nova-compute:cloud-compute
+- - nova-cloud-controller:amqp
+  - rabbitmq-server:amqp
+- - openstack-dashboard:identity-service
+  - keystone:identity-service
+- - nova-cloud-controller:shared-db
+  - mysql:shared-db
+- - nova-cloud-controller:neutron-api
+  - neutron-api:neutron-api
+- - cinder:image-service
+  - glance:image-service
+- - cinder:amqp
+  - rabbitmq-server:amqp
+- - cinder:identity-service
+  - keystone:identity-service
+- - cinder:cinder-volume-service
+  - nova-cloud-controller:cinder-volume-service
+- - cinder-ceph:storage-backend
+  - cinder:storage-backend
+- - ceph:client
+  - nova-compute:ceph
+- - cinder:shared-db
+  - mysql:shared-db
+- - ceph:client
+  - cinder-ceph:ceph
+- - ceph:client
+  - glance:ceph
+- - ceph-osd:mon
+  - ceph:osd
+- - ntp:juju-info
+  - nova-compute:juju-info
+- - ceph-radosgw:mon
+  - ceph:radosgw
+- - ceph-radosgw:identity-service
+  - keystone:identity-service
+- - neutron-api-cplane:neutron-plugin-api-subordinate
+  - neutron-api:neutron-plugin-api-subordinate
+- - neutron-api-cplane:amqp
+  - rabbitmq-server:amqp
+- - neutron-openvswitch-cplane:neutron-plugin
+  - nova-compute:neutron-plugin
+- - neutron-openvswitch-cplane:amqp
+  - rabbitmq-server:amqp
+- - neutron-openvswitch-cplane:identity-service
+  - keystone:identity-service
+- - cplane-compute:amqp
+  - rabbitmq-server:amqp
+- - cplane-compute:image-service
+  - glance:image-service
+- - nova-cloud-controller:cloud-compute
+  - cplane-compute:cloud-compute
+- - ogr-compute-cplane:neutron-plugin
+  - cplane-compute:neutron-plugin
+- - ogr-compute-cplane:amqp
+  - rabbitmq-server:amqp
+- - ogr-compute-cplane:identity-service
+  - keystone:identity-service
+- - ogr-compute-cplane:cplane-neutron
+  - neutron-api-cplane:cplane-neutron
+- - neutron-api-cplane:shared-db
+  - mysql:shared-db
+
+series: trusty
+services:
+  juju-gui:
+    annotations:
+      gui-x: '0'
+      gui-y: '250'
+    charm: cs:trusty/juju-gui-52
+    num_units: 1
+    to:
+    - 0
+  ceph:
+    annotations:
+      gui-x: '750'
+      gui-y: '500'
+    charm: cs:trusty/ceph-43
+    num_units: 1
+    options:
+      fsid: 5a791d94-980b-11e4-b6f6-3c970e8b1cf7
+      monitor-secret: AQAi5a9UeJXUExAA+By9u+GPhl8/XiUQ4nwI3A==
+      osd-devices: /dev/sdb
+      osd-reformat: 'yes'
+      source: cloud:trusty-liberty
+    to:
+    - '1'
+  ceph-osd:
+    annotations:
+      gui-x: '1000'
+      gui-y: '500'
+    charm: cs:trusty/ceph-osd-14
+    num_units: 1
+    options:
+      osd-devices: /dev/sdb
+      osd-reformat: 'yes'
+      source: cloud:trusty-liberty
+    to:
+    - '0'
+  ceph-radosgw:
+    annotations:
+      gui-x: '1000'
+      gui-y: '250'
+    charm: cs:trusty/ceph-radosgw-19
+    num_units: 1
+    options:
+      source: cloud:trusty-liberty
+      use-embedded-webserver: true
+    to:
+    - lxc:0
+  cinder:
+    annotations:
+      gui-x: '750'
+      gui-y: '0'
+    charm: cs:trusty/cinder-34
+    num_units: 1
+    options:
+      block-device: None
+      glance-api-version: 2
+      ha-mcastport: 5401
+      openstack-origin: cloud:trusty-liberty
+    to:
+    - lxc:1
+  cinder-ceph:
+    annotations:
+      gui-x: '750'
+      gui-y: '250'
+    charm: cs:trusty/cinder-ceph-16
+    num_units: 0
+  glance:
+    annotations:
+      gui-x: '250'
+      gui-y: '0'
+    charm: cs:trusty/glance-30
+    num_units: 1
+    options:
+      ha-mcastport: 5402
+      openstack-origin: cloud:trusty-liberty
+    to:
+    - lxc:2
+  keystone:
+    annotations:
+      gui-x: '500'
+      gui-y: '0'
+    charm: cs:trusty/keystone-253
+    num_units: 1
+    options:
+      admin-password: openstack
+      ha-mcastport: 5403
+      openstack-origin: cloud:trusty-liberty
+    to:
+    - lxc:3
+  mysql:
+    annotations:
+      gui-x: '0'
+      gui-y: '250'
+    charm: cs:trusty/percona-cluster-32
+    num_units: 1
+    options:
+      max-connections: 20000
+    to:
+    - lxc:0
+  neutron-api:
+    annotations:
+      gui-x: '500'
+      gui-y: '500'
+    charm: cs:trusty/neutron-api-23
+    num_units: 1
+    options:
+      neutron-security-groups: true
+      openstack-origin: cloud:trusty-liberty
+      manage-neutron-plugin-legacy-mode: False
+    to:
+    - lxc:1
+  nova-cloud-controller:
+    annotations:
+      gui-x: '0'
+      gui-y: '500'
+    charm: cs:trusty/nova-cloud-controller-66
+    num_units: 1
+    options:
+      network-manager: Neutron
+      openstack-origin: cloud:trusty-liberty
+      quantum-security-groups: 'yes'
+    to:
+    - lxc:2
+  nova-compute:
+    annotations:
+      gui-x: '250'
+      gui-y: '250'
+    charm: cs:trusty/nova-compute-36
+    num_units: 1
+    options:
+      enable-live-migration: true
+      enable-resize: true
+      manage-neutron-plugin-legacy-mode: false
+      migration-auth-type: ssh
+      openstack-origin: cloud:trusty-liberty
+      virt-type: qemu
+    to:
+    - '1'
+  cplane-compute:
+    annotations:
+      gui-x: '350'
+      gui-y: '350'
+    charm: cs:trusty/nova-compute-36
+    num_units: 1
+    options:
+      enable-live-migration: true
+      enable-resize: true
+      manage-neutron-plugin-legacy-mode: false
+      migration-auth-type: ssh
+      openstack-origin: cloud:trusty-liberty
+      virt-type: qemu
+    to:
+    - '2'
+  ntp:
+    annotations:
+      gui-x: '1000'
+      gui-y: '0'
+    charm: cs:trusty/ntp-14
+    num_units: 0
+  openstack-dashboard:
+    annotations:
+      gui-x: '500'
+      gui-y: '-250'
+    charm: cs:trusty/openstack-dashboard-21
+    num_units: 1
+    options:
+      openstack-origin: cloud:trusty-liberty
+    to:
+    - lxc:3
+  rabbitmq-server:
+    annotations:
+      gui-x: '500'
+      gui-y: '250'
+    charm: cs:trusty/rabbitmq-server-43
+    num_units: 1
+    options:
+      source: cloud:trusty-liberty
+    to:
+    - lxc:0
+  neutron-api-cplane:
+    annotations:
+      gui-x: '1000'
+      gui-y: '0'
+    charm: /home/rebaca/charms/trusty/neutron-api-cplane 
+    num_units: 0
+  neutron-openvswitch-cplane:
+    annotations:
+      gui-x: '700'
+      gui-y: '0'
+    charm: /home/rebaca/charms/trusty/neutron-openvswitch-cplane
+    num_units: 0
+  ogr-compute-cplane:
+    annotations:
+      gui-x: '800'
+      gui-y: '0'
+    charm: /home/rebaca/charms/trusty/ogr-compute-cplane
+    num_units: 0

@@ -13,7 +13,7 @@ options:
     description: "Cplane controller unicast port"
   rabbit-user:
     type: string
-    default: "nova"
+    default: "neutron"
     description: "Nova rabbit user name"
   rabbit-vhost:
     type: string
@@ -27,10 +27,6 @@ options:
     type: string
     default: "nova"
     description: "Admin password"
-  openstack-controller-ip:
-    type: string
-    default: "192.168.5.22"
-    description: "Cplane-nutron IP"
   cplane-controller-ip:
     type: string
     default: "192.168.4.154"
@@ -56,9 +52,12 @@ options:
     default: "dbg"
     description: "Log level for CP agent dbg,info"
   cp-package-url:
-    default: "https://www.dropbox.com/s/h2edle1o0jj1btt/cplane_metadata.json?dl=1"
+    default: "http://192.168.7.202/cplane_metadata.json"
     type: string
     description: |
       URL for cplane packages
       if from local repo then "http://xx.xx.xx.xx/cplane_metadata.json"
-
+  metadata-shared-secret:
+    default: "secret"
+    type: string
+    description: "Metadata shared secret"

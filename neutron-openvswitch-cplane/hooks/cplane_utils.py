@@ -1,5 +1,8 @@
 import subprocess
 
+from charmhelpers.contrib.openstack.utils import os_release
+from charmhelpers.contrib.openstack import context, templating
+
 from collections import OrderedDict
 from charmhelpers.core.hookenv import (
     config,
@@ -13,6 +16,7 @@ from charmhelpers.fetch import (
     apt_install,
 )
 
+import cplane_context
 
 from cplane_package_manager import(
     CPlanePackageManager
@@ -22,6 +26,8 @@ from cplane_network import (
     add_bridge,
     check_interface,
 )
+
+TEMPLATES = 'templates/'
 
 cplane_packages = OrderedDict([
     ('python-cplane-neutron-plugin', 439),
@@ -39,16 +45,6 @@ METADATA_AGENT_INI = '/etc/neutron/metadata_agent.ini'
 
 CPLANE_URL = config('cp-package-url')
 
-metadata_agent_config = OrderedDict([
-    ('auth_url', 'http://' + config('openstack-controller-ip') + ':5000/v2.0'),
-    ('auth_region', config('region')),
-    ('admin_tenant_name', 'service'),
-    ('admin_user', config('admin-user')),
-    ('admin_password', config('admin-password')),
-    ('nova_metadata_ip', config('openstack-controller-ip')),
-    ('metadata_proxy_shared_secret', 'secret'),
-])
-
 SYSTEM_CONF = '/etc/sysctl.conf'
 system_config = OrderedDict([
     ('net.ipv4.conf.all.rp_filter', '0'),
@@ -57,6 +53,25 @@ system_config = OrderedDict([
     ('net.bridge.bridge-nf-call-iptables', '1'),
     ('net.bridge.bridge-nf-call-ip6tables', '1'),
 ])
+
+
+def register_configs(release=None):
+    resources = OrderedDict([
+        (METADATA_AGENT_INI, {
+            'services': ['neutron-openvswitch-cplane'],
+            'contexts': [cplane_context.IdentityServiceContext(
+                         service='cplane',
+                         service_user='neutron'),
+                         cplane_context.CplaneMetadataContext(),
+                         context.AMQPContext(ssl_dir=METADATA_AGENT_INI)]
+        })
+    ])
+    release = os_release('neutron-common')
+    configs = templating.OSConfigRenderer(templates_dir=TEMPLATES,
+                                          openstack_release=release)
+    for cfg, rscs in resources.iteritems():
+        configs.register(cfg, rscs['contexts'])
+    return configs
 
 
 def api_ready(relation, key):
@@ -168,4 +183,9 @@ def restart_services():
     subprocess.check_call(cmd)
 
     cmd = ['update-rc.d', 'cp-agentd', 'enable']
+    subprocess.check_call(cmd)
+
+
+def restart_metadata_agent():
+    cmd = ['service', 'neutron-metadata-agent', 'restart']
     subprocess.check_call(cmd)

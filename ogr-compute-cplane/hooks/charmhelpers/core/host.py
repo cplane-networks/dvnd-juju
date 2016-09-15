@@ -1,18 +1,16 @@
 # Copyright 2014-2015 Canonical Limited.
 #
-# This file is part of charm-helpers.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# charm-helpers is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Lesser General Public License version 3 as
-# published by the Free Software Foundation.
+#  http://www.apache.org/licenses/LICENSE-2.0
 #
-# charm-helpers is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with charm-helpers.  If not, see <http://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 """Tools for working with the host system"""
 # Copyright 2012 Canonical Ltd.
@@ -32,13 +30,29 @@ import subprocess
 import hashlib
 import functools
 import itertools
-from contextlib import contextmanager
-from collections import OrderedDict
-
 import six
 
+from contextlib import contextmanager
+from collections import OrderedDict
 from .hookenv import log
 from .fstab import Fstab
+from charmhelpers.osplatform import get_platform
+
+__platform__ = get_platform()
+if __platform__ == "ubuntu":
+    from charmhelpers.core.host_factory.ubuntu import (
+        service_available,
+        add_new_group,
+        lsb_release,
+        cmp_pkgrevno,
+    )  # flake8: noqa -- ignore F401 for this import
+elif __platform__ == "centos":
+    from charmhelpers.core.host_factory.centos import (
+        service_available,
+        add_new_group,
+        lsb_release,
+        cmp_pkgrevno,
+    )  # flake8: noqa -- ignore F401 for this import
 
 
 def service_start(service_name):
@@ -128,11 +142,8 @@ def service(action, service_name):
     return subprocess.call(cmd) == 0
 
 
-def systemv_services_running():
-    output = subprocess.check_output(
-        ['service', '--status-all'],
-        stderr=subprocess.STDOUT).decode('UTF-8')
-    return [row.split()[-1] for row in output.split('\n') if '[ + ]' in row]
+_UPSTART_CONF = "/etc/init/{}.conf"
+_INIT_D_CONF = "/etc/init.d/{}"
 
 
 def service_running(service_name):
@@ -140,34 +151,25 @@ def service_running(service_name):
     if init_is_systemd():
         return service('is-active', service_name)
     else:
-        try:
-            output = subprocess.check_output(
-                ['service', service_name, 'status'],
-                stderr=subprocess.STDOUT).decode('UTF-8')
-        except subprocess.CalledProcessError:
-            return False
-        else:
-            # This works for upstart scripts where the 'service' command
-            # returns a consistent string to represent running 'start/running'
-            if ("start/running" in output or "is running" in output or
-                    "up and running" in output):
-                return True
+        if os.path.exists(_UPSTART_CONF.format(service_name)):
+            try:
+                output = subprocess.check_output(
+                    ['status', service_name],
+                    stderr=subprocess.STDOUT).decode('UTF-8')
+            except subprocess.CalledProcessError:
+                return False
+            else:
+                # This works for upstart scripts where the 'service' command
+                # returns a consistent string to represent running
+                # 'start/running'
+                if ("start/running" in output or
+                        "is running" in output or
+                        "up and running" in output):
+                    return True
+        elif os.path.exists(_INIT_D_CONF.format(service_name)):
             # Check System V scripts init script return codes
-            if service_name in systemv_services_running():
-                return True
-            return False
-
-
-def service_available(service_name):
-    """Determine whether a system service is available"""
-    try:
-        subprocess.check_output(
-            ['service', service_name, 'status'],
-            stderr=subprocess.STDOUT).decode('UTF-8')
-    except subprocess.CalledProcessError as e:
-        return b'unrecognized service' not in e.output
-    else:
-        return True
+            return service('status', service_name)
+        return False
 
 
 SYSTEMD_SYSTEM = '/run/systemd/system'
@@ -178,8 +180,9 @@ def init_is_systemd():
     return os.path.isdir(SYSTEMD_SYSTEM)
 
 
-def adduser(username, password=None, shell='/bin/bash', system_user=False,
-            primary_group=None, secondary_groups=None):
+def adduser(username, password=None, shell='/bin/bash',
+            system_user=False, primary_group=None,
+            secondary_groups=None, uid=None, home_dir=None):
     """Add a user to the system.
 
     Will log but otherwise succeed if the user already exists.
@@ -190,15 +193,24 @@ def adduser(username, password=None, shell='/bin/bash', system_user=False,
     :param bool system_user: Whether to create a login or system user
     :param str primary_group: Primary group for user; defaults to username
     :param list secondary_groups: Optional list of additional groups
+    :param int uid: UID for user being created
+    :param str home_dir: Home directory for user
 
     :returns: The password database entry struct, as returned by `pwd.getpwnam`
     """
     try:
         user_info = pwd.getpwnam(username)
         log('user {0} already exists!'.format(username))
+        if uid:
+            user_info = pwd.getpwuid(int(uid))
+            log('user with uid {0} already exists!'.format(uid))
     except KeyError:
         log('creating user {0}'.format(username))
         cmd = ['useradd']
+        if uid:
+            cmd.extend(['--uid', str(uid)])
+        if home_dir:
+            cmd.extend(['--home', str(home_dir)])
         if system_user or password is None:
             cmd.append('--system')
         else:
@@ -233,22 +245,56 @@ def user_exists(username):
     return user_exists
 
 
-def add_group(group_name, system_group=False):
-    """Add a group to the system"""
+def uid_exists(uid):
+    """Check if a uid exists"""
+    try:
+        pwd.getpwuid(uid)
+        uid_exists = True
+    except KeyError:
+        uid_exists = False
+    return uid_exists
+
+
+def group_exists(groupname):
+    """Check if a group exists"""
+    try:
+        grp.getgrnam(groupname)
+        group_exists = True
+    except KeyError:
+        group_exists = False
+    return group_exists
+
+
+def gid_exists(gid):
+    """Check if a gid exists"""
+    try:
+        grp.getgrgid(gid)
+        gid_exists = True
+    except KeyError:
+        gid_exists = False
+    return gid_exists
+
+
+def add_group(group_name, system_group=False, gid=None):
+    """Add a group to the system
+
+    Will log but otherwise succeed if the group already exists.
+
+    :param str group_name: group to create
+    :param bool system_group: Create system group
+    :param int gid: GID for user being created
+
+    :returns: The password database entry struct, as returned by `grp.getgrnam`
+    """
     try:
         group_info = grp.getgrnam(group_name)
         log('group {0} already exists!'.format(group_name))
+        if gid:
+            group_info = grp.getgrgid(gid)
+            log('group with gid {0} already exists!'.format(gid))
     except KeyError:
         log('creating group {0}'.format(group_name))
-        cmd = ['addgroup']
-        if system_group:
-            cmd.append('--system')
-        else:
-            cmd.extend([
-                '--group',
-            ])
-        cmd.append(group_name)
-        subprocess.check_call(cmd)
+        add_new_group(group_name, system_group, gid)
         group_info = grp.getgrnam(group_name)
     return group_info
 
@@ -493,16 +539,6 @@ def restart_on_change_helper(lambda_f, restart_map, stopstart=False,
     return r
 
 
-def lsb_release():
-    """Return /etc/lsb-release in a dict"""
-    d = {}
-    with open('/etc/lsb-release', 'r') as lsb:
-        for l in lsb:
-            k, v = l.split('=')
-            d[k.strip()] = v.strip()
-    return d
-
-
 def pwgen(length=None):
     """Generate a random pasword."""
     if length is None:
@@ -624,25 +660,6 @@ def get_nic_hwaddr(nic):
     if 'link/ether' in words:
         hwaddr = words[words.index('link/ether') + 1]
     return hwaddr
-
-
-def cmp_pkgrevno(package, revno, pkgcache=None):
-    """Compare supplied revno with the revno of the installed package
-
-    *  1 => Installed revno is greater than supplied arg
-    *  0 => Installed revno is the same as supplied arg
-    * -1 => Installed revno is less than supplied arg
-
-    This function imports apt_cache function from charmhelpers.fetch if
-    the pkgcache argument is None. Be sure to add charmhelpers.fetch if
-    you call this function, or pass an apt_pkg.Cache() instance.
-    """
-    import apt_pkg
-    if not pkgcache:
-        from charmhelpers.fetch import apt_cache
-        pkgcache = apt_cache()
-    pkg = pkgcache[package]
-    return apt_pkg.version_compare(pkg.current_ver.ver_str, revno)
 
 
 @contextmanager

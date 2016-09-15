@@ -8,6 +8,10 @@ description: |
 tags:
   - openstack
   - networking
+extra-bindings:
+  public:
+  admin:
+  internal:
 subordinate: true
 provides:
   neutron-plugin:

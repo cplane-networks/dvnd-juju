@@ -4,30 +4,38 @@ from charmhelpers.core.hookenv import (
     UnregisteredHookError,
     config,
     log as juju_log,
-    relation_get,
+    log,
     relation_set
 )
 import json
 import subprocess
 import sys
+import uuid
 
 from charmhelpers.fetch import (
     apt_install,
     apt_update,
 )
 
+from charmhelpers.contrib.openstack.ip import (
+    canonical_url,
+    PUBLIC, INTERNAL, ADMIN
+)
+
 from cplane_utils import (
     determine_packages,
     install_cplane_packages,
     cplane_config,
-    metadata_agent_config,
     METADATA_AGENT_INI,
     set_cp_agent,
     manage_fip,
     restart_services,
     system_config,
     SYSTEM_CONF,
+    register_configs,
+    restart_metadata_agent,
 )
+
 
 from cplane_network import (
     add_bridge,
@@ -35,6 +43,7 @@ from cplane_network import (
 )
 
 hooks = Hooks()
+CONFIGS = register_configs()
 
 
 @hooks.hook('cplane-controller-relation-changed')
@@ -42,16 +51,6 @@ def cplane_controller_relation_changed():
     set_cp_agent()
     manage_fip()
     restart_services()
-
-
-@hooks.hook('cplane-neutron-relation-changed')
-def cplane_neutron_relation_changed():
-    controller = relation_get('private-address')
-    if controller:
-        metadata_agent_config.update({'nova_metadata_ip': controller})
-        metadata_agent_config.update({'auth_url': 'http://' + controller +
-                                      ':5000/v2.0'})
-        cplane_config(metadata_agent_config, METADATA_AGENT_INI, 'DEFAULT')
 
 
 @hooks.hook('neutron-plugin-relation-joined')
@@ -71,6 +70,7 @@ def neutron_plugin_relation_joined(rid=None):
     relation_info = {
         'neutron-plugin': 'cplane',
         'subordinate_configuration': json.dumps(principle_config),
+        'metadata-shared-secret': config('metadata-shared-secret'),
     }
     relation_set(relation_settings=relation_info)
     restart_services()
@@ -83,14 +83,58 @@ def amqp_joined(relation_id=None):
                  vhost=config('rabbit-vhost'))
 
 
+@hooks.hook('amqp-relation-changed')
+def amqp_changed():
+    if 'amqp' not in CONFIGS.complete_contexts():
+        log('amqp relation incomplete. Peer not ready?')
+        return
+    CONFIGS.write(METADATA_AGENT_INI)
+    restart_metadata_agent()
+
+
+@hooks.hook('identity-service-relation-joined')
+def identity_joined(rid=None, relation_trigger=False):
+
+    public_url = '{}'.format(canonical_url(CONFIGS, PUBLIC))
+    internal_url = '{}'.format(canonical_url(CONFIGS, INTERNAL))
+    admin_url = '{}'.format(canonical_url(CONFIGS, ADMIN))
+
+    rel_settings = {
+        'service': 'neutron',
+        'region': config('region'),
+        'public_url': public_url,
+        'admin_url': admin_url,
+        'internal_url': internal_url,
+    }
+
+    if relation_trigger:
+        rel_settings['relation_trigger'] = str(uuid.uuid4())
+    relation_set(relation_id=rid, relation_settings=rel_settings)
+
+
+@hooks.hook('identity-service-relation-changed')
+def identity_service_changed():
+    if 'identity-service' not in CONFIGS.complete_contexts():
+        log('identity-service relation incomplete. Peer not ready?')
+        return
+    CONFIGS.write(METADATA_AGENT_INI)
+    restart_metadata_agent()
+
+
+@hooks.hook('identity-service-relation-broken',
+            'amqp-relation-broken')
+def relation_broken():
+    CONFIGS.write_all()
+    restart_metadata_agent()
+
+
 @hooks.hook('config-changed')
 def config_changed():
-    cplane_config(metadata_agent_config, METADATA_AGENT_INI, 'DEFAULT')
-    restart_services()
     set_cp_agent()
     cplane_config(system_config, SYSTEM_CONF, '')
     cmd = ['sysctl', '-p']
     subprocess.check_call(cmd)
+    CONFIGS.write(METADATA_AGENT_INI)
     restart_services()
 
 
