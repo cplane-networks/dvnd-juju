@@ -1,36 +1,53 @@
+import os
+import uuid
+
 from charmhelpers.core.hookenv import (
     config,
-    unit_private_ip,
+    relation_ids,
+    related_units,
+    relation_get,
 )
 
-from charmhelpers.contrib.openstack import context
+import charmhelpers.contrib.openstack.context as context
 
 
-class CplaneMetadataContext(context.OSContextGenerator):
-    interfaces = ['neutron-plugin']
-    metadata_keys = [
-        'metadata_ip',
-        'shared_secret',
-    ]
-
-    def _cplane_context(self):
-        ctxt = {'metadata_ip': unit_private_ip()}
-        return ctxt
-
-    def __call__(self):
-        ctxt = self._cplane_context()
-        if not ctxt:
-            return {}
-        ctxt['shared_secret'] = config('metadata-shared-secret')
-        return ctxt
+SHARED_SECRET = "/var/lib/juju/metadata-secret"
 
 
-class IdentityServiceContext(context.IdentityServiceContext):
+def get_shared_secret():
+    secret = config('metadata-shared-secret') or str(uuid.uuid4())
+    if not os.path.exists(SHARED_SECRET):
+        with open(SHARED_SECRET, 'w') as secret_file:
+            secret_file.write(secret)
+    else:
+        with open(SHARED_SECRET, 'r') as secret_file:
+            secret = secret_file.read().strip()
+    return secret
+
+
+class SharedSecretContext(context.OSContextGenerator):
 
     def __call__(self):
-        ctxt = super(IdentityServiceContext, self).__call__()
+        ctxt = {
+            'shared_secret': get_shared_secret(),
+        }
+        return ctxt
+
+
+class APIIdentityServiceContext(context.IdentityServiceContext):
+
+    def __init__(self):
+        super(APIIdentityServiceContext,
+              self).__init__(rel_name='neutron-plugin-api')
+
+    def __call__(self):
+        ctxt = super(APIIdentityServiceContext, self).__call__()
         if not ctxt:
             return
-        ctxt['region'] = config('region')
-
+        for rid in relation_ids('neutron-plugin-api'):
+            for unit in related_units(rid):
+                rdata = relation_get(rid=rid, unit=unit)
+                ctxt['region'] = rdata.get('region')
+                if ctxt['region']:
+                    return ctxt
         return ctxt

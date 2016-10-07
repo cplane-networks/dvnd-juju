@@ -1,8 +1,0 @@
-{% if auth_host -%}
-auth_url = {{ service_protocol }}://{{ service_host }}:{{ service_port }}/v2.0/
-auth_region = {{ region }}
-admin_tenant_name = {{ admin_tenant_name }}
-username = {{ admin_user }}
-password = {{ admin_password }}
-{% endif -%}
-
