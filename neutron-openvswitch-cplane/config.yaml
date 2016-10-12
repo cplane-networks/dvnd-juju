@@ -14,7 +14,7 @@ options:
   rabbit-user:
     type: string
     default: "neutron"
-    description: "Nova rabbit user name"
+    description: "Neutron rabbit user name"
   rabbit-vhost:
     type: string
     default: "openstack"
@@ -58,6 +58,6 @@ options:
       URL for cplane packages
       if from local repo then "http://xx.xx.xx.xx/cplane_metadata.json"
   metadata-shared-secret:
-    default: "secret"
     type: string
+    default:
     description: "Metadata shared secret"

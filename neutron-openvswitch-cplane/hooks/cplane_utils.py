@@ -1,7 +1,7 @@
 import subprocess
 
 from charmhelpers.contrib.openstack.utils import os_release
-from charmhelpers.contrib.openstack import context, templating
+from charmhelpers.contrib.openstack import templating
 
 from collections import OrderedDict
 from charmhelpers.core.hookenv import (
@@ -37,11 +37,28 @@ cplane_packages = OrderedDict([
     ('cp-agentd', 396),
 ])
 
+neutron_config = {
+    'rabbit_userid': config('rabbit-user'),
+    'rabbit_virtual_host': config('rabbit-vhost'),
+    'rabbit_password': 'password',
+    'rabbit_host': 'localhost',
+}
+
+NEUTRON_CONF = '/etc/neutron/neutron.conf'
 
 PACKAGES = ['neutron-metadata-agent', 'neutron-plugin-ml2', 'crudini',
             'dkms', 'iputils-arping', 'dnsmasq']
 
-METADATA_AGENT_INI = '/etc/neutron/metadata_agent.ini'
+NEUTRON_METADATA_AGENT_CONF = '/etc/neutron/metadata_agent.ini'
+
+METADATA_RESOURCE_MAP = OrderedDict([
+    (NEUTRON_METADATA_AGENT_CONF, {
+        'services': ['neutron-metadata-agent'],
+        'contexts': [cplane_context.SharedSecretContext(),
+                     cplane_context.APIIdentityServiceContext()],
+    }),
+])
+
 
 CPLANE_URL = config('cp-package-url')
 
@@ -56,16 +73,7 @@ system_config = OrderedDict([
 
 
 def register_configs(release=None):
-    resources = OrderedDict([
-        (METADATA_AGENT_INI, {
-            'services': ['neutron-openvswitch-cplane'],
-            'contexts': [cplane_context.IdentityServiceContext(
-                         service='cplane',
-                         service_user='neutron'),
-                         cplane_context.CplaneMetadataContext(),
-                         context.AMQPContext(ssl_dir=METADATA_AGENT_INI)]
-        })
-    ])
+    resources = METADATA_RESOURCE_MAP
     release = os_release('neutron-common')
     configs = templating.OSConfigRenderer(templates_dir=TEMPLATES,
                                           openstack_release=release)
@@ -183,9 +191,4 @@ def restart_services():
     subprocess.check_call(cmd)
 
     cmd = ['update-rc.d', 'cp-agentd', 'enable']
-    subprocess.check_call(cmd)
-
-
-def restart_metadata_agent():
-    cmd = ['service', 'neutron-metadata-agent', 'restart']
     subprocess.check_call(cmd)
