@@ -1,9 +1,5 @@
 from charmhelpers.core.hookenv import (
     config,
-    relation_ids,
-    related_units,
-    relation_get,
-    log,
 )
 
 from charmhelpers.contrib.openstack import context
@@ -24,29 +20,8 @@ def get_overlay_network_type():
 
 
 class CplaneMl2Context(context.OSContextGenerator):
-    interfaces = ['cp_controller']
-    ml2_keys = [
-        'controller_ip',
-        'controller_port',
-        'overlay_network_type',
-        'security_groups',
-    ]
-
     def _cplane_context(self):
-        for rid in relation_ids('cp_controller'):
-            for unit in related_units(rid):
-                ctxt = {}
-                rel_data = relation_get(unit=unit, rid=rid)
-                for k in self.ml2_keys:
-                    ctxt[k] = rel_data.get(k)
-                if None not in ctxt.values():
-                    return ctxt
-
-        log('Cplane controller relation data incomplete/relation not set, \
-             get data from config')
-
-        ctxt = {'controller_ip': config('cplane-controller_ip'),
-                'controller_port': config('cplane-controller_port')}
+        ctxt = {'controller_ip': config('cplane-controller_ip')}
         return ctxt
 
     def __call__(self):
@@ -56,4 +31,5 @@ class CplaneMl2Context(context.OSContextGenerator):
         ctxt['vlan_ranges'] = config('vlan-ranges')
         ctxt['overlay_network_type'] = get_overlay_network_type()
         ctxt['security_groups'] = config('security-groups')
+        ctxt['controller_port'] = config('cplane-controller_port')
         return ctxt

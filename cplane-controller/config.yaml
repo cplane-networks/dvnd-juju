@@ -1,0 +1,59 @@
+options:
+  oracle-version:
+    default: "oracle-xe"
+    type: string
+    description: "Version of oracle to be installed"
+  controller-app-mode:
+    default: "dvnd"
+    type: string
+    description: "The same installation can be use to install DVND(dvnd) as well as MSM(msm)"
+  cp-package-url:
+    default: "http://192.168.7.103/cplane_metadata.json"
+    type: string
+    description: |
+      URL for cplane packages
+      if from local repo then "http://xx.xx.xx.xx/cplane_metadata.json"
+  oracle-http-port:
+    default: "8085"
+    type: string
+    description: "Oracle Http port"
+  oracle-listener-port:
+    default: "1521"
+    type: string
+    description: "Oracle listener port"
+  oracle-password:
+    default: "password"
+    type: string
+    description: "Oracle password"
+  db-user:
+    default: "admin"
+    type: string
+    description: "Database  username"
+  db-password:
+    default: "admin"
+    type: string
+    description: "Database password"
+  oracle-db-enable:
+    default: "y"
+    type: string
+    description: "Enable Oracle at boot time"  
+  multicast-port:
+    default: "1901"
+    type: string
+    description: "Multicast port"
+  multicast-intf:
+    default: "br-eth0"
+    type: string
+    description: "Multicast Interface"
+  unicast-port:
+    default: "1902"
+    type: string
+    description: "Unicast port"
+  multicast-srv-intf:
+    default: "br-eth0"
+    type: string
+    description: "Multicast server Interface"
+  jboss-home:
+    default: "/opt/jboss/jboss-6.1.0.Final"
+    type: string
+    description: "JBOSS_HOME path"

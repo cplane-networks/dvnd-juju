@@ -42,7 +42,7 @@ options:
     type: boolean
     description: Enable cplane  managed security groups.
   cp-package-url:
-    default: "http://192.168.7.202/cplane_metadata.json"
+    default: "http://192.168.7.103/cplane_metadata.json"
     type: string
     description: |
       URL for cplane packages

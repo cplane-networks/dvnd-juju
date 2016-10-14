@@ -32,6 +32,7 @@ from cplane_utils import (
     register_configs,
     NEUTRON_CONF,
     neutron_config,
+    restart_cp_agentd,
 )
 
 
@@ -48,7 +49,7 @@ CONFIGS = register_configs()
 def cplane_controller_relation_changed():
     set_cp_agent()
     manage_fip()
-    restart_services()
+    restart_cp_agentd()
 
 
 @hooks.hook('neutron-plugin-api-relation-changed')

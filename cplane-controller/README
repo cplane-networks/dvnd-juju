@@ -1,0 +1,53 @@
+# Overview
+
+The CPLANE Controller is an SDN orchestration system for the CPLANE DVNd OpenStack Neutron Solution.   The CPLANE Controller receives neutron events from the OpenStack Neutron service and converts those events into a Multi-Tenant Network Topologies and SDN instructions.  The CPLANE Controller sends SDN instructions to OpenVSwitch via CPLANE agents software running on compute nodes and other networking hardware and components.  
+
+CPLANE's software-only solution automates creation of WAN and LAN network services with a highly intelligent SDN platform. Through advanced discovery, modeling and service orchestration, CPLANE automates not only the low-level infrastructure configuration and management of data center and wide area networks, but also the higher-level, value-add functions such as network virtualization, routing, policy and QoS.   CPLANE delivers network services faster and more reliably on existing network infrastructure. Since CPLANE is a software-only solution with no vendor-specific dependencies, it offers the added advantage of providing a
+path to new network architectures and technologies, and away from vendor lock-in.
+
+For more information see [http://www.cplanenetworks.com/]
+
+# Usage
+
+This charm requires the deployment of the **neutron-api-cplane** charm and **neutron-openvswitch-cplane** charm. It eliminates the need for the neutron-gateway charm as L3 routing agent which is handled by the compute tier.
+
+The neutron-openvswitch-cplane charm has several core functions:
+
+ - Install JBOSS 
+ - Install JDK  
+ - Install Oracle
+ - Configure oracle 
+ - Install CPinstaller 
+ - Configure CP installer
+
+Instruction for deploying the CPlane openstack bundle is as follows:
+Note: This bundle will install some components of Openstack as well as CPlane charms.
+
+    juju deploy cplane_openstack.yaml
+
+# Configuration
+
+ - ***oracle-version***: Version of oracle to be installed.
+ - ***controller-app-mode***: The same installation can be use to install DVND(dvnd) as well as MSM(msm).
+ - ***cp-package-url***:  URL for cplane packages
+      if from local repo then "http://xx.xx.xx.xx/cplane_metadata.json".
+ - ***oracle-http-port***: Configures Oracle Http port, and the value will be overwritten if a oracle charm is deployed .
+ - ***oracle-listener-port***: Configures oracle listener port, but this value will be
+   overwritten if a oracle charm is deployed.
+ - ***oracle-password***: Password for oracle charm.
+ - ***db-user***: Username for Database.
+ - ***db-password***: Password for Database.
+ - ***oracle-db-enable***: Enable Oracle at boot time.
+ - ***multicast-port***: Configures Oracle multicast port, and the value
+   will be overwritten if a oracle charm is deployed.
+ - ***multicast-intf***: Configures multicast interface.
+ - ***unicast-port***:  Configures Oracle unicast port, and the value
+   will be overwritten if a oracle charm is deployed.
+ - ***multicast-srv-intf***: Configures Multicast server interface.
+ - ***jboss-home***: JBOSS_HOME path.
+
+# Contact Information
+
+www.cplanenetworks.com
+info@cplanenetworks.com
+

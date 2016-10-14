@@ -51,9 +51,9 @@ class CplaneUtilsTest(CharmTestCase):
 
         cplane_utils.manage_fip()
 
-        self.relation_ids.assert_called_with('cplane-controller-ovs')
+        self.relation_ids.assert_called_with('cplane-controller')
         self.related_units.assert_called_with('random_rid')
-        self.relation_get.assert_called_with(attribute='fip-set',
+        self.relation_get.assert_called_with(attribute='fip-mode',
                                              unit='random_unit',
                                              rid='random_rid')
         self.config.assert_called_with('fip-interface')
@@ -65,9 +65,9 @@ class CplaneUtilsTest(CharmTestCase):
 
         cplane_utils.manage_fip()
 
-        self.relation_ids.assert_called_with('cplane-controller-ovs')
+        self.relation_ids.assert_called_with('cplane-controller')
         self.related_units.assert_called_with('random_rid')
-        self.relation_get.assert_called_with(attribute='fip-set',
+        self.relation_get.assert_called_with(attribute='fip-mode',
                                              unit='random_unit',
                                              rid='random_rid')
         self.config.assert_called_with('fip-interface')
@@ -81,7 +81,7 @@ class CplaneUtilsTest(CharmTestCase):
         self.relation_get.return_value = "9000"
         cplane_utils.set_cp_agent()
 
-        self.relation_ids.assert_called_with('cplane-controller-ovs')
+        self.relation_ids.assert_called_with('cplane-controller')
         self.related_units.assert_called_with('random_rid')
         self.relation_get.assert_called_with('private-address')
         self.assertEqual(m_check_call.call_args,
@@ -93,7 +93,7 @@ class CplaneUtilsTest(CharmTestCase):
         self.relation_get.return_value = "0"
         cplane_utils.set_cp_agent()
 
-        self.relation_ids.assert_called_with('cplane-controller-ovs')
+        self.relation_ids.assert_called_with('cplane-controller')
         self.related_units.assert_called_with('random_rid')
         self.relation_get.assert_called_with('private-address')
         self.assertEqual(m_check_call.call_args,
@@ -105,6 +105,13 @@ class CplaneUtilsTest(CharmTestCase):
         cplane_utils.restart_services()
         self.assertEqual(m_check_call.call_args, call(['update-rc.d',
                                                        'cp-agentd', 'enable']))
+
+    @patch("subprocess.check_call")
+    def test_restart_cp_agentd(self, m_check_call):
+        cplane_utils.restart_cp_agentd()
+        self.assertEqual(m_check_call.call_args,
+                         call(['service', 'cp-agentd',
+                               'restart']))
 
 suite = unittest.TestLoader().loadTestsFromTestCase(CplaneUtilsTest)
 unittest.TextTestRunner(verbosity=2).run(suite)

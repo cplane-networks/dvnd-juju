@@ -15,6 +15,7 @@ from charmhelpers.core.hookenv import (
 from charmhelpers.fetch import (
     apt_install,
 )
+import os
 
 import cplane_context
 
@@ -129,10 +130,10 @@ def install_cplane_packages():
 
 
 def manage_fip():
-    for rid in relation_ids('cplane-controller-ovs'):
+    for rid in relation_ids('cplane-controller'):
         for unit in related_units(rid):
-            fip_set = relation_get(attribute='fip-set', unit=unit, rid=rid)
-            if fip_set:
+            fip_mode = relation_get(attribute='fip-mode', unit=unit, rid=rid)
+            if fip_mode is True:
                 if check_interface(config('fip-interface')):
                     add_bridge('br-fip', config('fip-interface'))
                 else:
@@ -142,9 +143,11 @@ def manage_fip():
 
 def set_cp_agent():
     mport = 0
-    for rid in relation_ids('cplane-controller-ovs'):
+    for rid in relation_ids('cplane-controller'):
         for unit in related_units(rid):
             mport = relation_get(attribute='mport', unit=unit, rid=rid)
+            uport = relation_get(attribute='uport', unit=unit, rid=rid)
+            unicast_mode = config('enable-unicast')
             cplane_controller = relation_get('private-address')
             if mport:
                 key = 'mcast-port=' + mport
@@ -153,10 +156,14 @@ def set_cp_agent():
                 key = 'mgmt-iface=' + config('mgmt-int')
                 cmd = ['cp-agentd', 'set-config', key]
                 subprocess.check_call(cmd)
-                key = 'ucast-ip=' + cplane_controller
-                cmd = ['cp-agentd', 'set-config', key]
-                subprocess.check_call(cmd)
-                key = 'ucast-port=' + str(config('cp-controller-uport'))
+                if unicast_mode is True:
+                    key = 'ucast-ip=' + cplane_controller + ','
+                    cmd = ['cp-agentd', 'set-config', key]
+                    subprocess.check_call(cmd)
+                else:
+                    cmd = "sed -i '/ucast-ip/d' /etc/cplane/cp-config.json"
+                    os.system(cmd)
+                key = 'ucast-port=' + uport
                 cmd = ['cp-agentd', 'set-config', key]
                 subprocess.check_call(cmd)
                 key = 'log-level=file:' + str(config('cp-agent-log-level'))
@@ -191,4 +198,9 @@ def restart_services():
     subprocess.check_call(cmd)
 
     cmd = ['update-rc.d', 'cp-agentd', 'enable']
+    subprocess.check_call(cmd)
+
+
+def restart_cp_agentd():
+    cmd = ['service', 'cp-agentd', 'restart']
     subprocess.check_call(cmd)

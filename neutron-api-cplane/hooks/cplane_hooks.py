@@ -5,11 +5,13 @@ from charmhelpers.core.hookenv import (
     UnregisteredHookError,
     log as juju_log,
     config,
-    relation_set
+    relation_set,
+    relation_get,
 )
 import json
 import sys
 import uuid
+import os
 
 from charmhelpers.fetch import (
     apt_install,
@@ -44,8 +46,13 @@ def config_changed():
 
 @hooks.hook('cplane-controller-relation-changed')
 def cplane_controller_relation_changed():
-    configs = register_configs()
-    configs.write_all()
+    mport = relation_get('mport')
+    cplane_controller = relation_get('private-address')
+    if mport:
+        cmd = "sed -ie 's/cplane_controller_hosts.*/cplane_controller_\
+hosts = {}/g' /etc/neutron/plugins/ml2/ml2_conf.ini".format(cplane_controller)
+        os.system(cmd)
+        restart_service()
 
 
 @hooks.hook('shared-db-relation-changed')

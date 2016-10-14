@@ -5,8 +5,6 @@ import cplane_context
 TO_PATCH = [
     'context',
     'config',
-    'relation_get',
-    'relation_ids',
 ]
 
 
@@ -14,7 +12,6 @@ class CplaneContextTest(CharmTestCase):
 
     def setUp(self):
         super(CplaneContextTest, self).setUp(cplane_context, TO_PATCH)
-        self.relation_get.side_effect = self.test_relation.get
         self.config.side_effect = self.test_config.get
 
     def tearDown(self):
