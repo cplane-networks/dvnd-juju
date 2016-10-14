@@ -35,7 +35,7 @@ cplane_packages = OrderedDict([
     ('openvswitch-common', 0),
     ('openvswitch-datapath-dkms', 0),
     ('openvswitch-switch', 0),
-    ('cp-agentd', 396),
+    ('cp-agentd', -1),
 ])
 
 neutron_config = {

@@ -118,7 +118,7 @@ services:
     options:
       enable-live-migration: true
       enable-resize: true
-      manage-neutron-plugin-legacy-mode: false
+#      manage-neutron-plugin-legacy-mode: false
       migration-auth-type: ssh
       openstack-origin: cloud:trusty-liberty
       virt-type: qemu

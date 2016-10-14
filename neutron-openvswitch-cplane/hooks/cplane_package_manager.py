@@ -77,13 +77,20 @@ class CPlanePackageManager:
         version_exist = False
         package_dwnld_link = ""
         file_checksum = ""
-        for package in package_list:
-            if package.get("build_nr", 0) == int(version):
-                package_dwnld_link = package.get("dwd_link", "")
-                file_checksum = package.get("checksum", "")
-                version_exist = True
-                logging.info("Package download link %s" % package_dwnld_link)
-                break
+        if int(version) != -1:
+            for package in package_list:
+                if package.get("build_nr", 0) == int(version):
+                    package_dwnld_link = package.get("dwd_link", "")
+                    file_checksum = package.get("checksum", "")
+                    version_exist = True
+                    logging.info("Package download link %s" %
+                                 package_dwnld_link)
+                    break
+        else:
+            package_dwnld_link = package_list[-1].get("dwd_link", "")
+            file_checksum = package_list[-1].get("checksum", "")
+            version_exist = True
+            logging.info("Package download link %s" % package_dwnld_link)
 
         if not version_exist:
             logging.error("Version %d doesn't exist for package %s"

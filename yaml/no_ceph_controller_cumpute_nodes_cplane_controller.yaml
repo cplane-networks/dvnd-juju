@@ -125,7 +125,7 @@ services:
     options:
       enable-live-migration: true
       enable-resize: true
-      manage-neutron-plugin-legacy-mode: false
+#      manage-neutron-plugin-legacy-mode: false
       migration-auth-type: ssh
       openstack-origin: cloud:trusty-liberty
       virt-type: qemu
@@ -155,19 +155,19 @@ services:
     annotations:
       gui-x: '1000'
       gui-y: '0'
-    charm: /home/rebaca/metadata/dvnd-juju/neutron-api-cplane 
+    charm: /home/rebaca/venkat_test/dvnd-juju/neutron-api-cplane 
     num_units: 0
   neutron-openvswitch-cplane:
     annotations:
       gui-x: '700'
       gui-y: '0'
-    charm: /home/rebaca/metadata/dvnd-juju/neutron-openvswitch-cplane
+    charm: /home/rebaca/venkat_test/dvnd-juju/neutron-openvswitch-cplane
     num_units: 0
   cplane-controller:
     annotations:
       gui-x: '700'
       gui-y: '0'
-    charm: /home/rebaca/metadata/dvnd-juju/cplane-controller
+    charm: /home/rebaca/venkat_test/dvnd-juju/cplane-controller
     num_units: 1
     to:
     - '2' 
