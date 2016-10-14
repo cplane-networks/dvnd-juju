@@ -303,7 +303,7 @@ def start_services(install_type):
         subprocess.check_call(cmd)
         os.chdir(saved_path)
     else:
-        log("Setup not copleted")
+        log("Setup not completed")
 
 
 def set_config(key, value, config_file):
