@@ -157,7 +157,7 @@ def set_cp_agent():
                 cmd = ['cp-agentd', 'set-config', key]
                 subprocess.check_call(cmd)
                 if unicast_mode is True:
-                    key = 'ucast-ip=' + cplane_controller + ','
+                    key = 'ucast-ip=' + cplane_controller
                     cmd = ['cp-agentd', 'set-config', key]
                     subprocess.check_call(cmd)
                 else:
