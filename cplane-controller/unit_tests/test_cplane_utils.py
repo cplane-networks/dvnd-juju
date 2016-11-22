@@ -251,5 +251,21 @@ tee install.log")
         m_execute_sql_command.assert_called_with('admin/admin@XE',
                                                  '@reinstall_plsql')
 
+    @patch("os.chdir")
+    @patch("commands.getoutput")
+    def test_check_jboss_service(self, m_getoutput, m_chdir):
+        cplane_utils.CPLANE_DIR = '.'
+        cplane_utils.check_jboss_service()
+        m_getoutput.assert_called_with('bash checkJBossServer.sh')
+
+    @patch("os.chdir")
+    @patch("cplane_utils.load_config")
+    @patch("subprocess.check_call")
+    def test_run_cp_installer(self, m_check_call, m_load_config, m_chdir):
+        cplane_utils.run_cp_installer()
+        m_load_config.assert_called_with()
+        m_check_call.assert_called_with(['sh', 'cpinstaller', 'cplane-dvnd-\
+config.yaml'])
+
 suite = unittest.TestLoader().loadTestsFromTestCase(CplaneUtilsTest)
 unittest.TextTestRunner(verbosity=2).run(suite)

@@ -296,7 +296,7 @@ def start_services(install_type):
     if status is True:
         if install_type == 'reuse-db':
             initialize_programs('P')
-        else:
+        elif install_type == 'clean-db':
             initialize_programs('I')
 
         cmd = ['bash', 'startStartupPrograms.sh']
@@ -345,4 +345,25 @@ def clean_create_db():
     connect_string = '{}/{}@XE'.format(config('db-user'),
                                        config('db-password'))
     execute_sql_command(connect_string, "@reinstall_plsql")
+    os.chdir(saved_path)
+
+
+def check_jboss_service():
+    saved_path = os.getcwd()
+    os.chdir(CPLANE_DIR)
+    status = commands.getoutput('bash checkJBossServer.sh')
+    if status == "JBoss server is not running!":
+        return False
+    else:
+        return True
+    os.chdir(saved_path)
+
+
+def run_cp_installer():
+    saved_path = os.getcwd()
+    os.chdir(CHARM_LIB_DIR)
+    load_config()
+    os.chdir('PKG')
+    cmd = ['sh', 'cpinstaller', 'cplane-dvnd-config.yaml']
+    subprocess.check_call(cmd)
     os.chdir(saved_path)

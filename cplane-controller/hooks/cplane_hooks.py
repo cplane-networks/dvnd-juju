@@ -28,6 +28,8 @@ from cplane_utils import (
     get_upgrade_type,
     stop_jboss_service,
     clean_create_db,
+    check_jboss_service,
+    run_cp_installer,
 )
 
 
@@ -75,7 +77,15 @@ def install():
 
 @hooks.hook('start')
 def start():
-    start_services('install')
+    start_services('clean-db')
+
+
+@hooks.hook('config-changed')
+def config_changed():
+    if check_jboss_service() is True:
+        stop_jboss_service()
+        run_cp_installer()
+        start_services('config-change')
 
 
 def main():
