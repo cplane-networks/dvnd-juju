@@ -47,15 +47,16 @@ class CplaneUtilsTest(CharmTestCase):
     def test_prepare_env(self, m_check_call):
         cplane_utils.JBOSS_DIR = '.'
         cplane_utils.prepare_env()
-        m_check_call.assert_called_with(['chmod', '-R', '777',
-                                        '/var/lock/subsys'])
+        m_check_call.assert_called_with(['ln', '-sf', '/etc/init.d', '/etc/\
+rc.d/init.d'])
 
     @patch("subprocess.check_call")
     def test_prepare_env_jboss_not_exist(self, m_check_call):
         cplane_utils.JBOSS_DIR = '/opt/jboss'
         os.system("sudo rm -Rf /opt/jboss")
         cplane_utils.prepare_env()
-        m_check_call.assert_called_with(['mkdir', '/opt/jboss'])
+        m_check_call.assert_called_with(['ln', '-sf', '/etc/init.d', '/etc/\
+rc.d/init.d'])
 
     @patch("commands.getoutput")
     def test_get_upgrade_type(self, m_getoutput):
@@ -229,8 +230,8 @@ jboss-6.1.0.Final')
     @patch("cplane_utils.set_config")
     def test_load_config(self, m_set_config):
         cplane_utils.load_config()
-        m_set_config.assert_called_with('DB_PASSWORD', 'admin',
-                                        'cplane-dvnd-config.yaml')
+        m_set_config.assert_called_with('JBOSS_INSTALL_REBOOT', 'y', 'cplane-\
+dvnd-config.yaml')
 
     @patch("commands.getoutput")
     def test_check_fip_mode(self, m_getoutput):

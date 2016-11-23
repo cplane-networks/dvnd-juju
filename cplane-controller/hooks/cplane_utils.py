@@ -44,7 +44,8 @@ DVND_CONFIG = OrderedDict([
     ('multicast-srv-intf', 'multicastServerInterface'),
     ('jboss-home', 'JBOSS_HOME'),
     ('db-user', 'DB_USERNAME'),
-    ('db-password', 'DB_PASSWORD')
+    ('db-password', 'DB_PASSWORD'),
+    ('intall-reboot-scripts', 'JBOSS_INSTALL_REBOOT')
 ])
 
 filename = {}
@@ -97,6 +98,11 @@ def prepare_env():
     cmd = ['mkdir', JBOSS_DIR]
     if os.path.exists(JBOSS_DIR) == 0:
         subprocess.check_call(cmd)
+    cmd = ['mkdir', '/etc/rc.d']
+    if os.path.exists('/etc/rc.d') == 0:
+        subprocess.check_call(cmd)
+    cmd = ['ln', '-sf', '/etc/init.d', '/etc/rc.d/init.d']
+    subprocess.check_call(cmd)
 
 
 def install_jboss():
@@ -367,3 +373,20 @@ def run_cp_installer():
     cmd = ['sh', 'cpinstaller', 'cplane-dvnd-config.yaml']
     subprocess.check_call(cmd)
     os.chdir(saved_path)
+
+
+def install_reboot_scripts():
+    saved_path = os.getcwd()
+    os.chdir(CPLANE_DIR)
+    cmd = "sed -i -e 's/#!\/bin\/sh/#!\/bin\/bash/g' startInitialize\
+           Programs.sh"
+    os.system(cmd)
+    cmd = "sed -i -e 's/#!\/bin\/sh/#!\/bin\/bash/g' startJBossServer.sh"
+    os.system(cmd)
+    cmd = "sed -i -e 's/#!\/bin\/sh/#!\/bin\/bash/g' startStartupPrograms.sh"
+    os.system(cmd)
+    os.chdir(saved_path)
+    cmd = 'update-rc.d {} defaults 20 '.format(config('oracle-version'))
+    os.system(cmd)
+    cmd = 'update-rc.d cplane-controller defaults 30'
+    os.system(cmd)

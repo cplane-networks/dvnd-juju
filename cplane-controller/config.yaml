@@ -57,3 +57,7 @@ options:
     default: "/opt/jboss/jboss-6.1.0.Final"
     type: string
     description: "JBOSS_HOME path"
+  intall-reboot-scripts:
+    default: "y"
+    type: string
+    description: "Flag to install the reboot scripts"

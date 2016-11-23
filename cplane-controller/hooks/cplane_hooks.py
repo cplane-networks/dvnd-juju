@@ -30,6 +30,7 @@ from cplane_utils import (
     clean_create_db,
     check_jboss_service,
     run_cp_installer,
+    install_reboot_scripts,
 )
 
 
@@ -73,6 +74,8 @@ def install():
     install_oracle()
     configure_oracle()
     cplane_installer('install')
+    if config('intall-reboot-scripts') == 'y':
+        install_reboot_scripts()
 
 
 @hooks.hook('start')
