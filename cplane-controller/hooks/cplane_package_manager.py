@@ -12,6 +12,7 @@ from charmhelpers.core.host import (
 
 from charmhelpers.core.hookenv import (
     status_set,
+    config,
 )
 
 CHARM_LIB_DIR = os.environ.get('CHARM_DIR', '') + "/lib/"
@@ -51,7 +52,7 @@ class CPlanePackageManager:
         response = urllib.urlopen(url)
         logging.info("Package url:%s" % url)
         data = self._validate_json(response.read())
-        self.package_data = data.get("1.3.5",
+        self.package_data = data.get("{}".format(config('cplane-version')),
                                      {}).get("ubuntu",
                                              {}).get("14.04",
                                                      {}).get("liberty")

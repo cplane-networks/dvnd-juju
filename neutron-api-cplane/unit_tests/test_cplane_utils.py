@@ -13,7 +13,8 @@ templating.OSConfigRenderer = MagicMock()
 TO_PATCH = [
     'apt_install',
     'os_release',
-    'config'
+    'config',
+    'open'
 ]
 
 
@@ -70,5 +71,17 @@ class CplaneUtilsTest(CharmTestCase):
                                          'neutron-server',
                                          'restart'])
 
+    @patch("json.load")
+    @patch("json.dump")
+    def test_configure_policy(self, m_json_dump, m_json_load):
+        data = {}
+        self.open.return_value = None
+        m_json_load.return_value = data
+        cplane_utils.configure_policy()
+        m_json_dump.assert_called_with({'update_ogr': 'rule:admin_or_owner',
+                                        'get_ogr': '', 'get_ogrs': '',
+                                        'delete_ogr': 'rule:admin_only',
+                                        'create_floatingip:floating_ip_\
+address': 'rule:admin_or_owner'}, None, indent=4)
 suite = unittest.TestLoader().loadTestsFromTestCase(CplaneUtilsTest)
 unittest.TextTestRunner(verbosity=2).run(suite)

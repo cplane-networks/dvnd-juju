@@ -38,7 +38,7 @@ hooks = Hooks()
 
 
 @hooks.hook('cplane-controller-relation-joined')
-def cplane_controller_relation_changed():
+def cplane_controller_relation_joined():
     if check_fip_mode() == 'true':
         fip_mode = True
     else:

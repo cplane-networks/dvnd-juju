@@ -1,5 +1,6 @@
 import os
 import subprocess
+import json
 
 from collections import OrderedDict
 from charmhelpers.contrib.openstack.utils import os_release
@@ -41,9 +42,18 @@ neutron_config = {"neutron.ml2.mechanism_drivers":
                   {"cplane_qos": ("neutron.plugins.ml2.extensions."
                                   "cplane_qos:CpQosExtensionDriver")}}
 
-cplane_packages = OrderedDict([('python-cplane-neutron-plugin', 439),
-                               ('neutronclient', 0)])
+cplane_packages = OrderedDict([('cplane-neutron-plugin', -1),
+                               ('cplane-neutronclient-extension', -1),
+                               ('cplane-nova-extension', -1),
+                               ('neutronclient', -1)])
 
+if config('cplane-version') == "1.3.5":
+    cplane_packages['cplane-neutron-plugin'] = 439
+    del cplane_packages['cplane-neutronclient-extension']
+    del cplane_packages['cplane-nova-extension']
+
+if config('cplane-version') == "1.3.7":
+    del cplane_packages['neutronclient']
 
 PACKAGES = ['neutron-plugin-ml2', 'crudini', 'python-dev']
 
@@ -132,3 +142,14 @@ def migrate_db():
            '--config-file', '/etc/neutron/plugins/ml2/ml2_conf.ini', 'upgrade',
            'head']
     subprocess.check_call(cmd)
+
+
+def configure_policy():
+    policy_file = "/etc/neutron/policy.json"
+    data = json.load(open(policy_file))
+    data["create_floatingip:floating_ip_address"] = "rule:admin_or_owner"
+    data["get_ogr"] = ""
+    data["get_ogrs"] = ""
+    data["delete_ogr"] = "rule:admin_only"
+    data["update_ogr"] = "rule:admin_or_owner"
+    json.dump(data, open(policy_file, 'w'), indent=4)

@@ -31,12 +31,17 @@ from cplane_network import (
 TEMPLATES = 'templates/'
 
 cplane_packages = OrderedDict([
-    ('python-cplane-neutron-plugin', 439),
-    ('openvswitch-common', 0),
-    ('openvswitch-datapath-dkms', 0),
-    ('openvswitch-switch', 0),
+    ('cplane-neutron-plugin', -1),
+    ('openvswitch-common', -1),
+    ('openvswitch-datapath-dkms', -1),
+    ('openvswitch-switch', -1),
+    ('cplane_notification_driver', -1),
     ('cp-agentd', -1),
 ])
+
+if config('cplane-version') == "1.3.5":
+    cplane_packages['cplane-neutron-plugin'] = 439
+    del cplane_packages['cplane_notification_driver']
 
 neutron_config = {
     'rabbit_userid': config('rabbit-user'),

@@ -28,6 +28,7 @@ from cplane_utils import (
     restart_service,
     python_intall,
     migrate_db,
+    configure_policy,
 )
 
 hooks = Hooks()
@@ -37,11 +38,12 @@ hooks = Hooks()
 def config_changed():
     configs = register_configs()
     configs.write_all()
-    import pkg_resources
-    NEUTRON_ENTRY_POINT = "/usr/lib/python2.7/dist-packages/neutron-" + \
-                          pkg_resources.get_distribution('neutron').version + \
-                          ".egg-info/entry_points.txt"
-    cplane_config(neutron_config, NEUTRON_ENTRY_POINT)
+    if config('cplane-version') == "1.3.5":
+        import pkg_resources
+        NEUTRON_ENTRY_POINT = "/usr/lib/python2.7/dist-packages/neutron-" \
+                              + pkg_resources.get_distribution('neutron').\
+                              version + ".egg-info/entry_points.txt"
+        cplane_config(neutron_config, NEUTRON_ENTRY_POINT)
 
 
 @hooks.hook('cplane-controller-relation-changed')
@@ -98,6 +100,8 @@ def install():
     install_cplane_packages()
     python_intall("bitarray")
     create_link()
+    if config('cplane-version') == "1.3.7":
+        configure_policy()
     restart_service()
 
 
