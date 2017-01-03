@@ -6,6 +6,9 @@ from collections import OrderedDict
 from charmhelpers.core.hookenv import (
     config,
     log,
+    relation_get,
+    relation_ids,
+    related_units,
 )
 
 from charmhelpers.fetch import (
@@ -16,6 +19,9 @@ import os
 import pwd
 import commands
 import time
+import re
+import json
+
 
 from cplane_package_manager import(
     CPlanePackageManager
@@ -23,12 +29,25 @@ from cplane_package_manager import(
 
 from xml.dom import minidom
 
+file_header = (
+    '\n################################################\n',
+    '# Added by Cplane controller\'s Oracle client  #\n',
+    '################################################\n')
+
 cplane_packages = OrderedDict([
     (config('oracle-version'), '0'),
     ('jboss', '0'),
     ('jdk', '0'),
+    ('oracle-client-basic', config('oracle-client-basic')),
+    ('oracle-sqlplus', config('oracle-sqlplus')),
     (config('controller-app-mode'), '0')
 ])
+
+if config('jboss-db-on-host') == 'n':
+    del cplane_packages[config('oracle-version')]
+elif config('jboss-db-on-host') == 'y':
+    del cplane_packages['oracle-client-basic']
+    del cplane_packages['oracle-sqlplus']
 
 
 PACKAGES = ['alien', 'libaio1', 'zlib1g-dev', 'libxml2-dev',
@@ -41,18 +60,20 @@ DVND_CONFIG = OrderedDict([
     ('multicast-port', 'multicastPort'),
     ('multicast-intf', 'multicastInterface'),
     ('unicast-port', 'unicastPort'),
-    ('multicast-srv-intf', 'multicastServerInterface'),
     ('jboss-home', 'JBOSS_HOME'),
     ('db-user', 'DB_USERNAME'),
     ('db-password', 'DB_PASSWORD'),
-    ('intall-reboot-scripts', 'JBOSS_INSTALL_REBOOT')
+    ('intall-reboot-scripts', 'JBOSS_INSTALL_REBOOT'),
+    ('oracle-host', 'DB_HOSTNAME'),
+    ('jboss-db-on-host', 'JBOSS_DB_ON_HOST')
 ])
 
-filename = {}
-
+ORACLE_HOST = ''
 JBOSS_DIR = '/opt/jboss'
 CHARM_LIB_DIR = os.environ.get('CHARM_DIR', '') + "/lib/"
 CPLANE_DIR = '/opt/cplane/bin'
+DB_DIR = os.environ.get('CHARM_DIR', '') + "/lib/" + 'PKG/pkg/db_init/'
+FILES_PATH = CHARM_LIB_DIR + '/filelink'
 
 
 def determine_packages():
@@ -60,18 +81,22 @@ def determine_packages():
 
 
 def download_cplane_packages():
+    filename = {}
     cp_package = CPlanePackageManager(CPLANE_URL)
     for key, value in cplane_packages.items():
         filename[key] = cp_package.download_package(key, value)
-        print 'downloaded', filename[key]
+        log('downloaded {} package'.format(filename[key]))
+    json.dump(filename, open(FILES_PATH, 'w'))
 
 
 def download_cplane_installer():
+    filename = json.load(open(FILES_PATH))
     cp_package = CPlanePackageManager(CPLANE_URL)
     for key, value in cplane_packages.items():
         if key == config('controller-app-mode'):
             filename[key] = cp_package.download_package(key, value)
-            print 'downloaded', filename[key]
+            log('downloaded {} package'.format(filename[key]))
+    json.dump(filename, open(FILES_PATH, 'w'))
 
 
 def oracle_configure_init():
@@ -84,7 +109,7 @@ def oracle_configure_init():
     child.sendline(config('oracle-db-enable'))
     child.timeout = 300
     child.expect(pexpect.EOF)
-    print child.before
+    log('{}'.format(child.before))
 
 
 def prepare_env():
@@ -106,6 +131,7 @@ def prepare_env():
 
 
 def install_jboss():
+    filename = json.load(open(FILES_PATH))
     saved_path = os.getcwd()
     os.chdir(JBOSS_DIR)
     cmd = ['cp', filename['jboss'], '.']
@@ -122,6 +148,7 @@ def install_jboss():
 
 
 def deb_convert_install(module):
+    filename = json.load(open(FILES_PATH))
     saved_path = os.getcwd()
     os.chdir(CHARM_LIB_DIR)
     cmd = ['alien', '--scripts', '-d', '-i', filename[module]]
@@ -141,6 +168,46 @@ $(readlink -f $(which javac))))")
         f.write('export JAVA_HOME={}\n'.format(java_dir))
     f.close()
     os.system('export JAVA_HOME={}'.format(java_dir))
+
+
+def install_oracle_client():
+    log('Installing Oracle Client Basic')
+    deb_convert_install('oracle-client-basic')
+    log('Installing Oracle Sqlplus')
+    deb_convert_install('oracle-sqlplus')
+
+
+def configure_oracle_client():
+    filename = json.load(open(FILES_PATH))
+    cmd = 'ln -s /usr/bin/sqlplus64 /usr/bin/sqlplus'
+    os.system(cmd)
+    oracle_version = re.findall(u'instantclient([0-9.]+)', filename['oracle\
+-client-basic'])[0]
+    with open('/etc/ld.so.conf.d/oracle.conf',
+              'w') as oracle_configuration_file:
+        oracle_configuration_file.writelines(file_header)
+        oracle_configuration_file.write('/usr/lib/oracle/{}/client64/\
+lib\n'.format(oracle_version))
+    cmd = 'ldconfig'
+    os.system(cmd)
+
+    with open('/etc/profile.d/oracle.sh', 'w') as oracle_env:
+        oracle_env.write('export ORACLE_HOME=/usr/lib/oracle/''{}/\
+client64\n'.format(oracle_version))
+
+    home_dir = pwd.getpwuid(os.getuid()).pw_dir
+    with open('{}/.bashrc'.format(home_dir), 'a') as bashrc:
+        bashrc.write('export LD_LIBRARY_PATH=/usr/lib/oracle/''{}/\
+client64/lib\n'.format(oracle_version))
+        bashrc.write('export ORACLE_HOME=/usr/lib/oracle/''{}/\
+client64\n'.format(oracle_version))
+    cmd = 'export ORACLE_HOME=/usr/lib/oracle/{}/\
+           client64'.format(oracle_version)
+    os.system(cmd)
+
+    cmd = 'export LD_LIBRARY_PATH=/usr/lib/oracle/{}/\
+client64/lib'.format(oracle_version)
+    os.system(cmd)
 
 
 def install_oracle():
@@ -212,45 +279,56 @@ def execute_sql_command(connect_string, sql_command):
     session = subprocess.Popen(['sqlplus', '-S', connect_string], stdin=PIPE,
                                stdout=PIPE, stderr=PIPE)
     session.stdin.write(sql_command)
-    print session.communicate()
+    log('{}'.format(session.communicate()))
 
 
 def prepare_database():
-    connect_string = 'system/' + config('oracle-password') + '@XE'
-    execute_sql_command(connect_string,
-                        "@cp_create_ts /u01/app/oracle/oradata/XE/")
-    execute_sql_command(connect_string,
-                        "@cp_create_user {} {}".format(config('db-user'),
-                                                       config('db-password')))
-    execute_sql_command(connect_string,
-                        "grant resource to {};".format(config('db-user')))
-    execute_sql_command(connect_string,
-                        "grant create view to {};".format(config('db-user')))
+    saved_path = os.getcwd()
+    set_oracle_host()
+    os.chdir(DB_DIR)
+    host = ORACLE_HOST + '/'
+    log('preparing the Database')
+    connect_string = 'system/' + config('oracle-\
+password') + '@' + host + 'XE'
+    execute_sql_command(connect_string, "@cp_create_ts /\
+u01/app/oracle/oradata/XE/")
+    execute_sql_command(connect_string, "@cp_create_user {} \
+{}".format(config('db-user'), config('db-password')))
+    execute_sql_command(connect_string, "grant \
+resource to {};".format(config('db-user')))
+    execute_sql_command(connect_string, "grant \
+create view to {};".format(config('db-user')))
 
-    cmd = 'sh install.sh {}/{}@XE 2>&1 | tee install.log'\
-          .format(config('db-user'), config('db-password'))
+    cmd = 'sh install.sh {}/{}@{}XE 2>&1 | tee \
+install.log'.format(config('db-user'), config('db-password'), host)
     os.system(cmd)
-
-    connect_string = '{}/{}@XE'.format(config('db-user'),
-                                       config('db-password'))
+    connect_string = '{}/{}@{}XE'.format(config('db-user'), config('db-\
+password'), host)
     execute_sql_command(connect_string, "@install_plsql")
+    os.chdir(saved_path)
 
 
-def cplane_installer(install_type):
+def load_config():
+    if config('controller-app-mode') == 'dvnd':
+        for key, value in DVND_CONFIG.items():
+            set_config(value, config(key), 'cplane-dvnd-config.yaml')
+        set_config('multicastServerInterface', config('multicast-intf'),
+                   'cplane-dvnd-config.yaml')
+
+
+def cplane_installer():
+    filename = json.load(open(FILES_PATH))
     saved_path = os.getcwd()
     os.chdir(CHARM_LIB_DIR)
     cmd = ['unzip', '-o', filename[config('controller-app-mode')]]
     subprocess.check_call(cmd)
-
     load_config()
-
+    set_oracle_host()
+    if config('jboss-db-on-host') == 'n':
+        set_config('DB_HOSTNAME', ORACLE_HOST, 'cplane-dvnd-config.yaml')
     os.chdir('PKG/pkg')
     cmd = ['tar', 'xvf', 'db_init.tar']
     subprocess.check_call(cmd)
-
-    if install_type == 'install':
-        os.chdir('db_init')
-        prepare_database()
 
     os.chdir(CHARM_LIB_DIR + '/PKG')
     cmd = ['chmod', '+x', 'cpinstaller']
@@ -280,9 +358,9 @@ def initialize_programs(install_type):
     child.sendline(install_type)
     if install_type == 'I':
         child.sendline('y')
-    child.timeout = 1500
+    child.timeout = 3000
     child.expect(pexpect.EOF)
-    print child.before
+    log('{}'.format(child.before))
     log("Initialize programs Completed")
 
 
@@ -304,6 +382,8 @@ def start_services(install_type):
             initialize_programs('P')
         elif install_type == 'clean-db':
             initialize_programs('I')
+        elif install_type == 'create-db':
+            initialize_programs('I')
 
         cmd = ['bash', 'startStartupPrograms.sh']
         subprocess.check_call(cmd)
@@ -313,15 +393,9 @@ def start_services(install_type):
 
 
 def set_config(key, value, config_file):
-    path = CHARM_LIB_DIR + '/PKG/' + config_file
+    path = CHARM_LIB_DIR + 'PKG/' + config_file
     cmd = "sed -ie 's/{}:.*/{}: {}/g' {}". format(key, key, value, path)
     os.system(cmd)
-
-
-def load_config():
-    if config('controller-app-mode') == 'dvnd':
-        for key, value in DVND_CONFIG.items():
-            set_config(value, config(key), 'cplane-dvnd-config.yaml')
 
 
 def check_fip_mode():
@@ -338,18 +412,26 @@ awk '{ print $2}'")
     return upgrade_type
 
 
+def flush_upgrade_type():
+    cmd = "echo upgrade-type: create-db > $CHARM_DIR/config/upgrade-config"
+    os.system(cmd)
+
+
 def clean_create_db():
-    set_oracle_env()
+    if config('jboss-db-on-host') == 'y':
+        set_oracle_env()
+    set_oracle_host()
+    host = ORACLE_HOST + '/'
     saved_path = os.getcwd()
     os.chdir('{}/PKG/pkg/db_init'.format(CHARM_LIB_DIR))
-    cmd = 'sh un_install.sh {}/{}@XE 2>&1 | tee install.log'\
-          .format(config('db-user'), config('db-password'))
+    cmd = 'sh un_install.sh {}/{}@{}XE 2>&1 | tee install.log'\
+          .format(config('db-user'), config('db-password'), host)
     os.system(cmd)
-    cmd = 'sh install.sh {}/{}@XE 2>&1 | tee install.log'\
-          .format(config('db-user'), config('db-password'))
+    cmd = 'sh install.sh {}/{}@{}XE 2>&1 | tee install.log'\
+          .format(config('db-user'), config('db-password'), host)
     os.system(cmd)
-    connect_string = '{}/{}@XE'.format(config('db-user'),
-                                       config('db-password'))
+    connect_string = '{}/{}@{}XE'.format(config('db-user'), config('db-\
+password'), host)
     execute_sql_command(connect_string, "@reinstall_plsql")
     os.chdir(saved_path)
 
@@ -369,6 +451,9 @@ def run_cp_installer():
     saved_path = os.getcwd()
     os.chdir(CHARM_LIB_DIR)
     load_config()
+    set_oracle_host()
+    if config('jboss-db-on-host') == 'n':
+        set_config('DB_HOSTNAME', ORACLE_HOST, 'cplane-dvnd-config.yaml')
     os.chdir('PKG')
     cmd = ['sh', 'cpinstaller', 'cplane-dvnd-config.yaml']
     subprocess.check_call(cmd)
@@ -386,7 +471,24 @@ def install_reboot_scripts():
     cmd = "sed -i -e 's/#!\/bin\/sh/#!\/bin\/bash/g' startStartupPrograms.sh"
     os.system(cmd)
     os.chdir(saved_path)
-    cmd = 'update-rc.d {} defaults 20 '.format(config('oracle-version'))
-    os.system(cmd)
+    if config('jboss-db-on-host') == 'y':
+        cmd = 'update-rc.d {} defaults 20 '.format(config('oracle-version'))
+        os.system(cmd)
     cmd = 'update-rc.d cplane-controller defaults 30'
     os.system(cmd)
+
+
+def set_oracle_host():
+    global ORACLE_HOST
+    if config('jboss-db-on-host') == 'y':
+        ORACLE_HOST = 'localhost'
+        return ORACLE_HOST
+    for rid in relation_ids('oracle'):
+        for unit in related_units(rid):
+            oracle_host = relation_get(attribute='oracle-\
+host', unit=unit, rid=rid)
+            if oracle_host:
+                ORACLE_HOST = oracle_host
+                return oracle_host
+            else:
+                return oracle_host

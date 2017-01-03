@@ -1,1 +1,1 @@
-upgrade-type: clean-db
+upgrade-type: create-db

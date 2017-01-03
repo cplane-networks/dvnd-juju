@@ -16,3 +16,8 @@ provides:
   cplane-controller:
     interface: cplane-controller
     scope: global
+requires:
+  oracle:
+   interface: oracle
+   scope: global
+

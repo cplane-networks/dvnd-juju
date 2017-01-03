@@ -1,0 +1,20 @@
+name: oracle
+summary: Oracle for Openstack 
+maintainer: amarendra <info@cplanenetworks.com>
+description: |
+      This is Oracle charm.
+
+tags:
+  - openstack
+  - networking
+  - database
+extra-bindings:
+  public:
+  admin:
+  internal:
+subordinate: False 
+provides:
+  oracle:
+    interface: oracle
+    scope: global
+

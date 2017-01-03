@@ -11,7 +11,7 @@ For more information see [http://www.cplanenetworks.com/]
 
 This charm requires the deployment of the **neutron-api-cplane** charm and **neutron-openvswitch-cplane** charm. It eliminates the need for the neutron-gateway charm as L3 routing agent which is handled by the compute tier.
 
-The neutron-openvswitch-cplane charm has several core functions:
+The cplane-controller charm has several core functions:
 
  - Install JBOSS 
  - Install JDK  

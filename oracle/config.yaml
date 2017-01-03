@@ -1,0 +1,35 @@
+options:
+  oracle-version:
+    default: "oracle-xe"
+    type: string
+    description: "Version of oracle to be installed"
+  cp-package-url:
+    default: "http://192.168.7.103/cplane_metadata.json"
+    type: string
+    description: |
+      URL for cplane packages
+      if from local repo then "http://xx.xx.xx.xx/cplane_metadata.json"
+  oracle-http-port:
+    default: "8085"
+    type: string
+    description: "Oracle Http port"
+  oracle-listener-port:
+    default: "1521"
+    type: string
+    description: "Oracle listener port"
+  oracle-password:
+    default: "password"
+    type: string
+    description: "Oracle password"
+  db-user:
+    default: "admin"
+    type: string
+    description: "Database  username"
+  db-password:
+    default: "admin"
+    type: string
+    description: "Database password"
+  oracle-db-enable:
+    default: "y"
+    type: string
+    description: "Enable Oracle at boot time"

@@ -20,16 +20,17 @@ TO_PATCH = [
     'apt_install',
     'config',
     'open',
+    'log'
 ]
-
 
 cplane_install_package = OrderedDict([
     ('dvnd', '0')
 ])
 
+CPLANE_URL = 'http://192.168.7.103/cplane_metadata.json'
+
 
 class CplaneUtilsTest(CharmTestCase):
-
     def setUp(self):
         super(CplaneUtilsTest, self).setUp(cplane_utils, TO_PATCH)
         self.config.side_effect = self.test_config.get
@@ -65,17 +66,19 @@ rc.d/init.d'])
 | awk '{ print $2}'")
 
     @patch.object(CPlanePackageManager, "download_package")
-    def test_download_cplane_packages(self, m_download_package):
-        cplane_utils.CPLANE_URL = 'https://www.dropbox.com/s/h2edle1o0jj1btt/\
-cplane_metadata.json?dl=1'
+    @patch("json.dump")
+    def test_download_cplane_packages(self, m_json_dump, m_download_package):
+        cplane_utils.CPLANE_URL = CPLANE_URL
         cplane_utils.cplane_packages = cplane_install_package
         cplane_utils.download_cplane_packages()
         m_download_package.assert_called_with('dvnd', '0')
 
     @patch.object(CPlanePackageManager, "download_package")
-    def test_download_cplane_installer(self, m_download_package):
-        cplane_utils.CPLANE_URL = 'https://www.dropbox.com/s/h2edle1o0jj1btt/\
-cplane_metadata.json?dl=1'
+    @patch("json.load")
+    @patch("json.dump")
+    def test_download_cplane_installer(self, m_json_dump, m_json_load,
+                                       m_download_package):
+        cplane_utils.CPLANE_URL = CPLANE_URL
         cplane_utils.cplane_packages = cplane_install_package
         self.test_config.set('controller-app-mode', 'dvnd')
         cplane_utils.download_cplane_installer()
@@ -89,9 +92,12 @@ cplane_metadata.json?dl=1'
 
     @patch("subprocess.check_call")
     @patch("os.system")
-    def test_install_jboss(self, m_system, m_check_call):
+    @patch("json.load")
+    def test_install_jboss(self, m_json_load, m_system, m_check_call):
         commands.getoutput("echo test > test.txt")
-        cplane_utils.filename['jboss'] = 'test.txt'
+        cplane_utils.JBOSS_DIR = '.'
+        data = {'jboss': 'test.txt'}
+        m_json_load.return_value = data
         cplane_utils.JBOSS_DIR = '.'
         cplane_utils.install_jboss()
         m_check_call.assert_called_with(['unzip', '-o', 'test.txt'])
@@ -100,9 +106,11 @@ jboss-6.1.0.Final')
         commands.getoutput("rm -f  test.txt")
 
     @patch("subprocess.check_call")
-    def test_deb_convert_install(self, m_check_call):
+    @patch('json.load')
+    def test_deb_convert_install(self, m_json_load, m_check_call):
         cplane_utils.CHARM_LIB_DIR = '.'
-        cplane_utils.filename['jboss'] = 'test.txt'
+        data = {'jboss': 'test.txt'}
+        m_json_load.return_value = data
         cplane_utils.deb_convert_install('jboss')
         m_check_call.assert_called_with(['alien', '--scripts', '-d',
                                         '-i', 'test.txt'])
@@ -144,22 +152,35 @@ jboss-6.1.0.Final')
 
     @patch("cplane_utils.execute_sql_command")
     @patch("os.system")
-    def test_prepare_database(self, m_system, m_execute_sql_command):
+    @patch("cplane_utils.set_oracle_host")
+    def test_prepare_database(self, m_set_oracle_host, m_system,
+                              m_execute_sql_command):
+        cplane_utils.DB_DIR = '.'
         cplane_utils.prepare_database()
-        m_system.assert_called_with('sh install.sh admin/admin@XE 2>&1 \
-| tee install.log')
-        m_execute_sql_command.assert_called_with('admin/admin@XE',
+        m_set_oracle_host.assert_called_with()
+        m_system.assert_called_with('sh install.sh admin/admin@localhost/\
+XE 2>&1 | tee install.log')
+        m_execute_sql_command.assert_called_with('admin/admin@localhost/XE',
                                                  '@install_plsql')
+        m_system.assert_called_with('sh install.sh admin/admin@{}/XE 2>&1 \
+| tee install.log'.format(cplane_utils.ORACLE_HOST))
+        m_execute_sql_command.assert_called_with('admin/admin@{}/\
+XE'.format(cplane_utils.ORACLE_HOST), '@install_plsql')
 
     @patch("subprocess.check_call")
     @patch("cplane_utils.load_config")
     @patch("cplane_utils.prepare_database")
     @patch("os.chdir")
-    def test_cplane_installer_install(self, m_chdir, m_prepare_database,
-                                      m_load_config, m_check_call):
-        cplane_utils.filename['dvnd'] = 'PKG.zip'
-        cplane_utils.cplane_installer("install")
-        m_prepare_database.assert_called_with()
+    @patch("json.load")
+    @patch("json.dump")
+    @patch("cplane_utils.set_oracle_host")
+    @patch("cplane_utils.set_config")
+    def test_cplane_installer_install(self, m_set_config, m_set_oracle_host,
+                                      m_json_dump, m_json_load, m_chdir,
+                                      m_prepare_database, m_load_config,
+                                      m_check_call):
+        cplane_utils.cplane_installer()
+        m_set_oracle_host.assert_called_with()
         m_check_call.assert_called_with(['sh', 'cpinstaller',
                                         'cplane-dvnd-config.yaml'])
 
@@ -167,10 +188,16 @@ jboss-6.1.0.Final')
     @patch("cplane_utils.load_config")
     @patch("cplane_utils.prepare_database")
     @patch("os.chdir")
-    def test_cplane_installer_upgrade(self, m_chdir, m_prepare_database,
-                                      m_load_config, m_check_call):
-        cplane_utils.filename['dvnd'] = 'PKG.zip'
-        cplane_utils.cplane_installer("upgrade")
+    @patch("json.load")
+    @patch("json.dump")
+    @patch("cplane_utils.set_oracle_host")
+    @patch("cplane_utils.set_config")
+    def test_cplane_installer_upgrade(self, m_set_config, m_set_oracle_host,
+                                      m_json_dump, m_json_load, m_chdir,
+                                      m_prepare_database, m_load_config,
+                                      m_check_call):
+        cplane_utils.cplane_installer()
+        m_set_oracle_host.assert_called_with()
         m_check_call.assert_called_with(['sh', 'cpinstaller',
                                         'cplane-dvnd-config.yaml'])
 
@@ -224,14 +251,14 @@ jboss-6.1.0.Final')
     @patch("os.system")
     def test_set_config(self, m_system):
         cplane_utils.set_config('test', 'test', 'test.txt')
-        m_system.assert_called_with("sed -ie 's/test:.*/test: test/g'\
- ./PKG/test.txt")
+        m_system.assert_called_with("sed -ie 's/test:.*/test: test/\
+g' .PKG/test.txt")
 
     @patch("cplane_utils.set_config")
     def test_load_config(self, m_set_config):
         cplane_utils.load_config()
-        m_set_config.assert_called_with('JBOSS_INSTALL_REBOOT', 'y', 'cplane-\
-dvnd-config.yaml')
+        m_set_config.assert_called_with('multicastServerInterface',
+                                        'br-eth2', 'cplane-dvnd-config.yaml')
 
     @patch("commands.getoutput")
     def test_check_fip_mode(self, m_getoutput):
@@ -243,13 +270,20 @@ dvnd-config.yaml')
     @patch("os.chdir")
     @patch("os.system")
     @patch("cplane_utils.execute_sql_command")
-    def test_clean_create_db(self, m_execute_sql_command, m_system, m_chdir,
-                             m_set_oracle_env):
+    @patch("cplane_utils.set_oracle_host")
+    def test_clean_create_db(self, m_set_oracle_host, m_execute_sql_command,
+                             m_system, m_chdir, m_set_oracle_env):
+        cplane_utils.ORACLE_HOST = 'localhost'
         cplane_utils.clean_create_db()
-        m_set_oracle_env.assert_called_with()
-        m_system.assert_called_with("sh install.sh admin/admin@XE 2>&1 | \
-tee install.log")
-        m_execute_sql_command.assert_called_with('admin/admin@XE',
+#        m_set_oracle_env.assert_called_with()
+        m_set_oracle_host.assert_called_with()
+        m_system.assert_called_with('sh install.sh admin/admin@localhost/\
+XE 2>&1 | tee install.log')
+        m_execute_sql_command.assert_called_with('admin/admin@localhost/XE',
+                                                 '@reinstall_plsql')
+        m_system.assert_called_with('sh install.sh admin/admin@localhost/\
+XE 2>&1 | tee install.log'.format(cplane_utils.ORACLE_HOST))
+        m_execute_sql_command.assert_called_with('admin/admin@localhost/XE',
                                                  '@reinstall_plsql')
 
     @patch("os.chdir")
@@ -262,9 +296,13 @@ tee install.log")
     @patch("os.chdir")
     @patch("cplane_utils.load_config")
     @patch("subprocess.check_call")
-    def test_run_cp_installer(self, m_check_call, m_load_config, m_chdir):
+    @patch("cplane_utils.set_oracle_host")
+    @patch("cplane_utils.set_config")
+    def test_run_cp_installer(self, m_set_config, m_set_oracle_host,
+                              m_check_call, m_load_config, m_chdir):
         cplane_utils.run_cp_installer()
         m_load_config.assert_called_with()
+        m_set_oracle_host.assert_called_with()
         m_check_call.assert_called_with(['sh', 'cpinstaller', 'cplane-dvnd-\
 config.yaml'])
 
