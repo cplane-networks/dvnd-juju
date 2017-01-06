@@ -148,6 +148,9 @@ def configure_policy():
     policy_file = "/etc/neutron/policy.json"
     data = json.load(open(policy_file))
     data["create_floatingip:floating_ip_address"] = "rule:admin_or_owner"
+    data["update_floatingip_quota"] = "rule:admin_or_owner"
+    data["get_floatingip_quota"] = "rule:admin_or_owner"
+    data["get_floatingip_quotas"] = ""
     data["get_ogr"] = ""
     data["get_ogrs"] = ""
     data["delete_ogr"] = "rule:admin_only"
