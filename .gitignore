@@ -1,3 +1,4 @@
 *.pyc
 .testrepository/
 .tox/
+cp-package-manager.log

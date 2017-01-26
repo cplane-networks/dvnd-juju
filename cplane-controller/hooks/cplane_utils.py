@@ -3,12 +3,15 @@ import subprocess
 
 from subprocess import PIPE
 from collections import OrderedDict
+import netifaces as ni
 from charmhelpers.core.hookenv import (
     config,
     log,
     relation_get,
     relation_ids,
     related_units,
+    unit_get,
+    network_get_primary_address,
 )
 
 from charmhelpers.fetch import (
@@ -498,3 +501,47 @@ host', unit=unit, rid=rid)
                 return oracle_host
             else:
                 return oracle_host
+
+
+class UnconfiguredInterface(Exception):
+    pass
+
+
+def get_unit_ip(config_override='multicast-intf', address_family=ni.AF_INET):
+    """Get the IP of this unit for cplane-controller relationship
+
+    If the config override interface is configured use that address otherwise
+    consult network-get for the correct address. As a last resort use the
+    fallback interface.
+
+    @param config_overide: The string name of the configuration value that can
+                           override the use of network spaces
+    @param address_family: The netifaces address familiy
+                           i.e. for IPv4 AF_INET
+                           Only used when config(config_override) is configured
+    @returns: IP address for this unit for the cplane-controller relationship
+    """
+
+    # If the config override is not set to an interface use network-get
+    # to leverage network spaces in MAAS 2.x
+    if not config(config_override):
+        try:
+            return network_get_primary_address('cplane-controller')
+        except NotImplementedError:
+            # Juju 1.x enviornment
+            return unit_get('private-address')
+
+    interface = config(config_override)
+    try:
+        interface_config = ni.ifaddresses(interface).get(address_family)
+        if interface_config:
+            for link in interface_config:
+                addr = link['addr']
+                if addr:
+                    return addr
+    except ValueError as e:
+        raise UnconfiguredInterface("Interface {} is invalid: {}"
+                                    "".format(interface, e.message))
+    raise UnconfiguredInterface("{} interface has no address in the "
+                                "address family {}".format(interface,
+                                                           address_family))

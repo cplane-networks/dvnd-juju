@@ -39,6 +39,7 @@ from cplane_utils import (
     prepare_database,
     set_oracle_env,
     flush_upgrade_type,
+    get_unit_ip,
 )
 
 
@@ -56,7 +57,9 @@ def cplane_controller_relation_joined(rid=None):
         'fip-mode': fip_mode,
         'mport': config('multicast-port'),
         'uport': config('unicast-port'),
-        'rel-time': tm
+        'rel-time': tm,
+        'private-address': get_unit_ip(),
+        'hostname': get_unit_ip(),
     }
     relation_set(relation_id=rid, relation_settings=relation_info)
 
@@ -72,11 +75,9 @@ def upgrade_charm():
     if config('intall-reboot-scripts') == 'y':
         install_reboot_scripts()
     start_services(upgrade_type)
-    for r_id in relation_ids('cplane-controller'):
-        cplane_controller_relation_joined(rid=r_id)
 
 
-@hooks.hook('install')
+@hooks.hook('install.real')
 def install():
     apt_update(fatal=True)
     pkgs = determine_packages()
@@ -131,6 +132,8 @@ def config_changed():
         if config('intall-reboot-scripts') == 'y':
             install_reboot_scripts()
         start_services('config-change')
+    for r_id in relation_ids('cplane-controller'):
+        cplane_controller_relation_joined(rid=r_id)
 
 
 def main():
