@@ -21,6 +21,7 @@ import commands
 import time
 import re
 import json
+import socket
 
 
 from cplane_package_manager import(
@@ -314,6 +315,11 @@ def load_config():
             set_config(value, config(key), 'cplane-dvnd-config.yaml')
         set_config('multicastServerInterface', config('multicast-intf'),
                    'cplane-dvnd-config.yaml')
+        if config('use-default-jboss-cluster') == 'n':
+            hostname = socket.gethostname()
+            cluster_name = 'cplane' + '-' + hostname
+            set_config('JBOSS_CLUSTER_NAME', cluster_name,
+                       'cplane-dvnd-config.yaml')
 
 
 def cplane_installer():

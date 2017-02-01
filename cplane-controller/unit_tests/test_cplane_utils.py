@@ -258,7 +258,8 @@ g' .PKG/test.txt")
     def test_load_config(self, m_set_config):
         cplane_utils.load_config()
         m_set_config.assert_called_with('multicastServerInterface',
-                                        'br-eth2', 'cplane-dvnd-config.yaml')
+                                        'br-eth2',
+                                        'cplane-dvnd-config.yaml')
 
     @patch("commands.getoutput")
     def test_check_fip_mode(self, m_getoutput):
