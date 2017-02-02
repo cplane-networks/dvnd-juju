@@ -39,6 +39,10 @@ options:
     type: string
     default: "br-eth1"
     description: "Data interface to create the bridge network"
+  data-gateway:
+    type: string
+    default:
+    description: "Data network gateway if this cannot be configured in /etc/network/interfaces"
   tun-interface:
     type: string
     default: "br-eth2"

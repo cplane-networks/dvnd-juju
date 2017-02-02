@@ -51,7 +51,7 @@ def delete_br_ext(interface):
     subprocess.check_call(cmd)
 
 
-def add_bridge(name, interface):
+def add_bridge(name, interface, gw=None):
     network_configuration = UbuntuIntfMgmt()
 
     if check_interface(name):
@@ -59,8 +59,9 @@ def add_bridge(name, interface):
     data = get_int_config(interface)
     netmask = data[0]['netmask']
     addr = data[0]['addr']
-    gateway = ni.gateways()
-    gw = gateway['default'][ni.AF_INET][0]
+    if not gw:
+        gateway = ni.gateways()
+        gw = gateway['default'][ni.AF_INET][0]
 
     extra_params = network_configuration.extract_net_config(interface,
                                                             backup=True,

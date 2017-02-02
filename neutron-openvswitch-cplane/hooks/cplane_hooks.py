@@ -118,7 +118,9 @@ def install():
     pkgs = determine_packages()
     apt_install(pkgs, fatal=True)
     install_cplane_packages()
-    add_bridge('br-ext', config('data-interface'))
+    add_bridge('br-ext',
+               interface=config('data-interface'),
+               gw=config('data-gateway'))
     if check_interface(config('tun-interface')):
         add_bridge('br-tun', config('tun-interface'))
     else:

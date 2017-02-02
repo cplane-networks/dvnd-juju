@@ -1,26 +1,24 @@
 #!/usr/bin/python
 from test_utils import CharmTestCase, unittest
 
-from mock import MagicMock, patch
+from mock import MagicMock, patch, call
 import charmhelpers.contrib.openstack.templating as templating
 from charmhelpers.core import hookenv
 hookenv.config = MagicMock()
 import cplane_utils
-import os
 import commands
 from collections import OrderedDict
 
 templating.OSConfigRenderer = MagicMock()
 
-from cplane_package_manager import(
-    CPlanePackageManager
-)
-
 TO_PATCH = [
     'apt_install',
     'config',
     'open',
-    'log'
+    'log',
+    'unit_get',
+    'network_get_primary_address',
+    'ni',
 ]
 
 cplane_install_package = OrderedDict([
@@ -51,13 +49,20 @@ class CplaneUtilsTest(CharmTestCase):
         m_check_call.assert_called_with(['ln', '-sf', '/etc/init.d', '/etc/\
 rc.d/init.d'])
 
+    @patch.object(cplane_utils.os.path, "exists")
     @patch("subprocess.check_call")
-    def test_prepare_env_jboss_not_exist(self, m_check_call):
+    def test_prepare_env_jboss_not_exist(self, m_check_call, m_os_path_exists):
         cplane_utils.JBOSS_DIR = '/opt/jboss'
-        os.system("sudo rm -Rf /opt/jboss")
+        m_os_path_exists.return_value = False
         cplane_utils.prepare_env()
-        m_check_call.assert_called_with(['ln', '-sf', '/etc/init.d', '/etc/\
-rc.d/init.d'])
+        m_check_call.assert_has_calls(
+            [call(['ln', '-sf', '/usr/bin/awk', '/bin/awk']),
+             call(['mkdir', '/var/lock/subsys']),
+             call(['chmod', '-R', '777', '/var/lock/subsys']),
+             call(['mkdir', '/opt/jboss']),
+             call(['mkdir', '/etc/rc.d']),
+             call(['ln', '-sf', '/etc/init.d', '/etc/rc.d/init.d'])],
+            any_order=True)
 
     @patch("commands.getoutput")
     def test_get_upgrade_type(self, m_getoutput):
@@ -65,19 +70,25 @@ rc.d/init.d'])
         m_getoutput.assert_called_with("cat $CHARM_DIR/config/upgrade-config \
 | awk '{ print $2}'")
 
-    @patch.object(CPlanePackageManager, "download_package")
+    @patch.object(cplane_utils.CPlanePackageManager, "_create_log")
+    @patch.object(cplane_utils.CPlanePackageManager, "_get_pkg_json")
+    @patch.object(cplane_utils.CPlanePackageManager, "download_package")
     @patch("json.dump")
-    def test_download_cplane_packages(self, m_json_dump, m_download_package):
+    def test_download_cplane_packages(self, m_json_dump, m_download_package,
+                                      m_get_pkg_json, m_create_log):
         cplane_utils.CPLANE_URL = CPLANE_URL
         cplane_utils.cplane_packages = cplane_install_package
         cplane_utils.download_cplane_packages()
         m_download_package.assert_called_with('dvnd', '0')
 
-    @patch.object(CPlanePackageManager, "download_package")
+    @patch.object(cplane_utils.CPlanePackageManager, "_create_log")
+    @patch.object(cplane_utils.CPlanePackageManager, "_get_pkg_json")
+    @patch.object(cplane_utils.CPlanePackageManager, "download_package")
     @patch("json.load")
     @patch("json.dump")
     def test_download_cplane_installer(self, m_json_dump, m_json_load,
-                                       m_download_package):
+                                       m_download_package, m_get_pkg_json,
+                                       m_create_log):
         cplane_utils.CPLANE_URL = CPLANE_URL
         cplane_utils.cplane_packages = cplane_install_package
         self.test_config.set('controller-app-mode', 'dvnd')
@@ -306,6 +317,45 @@ XE 2>&1 | tee install.log'.format(cplane_utils.ORACLE_HOST))
         m_set_oracle_host.assert_called_with()
         m_check_call.assert_called_with(['sh', 'cpinstaller', 'cplane-dvnd-\
 config.yaml'])
+
+    def test_get_unit_ip(self):
+        SPACES_ADDRESS = '10.100.1.1'
+        NI_ADDRESS = '192.168.2.2'
+        DEFAULT_ADDRESS = '172.16.3.3'
+        self.unit_get.return_value = DEFAULT_ADDRESS
+        self.ni.ifaddresses.return_value = None
+
+        _config = {'multicast-intf': None}
+        self.config.side_effect = lambda key: _config.get(key)
+
+        # Network spaces address
+        self.network_get_primary_address.return_value = SPACES_ADDRESS
+        self.assertEqual(SPACES_ADDRESS, cplane_utils.get_unit_ip())
+        (self.network_get_primary_address.
+            assert_called_with('cplane-controller'))
+
+        # Default unit_get address
+        self.network_get_primary_address.side_effect = NotImplementedError
+        self.assertEqual(DEFAULT_ADDRESS, cplane_utils.get_unit_ip())
+        self.unit_get.assert_called_with('private-address')
+
+        # multicast-intf address
+        self.ni.ifaddresses.return_value = {2: [{'addr': NI_ADDRESS}]}
+        _config = {'multicast-intf': 'eth0'}
+        self.config.side_effect = lambda key: _config.get(key)
+        self.assertEqual(NI_ADDRESS, cplane_utils.get_unit_ip())
+        self.ni.ifaddresses.assert_called_with('eth0')
+
+        # Interface configured with multicast-intf has no IP
+        self.ni.ifaddresses.return_value = {4: [{'addr': NI_ADDRESS}]}
+        with self.assertRaises(cplane_utils.UnconfiguredInterface):
+            cplane_utils.get_unit_ip()
+
+        # Invalid interface configured with muilticast-intf
+        self.ni.ifaddresses.side_effect = ValueError
+        with self.assertRaises(cplane_utils.UnconfiguredInterface):
+            cplane_utils.get_unit_ip()
+
 
 suite = unittest.TestLoader().loadTestsFromTestCase(CplaneUtilsTest)
 unittest.TextTestRunner(verbosity=2).run(suite)
