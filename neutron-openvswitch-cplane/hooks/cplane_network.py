@@ -70,6 +70,10 @@ def add_bridge(name, interface, gw=None):
     extra_params['bridge_name'] = name
     extra_params = dict([(k, "".join(list(v))) for k, v in extra_params
                          .iteritems()])
+
+    cmd = ['ifdown', interface, ]
+    subprocess.check_call(cmd)
+
     network_configuration._write_net_config_bridged_iface_br(interface,
                                                              **extra_params)
 
@@ -81,8 +85,6 @@ def add_bridge(name, interface, gw=None):
 
 
 def restart_network_service(name, interface):
-    cmd = ['ifdown', interface, ]
-    subprocess.check_call(cmd)
     cmd = ['ifup', name, ]
     subprocess.check_call(cmd)
 
