@@ -266,11 +266,22 @@ XE'.format(cplane_utils.ORACLE_HOST), '@install_plsql')
 g' .PKG/test.txt")
 
     @patch("cplane_utils.set_config")
-    def test_load_config(self, m_set_config):
+    def test_load_config_default_jbooss_cluster(self, m_set_config):
+        self.test_config.set('use-default-jboss-cluster', 'y')
         cplane_utils.load_config()
         m_set_config.assert_called_with('multicastServerInterface',
                                         'br-eth2',
                                         'cplane-dvnd-config.yaml')
+
+    @patch("cplane_utils.set_config")
+    def test_load_config_diff_jbooss_cluster(self, m_set_config):
+        import socket
+        self.test_config.set('use-default-jboss-cluster', 'n')
+        cplane_utils.load_config()
+        hostname = socket.gethostname()
+        m_set_config.assert_called_with('JBOSS_CLUSTER_NAME',
+                                        'cplane-{}'.format(hostname),
+                                        'cplane-dvnd-config.yaml'),
 
     @patch("commands.getoutput")
     def test_check_fip_mode(self, m_getoutput):
