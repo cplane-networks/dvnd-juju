@@ -86,7 +86,7 @@ class CplaneUtilsTest(CharmTestCase):
         self.relation_get.assert_called_with('private-address')
         self.assertEqual(m_check_call.call_args,
                          call(['cp-agentd', 'set-config',
-                              'log-level=file:random_interface']))
+                              'vm-mtu=random_interface']))
 
         # Check if invallid port is returned
 
@@ -98,7 +98,7 @@ class CplaneUtilsTest(CharmTestCase):
         self.relation_get.assert_called_with('private-address')
         self.assertEqual(m_check_call.call_args,
                          call(['cp-agentd', 'set-config',
-                               'log-level=file:random_interface']))
+                               'vm-mtu=random_interface']))
 
     @patch("subprocess.check_call")
     def test_restart_services(self, m_check_call):

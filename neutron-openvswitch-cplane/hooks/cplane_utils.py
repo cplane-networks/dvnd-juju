@@ -138,7 +138,7 @@ def manage_fip():
     for rid in relation_ids('cplane-controller'):
         for unit in related_units(rid):
             fip_mode = relation_get(attribute='fip-mode', unit=unit, rid=rid)
-            if fip_mode is True:
+            if fip_mode:
                 if check_interface(config('fip-interface')):
                     add_bridge('br-fip', config('fip-interface'))
                 else:
@@ -174,7 +174,12 @@ def set_cp_agent():
                 key = 'log-level=file:' + str(config('cp-agent-log-level'))
                 cmd = ['cp-agentd', 'set-config', key]
                 subprocess.check_call(cmd)
+                key = 'vm-mtu=' + str(config('cp-vm-mtu'))
+                cmd = ['cp-agentd', 'set-config', key]
+                subprocess.check_call(cmd)
+
                 return
+
     key = 'mcast-port=' + str(config('cp-controller-mport'))
     cmd = ['cp-agentd', 'set-config', key]
     subprocess.check_call(cmd)
@@ -188,6 +193,9 @@ def set_cp_agent():
     cmd = ['cp-agentd', 'set-config', key]
     subprocess.check_call(cmd)
     key = 'log-level=file:' + str(config('cp-agent-log-level'))
+    cmd = ['cp-agentd', 'set-config', key]
+    subprocess.check_call(cmd)
+    key = 'vm-mtu=' + str(config('cp-vm-mtu'))
     cmd = ['cp-agentd', 'set-config', key]
     subprocess.check_call(cmd)
 
