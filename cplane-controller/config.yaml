@@ -81,4 +81,7 @@ options:
     default: "y"
     type: string
     description: "Set y to use the default cluster else set n to use random cluster for each instance"
-
+  enable-fip:
+    default: "true"
+    type: string
+    description: "Flag to enable FIP interface"

@@ -69,7 +69,8 @@ DVND_CONFIG = OrderedDict([
     ('db-password', 'DB_PASSWORD'),
     ('intall-reboot-scripts', 'JBOSS_INSTALL_REBOOT'),
     ('oracle-host', 'DB_HOSTNAME'),
-    ('jboss-db-on-host', 'JBOSS_DB_ON_HOST')
+    ('jboss-db-on-host', 'JBOSS_DB_ON_HOST'),
+    ('enable-fip', 'GatewayBridgeFipExt')
 ])
 
 ORACLE_HOST = ''
