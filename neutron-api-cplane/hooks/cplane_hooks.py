@@ -34,9 +34,11 @@ from cplane_utils import (
 hooks = Hooks()
 
 
+configs = register_configs()
+
+
 @hooks.hook('config-changed')
 def config_changed():
-    configs = register_configs()
     configs.write_all()
     if config('cplane-version') == "1.3.5":
         import pkg_resources
@@ -59,6 +61,9 @@ hosts = {}/g' /etc/neutron/plugins/ml2/ml2_conf.ini".format(cplane_controller)
 
 @hooks.hook('shared-db-relation-changed')
 def share_db_relation_changed():
+    if 'shared-db' not in configs.complete_contexts():
+        juju_log('shared-db relation incomplete. Peer not ready?')
+        return
     migrate_db()
 
 
