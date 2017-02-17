@@ -5,7 +5,6 @@ import json
 from collections import OrderedDict
 from charmhelpers.contrib.openstack.utils import os_release
 from charmhelpers.contrib.openstack import templating
-from charmhelpers.contrib.openstack import context
 from charmhelpers.core.hookenv import (
     config,
     relation_ids,
@@ -69,8 +68,7 @@ def register_configs(release=None):
     resources = OrderedDict([
         (ML2_CONFIG, {
             'services': ['neutron-server'],
-            'contexts': [cplane_context.CplaneMl2Context(),
-                         context.SharedDBContext(), ]
+            'contexts': [cplane_context.CplaneMl2Context(), ]
         })
     ])
     release = os_release('neutron-common')

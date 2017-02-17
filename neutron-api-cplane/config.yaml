@@ -15,11 +15,11 @@ options:
     type: string
     default: "openstack"
     description: "Rabbit vhost"
-  database-user:
+  nova-database-user:
     type: string
     default: "neutron"
     description: "Neutron databse user"
-  database:
+  nova-database:
     type: string
     default: "neutron"
     description: "Neutron databasee"
