@@ -48,6 +48,7 @@ class CplaneUtilsTest(CharmTestCase):
 
         # Check for correct fip interface
         self.check_interface.return_value = True
+        self.relation_get.return_value = 'True'
 
         cplane_utils.manage_fip()
 

@@ -138,7 +138,7 @@ def manage_fip():
     for rid in relation_ids('cplane-controller'):
         for unit in related_units(rid):
             fip_mode = relation_get(attribute='fip-mode', unit=unit, rid=rid)
-            if fip_mode:
+            if fip_mode == 'True':
                 if check_interface(config('fip-interface')):
                     add_bridge('br-fip', config('fip-interface'))
                 else:

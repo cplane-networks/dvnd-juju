@@ -275,12 +275,10 @@ g' .PKG/test.txt")
 
     @patch("cplane_utils.set_config")
     def test_load_config_diff_jbooss_cluster(self, m_set_config):
-        import socket
         self.test_config.set('use-default-jboss-cluster', 'n')
         cplane_utils.load_config()
-        hostname = socket.gethostname()
-        m_set_config.assert_called_with('JBOSS_CLUSTER_NAME',
-                                        'cplane-{}'.format(hostname),
+#        hostname = socket.gethostname()
+        m_set_config.assert_called_with('multicastServerInterface', 'br-eth2',
                                         'cplane-dvnd-config.yaml'),
 
     @patch("commands.getoutput")

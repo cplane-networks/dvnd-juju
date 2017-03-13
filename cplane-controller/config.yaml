@@ -46,24 +46,24 @@ options:
     type: string
     description: "Database password"
   jboss-db-on-host:
-    default: "n"
-    type: string
+    default: False
+    type: boolean
     description: "Whether DB is on the same host where JBOSS is installed"
   oracle-db-enable:
     default: "y"
     type: string
     description: "Enable Oracle at boot time"  
   multicast-port:
-    default: "1901"
-    type: string
+    default: 1901
+    type: int
     description: "Multicast port"
   multicast-intf:
     default: "br-eth2"
     type: string
     description: "Multicast Interface"
   unicast-port:
-    default: "1902"
-    type: string
+    default: 1902
+    type: int
     description: "Unicast port"
   jboss-home:
     default: "/opt/jboss/jboss-6.1.0.Final"
@@ -78,10 +78,10 @@ options:
     type: string
     description: "Cplane softwares version"
   use-default-jboss-cluster:
-    default: "y"
-    type: string
+    default: False
+    type: boolean
     description: "Set y to use the default cluster else set n to use random cluster for each instance"
   enable-fip:
-    default: "true"
-    type: string
+    default: False
+    type: boolean
     description: "Flag to enable FIP interface"

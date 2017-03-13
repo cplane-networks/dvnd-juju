@@ -47,9 +47,9 @@ cplane_packages = OrderedDict([
     (config('controller-app-mode'), '0')
 ])
 
-if config('jboss-db-on-host') == 'n':
+if config('jboss-db-on-host') is False:
     del cplane_packages[config('oracle-version')]
-elif config('jboss-db-on-host') == 'y':
+elif config('jboss-db-on-host'):
     del cplane_packages['oracle-client-basic']
     del cplane_packages['oracle-sqlplus']
 
@@ -316,10 +316,16 @@ password'), host)
 def load_config():
     if config('controller-app-mode') == 'dvnd':
         for key, value in DVND_CONFIG.items():
-            set_config(value, config(key), 'cplane-dvnd-config.yaml')
+            if key == 'enable-fip':
+                if(config(key)):
+                    set_config(value, 'true', 'cplane-dvnd-config.yaml')
+                else:
+                    set_config(value, 'false', 'cplane-dvnd-config.yaml')
+            else:
+                set_config(value, config(key), 'cplane-dvnd-config.yaml')
         set_config('multicastServerInterface', config('multicast-intf'),
                    'cplane-dvnd-config.yaml')
-        if config('use-default-jboss-cluster') == 'n':
+        if config('use-default-jboss-cluster') is False:
             hostname = socket.gethostname()
             cluster_name = 'cplane' + '-' + hostname
             set_config('JBOSS_CLUSTER_NAME', cluster_name,
@@ -334,7 +340,7 @@ def cplane_installer():
     subprocess.check_call(cmd)
     load_config()
     set_oracle_host()
-    if config('jboss-db-on-host') == 'n':
+    if config('jboss-db-on-host') is False:
         set_config('DB_HOSTNAME', ORACLE_HOST, 'cplane-dvnd-config.yaml')
     os.chdir('PKG/pkg')
     cmd = ['tar', 'xvf', 'db_init.tar']
@@ -428,7 +434,7 @@ def flush_upgrade_type():
 
 
 def clean_create_db():
-    if config('jboss-db-on-host') == 'y':
+    if config('jboss-db-on-host'):
         set_oracle_env()
     set_oracle_host()
     host = ORACLE_HOST + '/'
@@ -462,7 +468,7 @@ def run_cp_installer():
     os.chdir(CHARM_LIB_DIR)
     load_config()
     set_oracle_host()
-    if config('jboss-db-on-host') == 'n':
+    if config('jboss-db-on-host') is False:
         set_config('DB_HOSTNAME', ORACLE_HOST, 'cplane-dvnd-config.yaml')
     os.chdir('PKG')
     cmd = ['sh', 'cpinstaller', 'cplane-dvnd-config.yaml']
@@ -481,7 +487,7 @@ def install_reboot_scripts():
     cmd = "sed -i -e 's/#!\/bin\/sh/#!\/bin\/bash/g' startStartupPrograms.sh"
     os.system(cmd)
     os.chdir(saved_path)
-    if config('jboss-db-on-host') == 'y':
+    if config('jboss-db-on-host'):
         cmd = 'update-rc.d {} defaults 20 '.format(config('oracle-version'))
         os.system(cmd)
     cmd = 'update-rc.d cplane-controller defaults 30'
@@ -490,7 +496,7 @@ def install_reboot_scripts():
 
 def set_oracle_host():
     global ORACLE_HOST
-    if config('jboss-db-on-host') == 'y':
+    if config('jboss-db-on-host'):
         ORACLE_HOST = 'localhost'
         return ORACLE_HOST
     for rid in relation_ids('oracle'):

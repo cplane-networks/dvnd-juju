@@ -87,7 +87,7 @@ def install():
     download_cplane_packages()
     install_jboss()
     install_jdk()
-    if config('jboss-db-on-host') == 'y':
+    if config('jboss-db-on-host'):
         install_oracle()
         configure_oracle()
     else:
@@ -100,7 +100,7 @@ def install():
 
 @hooks.hook('start')
 def start():
-    if config('jboss-db-on-host') == 'y':
+    if config('jboss-db-on-host'):
         oracle_host = set_oracle_host()
         if oracle_host:
             set_oracle_env()
@@ -110,7 +110,7 @@ def start():
 
 @hooks.hook('oracle-relation-changed')
 def oracle_relation_changed():
-    if config('jboss-db-on-host') == 'n':
+    if config('jboss-db-on-host') is False:
         oracle_host = set_oracle_host()
         if oracle_host:
             if check_jboss_service() is False:
