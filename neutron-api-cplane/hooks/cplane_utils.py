@@ -52,7 +52,7 @@ if config('cplane-version') == "1.3.5":
     del cplane_packages['cplane-neutronclient-extension']
     del cplane_packages['cplane-nova-extension']
 
-if config('cplane-version') == "1.3.7":
+if config('cplane-version') == "1.3.7" or "1.3.8":
     del cplane_packages['neutronclient']
 
 PACKAGES = ['neutron-plugin-ml2', 'crudini', 'python-dev']
