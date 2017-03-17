@@ -9,6 +9,7 @@ from charmhelpers.core.hookenv import (
 )
 import sys
 import commands
+import os
 
 from charmhelpers.fetch import (
     apt_install,
@@ -87,6 +88,8 @@ def install():
     download_cplane_packages()
     install_jboss()
     install_jdk()
+    cmd = "echo '#Added by cplane' >> /etc/hosts"
+    os.system(cmd)
     if config('jboss-db-on-host'):
         install_oracle()
         configure_oracle()

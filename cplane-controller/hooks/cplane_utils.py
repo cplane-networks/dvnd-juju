@@ -25,6 +25,7 @@ import time
 import re
 import json
 import socket
+import pickle
 
 
 from cplane_package_manager import(
@@ -74,6 +75,8 @@ DVND_CONFIG = OrderedDict([
 ])
 
 ORACLE_HOST = ''
+DB_SERVICE = ''
+DB_PASSWORD = ''
 JBOSS_DIR = '/opt/jboss'
 CHARM_LIB_DIR = os.environ.get('CHARM_DIR', '') + "/lib/"
 CPLANE_DIR = '/opt/cplane/bin'
@@ -293,22 +296,38 @@ def prepare_database():
     os.chdir(DB_DIR)
     host = ORACLE_HOST + '/'
     log('preparing the Database')
-    connect_string = 'system/' + config('oracle-\
-password') + '@' + host + 'XE'
-    execute_sql_command(connect_string, "@cp_create_ts /\
+    connect_string = 'system/' + DB_PASSWORD \
+        + '@' + host + DB_SERVICE
+    if DB_SERVICE == 'XE':
+        execute_sql_command(connect_string, "@cp_create_ts /\
 u01/app/oracle/oradata/XE/")
+    else:
+        log('Configuring cplane-OracleDB-ds.xml file')
+        cmd = "sed -i 's/:{}/\/{}/g' /opt/jboss/jboss-6.1.0.Final/server/all/\
+deploy/cplane-OracleDB-ds.xml".format(DB_SERVICE, DB_SERVICE)
+        os.system(cmd)
+        log('Configuring quartz.properties file')
+        cmd = "sed -i 's/:{}/\/{}/g' /opt/jboss/jboss-6.1.0.Final/server/all/\
+conf/quartz.properties".format(DB_SERVICE, DB_SERVICE)
+        os.system(cmd)
+        execute_sql_command(connect_string, "@cp_create_ts +DATA")
+
+    connect_string = 'sys/' + DB_PASSWORD \
+        + '@' + host + DB_SERVICE + ' as' + ' sysdba'
     execute_sql_command(connect_string, "@cp_create_user {} \
 {}".format(config('db-user'), config('db-password')))
+    connect_string = 'system/' + DB_PASSWORD \
+        + '@' + host + DB_SERVICE
     execute_sql_command(connect_string, "grant \
 resource to {};".format(config('db-user')))
     execute_sql_command(connect_string, "grant \
 create view to {};".format(config('db-user')))
 
-    cmd = 'sh install.sh {}/{}@{}XE 2>&1 | tee \
-install.log'.format(config('db-user'), config('db-password'), host)
+    cmd = 'sh install.sh {}/{}@{}{} 2>&1 | tee \
+install.log'.format(config('db-user'), config('db-password'), host, DB_SERVICE)
     os.system(cmd)
-    connect_string = '{}/{}@{}XE'.format(config('db-user'), config('db-\
-password'), host)
+    connect_string = '{}/{}@{}{}'.format(config('db-user'), config('db-\
+password'), host, DB_SERVICE)
     execute_sql_command(connect_string, "@install_plsql")
     os.chdir(saved_path)
 
@@ -342,10 +361,13 @@ def cplane_installer():
     set_oracle_host()
     if config('jboss-db-on-host') is False:
         set_config('DB_HOSTNAME', ORACLE_HOST, 'cplane-dvnd-config.yaml')
+        set_config('DB_SID', DB_SERVICE, 'cplane-dvnd-config.yaml')
     os.chdir('PKG/pkg')
     cmd = ['tar', 'xvf', 'db_init.tar']
     subprocess.check_call(cmd)
-
+    if DB_SERVICE is not 'XE':
+        cmd = "cp {}/cp_wf.sql db_init/.".format(CHARM_LIB_DIR)
+        os.system(cmd)
     os.chdir(CHARM_LIB_DIR + '/PKG')
     cmd = ['chmod', '+x', 'cpinstaller']
     subprocess.check_call(cmd)
@@ -440,14 +462,14 @@ def clean_create_db():
     host = ORACLE_HOST + '/'
     saved_path = os.getcwd()
     os.chdir('{}/PKG/pkg/db_init'.format(CHARM_LIB_DIR))
-    cmd = 'sh un_install.sh {}/{}@{}XE 2>&1 | tee install.log'\
-          .format(config('db-user'), config('db-password'), host)
+    cmd = 'sh un_install.sh {}/{}@{}{} 2>&1 | tee install.log'\
+          .format(config('db-user'), config('db-password'), host, DB_SERVICE)
     os.system(cmd)
-    cmd = 'sh install.sh {}/{}@{}XE 2>&1 | tee install.log'\
-          .format(config('db-user'), config('db-password'), host)
+    cmd = 'sh install.sh {}/{}@{}{} 2>&1 | tee install.log'\
+          .format(config('db-user'), config('db-password'), host, DB_SERVICE)
     os.system(cmd)
-    connect_string = '{}/{}@{}XE'.format(config('db-user'), config('db-\
-password'), host)
+    connect_string = '{}/{}@{}{}'.format(config('db-user'), config('db-\
+password'), host, DB_SERVICE)
     execute_sql_command(connect_string, "@reinstall_plsql")
     os.chdir(saved_path)
 
@@ -470,6 +492,7 @@ def run_cp_installer():
     set_oracle_host()
     if config('jboss-db-on-host') is False:
         set_config('DB_HOSTNAME', ORACLE_HOST, 'cplane-dvnd-config.yaml')
+        set_config('DB_SID', DB_SERVICE, 'cplane-dvnd-config.yaml')
     os.chdir('PKG')
     cmd = ['sh', 'cpinstaller', 'cplane-dvnd-config.yaml']
     subprocess.check_call(cmd)
@@ -496,13 +519,32 @@ def install_reboot_scripts():
 
 def set_oracle_host():
     global ORACLE_HOST
+    global DB_SERVICE
+    global DB_PASSWORD
     if config('jboss-db-on-host'):
+        DB_SERVICE = 'XE'
+        DB_PASSWORD = config('oracle-password')
         ORACLE_HOST = 'localhost'
         return ORACLE_HOST
     for rid in relation_ids('oracle'):
         for unit in related_units(rid):
             oracle_host = relation_get(attribute='oracle-\
 host', unit=unit, rid=rid)
+            db_service = relation_get(attribute='db-\
+service', unit=unit, rid=rid)
+            raw_scan_string = relation_get(attribute='scan-string\
+', unit=unit, rid=rid)
+            db_password = relation_get(attribute='db-password\
+', unit=unit, rid=rid)
+            if raw_scan_string:
+                scan_string = pickle.loads(raw_scan_string)
+                flush_host()
+                for value in scan_string:
+                    config_host(value, 'scan')
+            if db_service:
+                DB_SERVICE = db_service
+            if db_password:
+                DB_PASSWORD = db_password
             if oracle_host:
                 ORACLE_HOST = oracle_host
                 return oracle_host
@@ -552,3 +594,19 @@ def get_unit_ip(config_override='multicast-intf', address_family=ni.AF_INET):
     raise UnconfiguredInterface("{} interface has no address in the "
                                 "address family {}".format(interface,
                                                            address_family))
+
+
+def flush_host():
+    host_file = "/etc/hosts"
+    cmd = ("sed -i '/#Added by cplane/q' {}".format(host_file))
+    os.system(cmd)
+    cmd = "echo '\n# SCAN' >> /etc/hosts"
+    os.system(cmd)
+
+
+def config_host(host_string, address_type):
+    if host_string:
+        host_file = "/etc/hosts"
+        if address_type == 'scan':
+            cmd = ("sed -i '/# SCAN/a{}' {}".format(host_string, host_file))
+            os.system(cmd)

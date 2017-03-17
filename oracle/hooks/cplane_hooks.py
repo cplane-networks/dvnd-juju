@@ -4,6 +4,7 @@ from charmhelpers.core.hookenv import (
     UnregisteredHookError,
     log as juju_log,
     unit_get,
+    config,
     relation_set,
 )
 import sys
@@ -27,7 +28,9 @@ hooks = Hooks()
 def oracle_relation_joined():
     host = unit_get('private-address')
     relation_info = {
-        'oracle-host': host
+        'oracle-host': host,
+        'db-password': config('oracle-password'),
+        'db-service': 'XE'
     }
     relation_set(relation_settings=relation_info)
 

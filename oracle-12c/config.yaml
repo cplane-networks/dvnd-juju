@@ -1,0 +1,60 @@
+options:
+  oracle-version:
+    default: "oracle-12c"
+    type: string
+    description: "Version of oracle to be installed"
+  slave-units-number:
+    default: 4
+    type: int
+    description: "Numbet of slave units"
+  vip-range:
+    default: "10.14.0.180"
+    type: string
+    description: "Range of VIP addresses for Oacle-12c"
+  scan-name:
+    default: "rac"
+    type: string
+    description: "Scan name for for Oracle-12c"
+  scan-ip-range:
+    default: "10.14.0.187"
+    type: string
+    description: "Scan ip range for Oracle-12c RAC"
+  domain-name:
+    default: "maas"
+    type: string
+    description: "Domain name"
+  asm-sys-password:
+    default: "Cplane01"
+    type: string
+    description: "Password for asm system"
+  asm-snmp-password:
+    default: "Cplane01"
+    type: string
+    description: "Password for ams snmp"
+  asm-disk-group:
+    default: "/dev/sdb1,/dev/sdc1,/dev/sdd1"
+    type: string
+    description: "Storage disk groups for Oracle-12c"
+  cp-package-url:
+    default: "http://192.168.7.103/cplane_metadata.json"
+    type: string
+    description: |
+      URL for cplane packages
+      if from local repo then "http://xx.xx.xx.xx/cplane_metadata.json"
+  cplane-version:
+    default: "1.3.7"
+    type: string
+    description: "Cplane softwares version"
+  manage-partition: 
+    default: true 
+    type: boolean
+    description: "Create a pritition if not there or wipe the existing partiton"
+  db-service:
+    default: "CPLANE"
+    type: string
+    description: "Name of the DB service"
+  db-password:
+    default: "cplane123"
+    type: string
+    description: "Password to access the database"
+

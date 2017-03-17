@@ -170,13 +170,13 @@ jboss-6.1.0.Final')
         cplane_utils.prepare_database()
         m_set_oracle_host.assert_called_with()
         m_system.assert_called_with('sh install.sh admin/admin@localhost/\
-XE 2>&1 | tee install.log')
-        m_execute_sql_command.assert_called_with('admin/admin@localhost/XE',
+ 2>&1 | tee install.log')
+        m_execute_sql_command.assert_called_with('admin/admin@localhost/',
                                                  '@install_plsql')
-        m_system.assert_called_with('sh install.sh admin/admin@{}/XE 2>&1 \
+        m_system.assert_called_with('sh install.sh admin/admin@{}/ 2>&1 \
 | tee install.log'.format(cplane_utils.ORACLE_HOST))
         m_execute_sql_command.assert_called_with('admin/admin@{}/\
-XE'.format(cplane_utils.ORACLE_HOST), '@install_plsql')
+'.format(cplane_utils.ORACLE_HOST), '@install_plsql')
 
     @patch("subprocess.check_call")
     @patch("cplane_utils.load_config")
@@ -299,12 +299,12 @@ g' .PKG/test.txt")
 #        m_set_oracle_env.assert_called_with()
         m_set_oracle_host.assert_called_with()
         m_system.assert_called_with('sh install.sh admin/admin@localhost/\
-XE 2>&1 | tee install.log')
-        m_execute_sql_command.assert_called_with('admin/admin@localhost/XE',
+ 2>&1 | tee install.log')
+        m_execute_sql_command.assert_called_with('admin/admin@localhost/',
                                                  '@reinstall_plsql')
         m_system.assert_called_with('sh install.sh admin/admin@localhost/\
-XE 2>&1 | tee install.log'.format(cplane_utils.ORACLE_HOST))
-        m_execute_sql_command.assert_called_with('admin/admin@localhost/XE',
+ 2>&1 | tee install.log'.format(cplane_utils.ORACLE_HOST))
+        m_execute_sql_command.assert_called_with('admin/admin@localhost/',
                                                  '@reinstall_plsql')
 
     @patch("os.chdir")

@@ -1,0 +1,40 @@
+# Overview
+
+The ORACLE-12c RAC charm is required for the Cplane controller which is an SDN orchestration system for the CPLANE DVNd OpenStack Neutron Solution.   All the information regarding the OVS, tenants and networks are stored in the Oracle Database.
+
+CPLANE's software-only solution automates creation of WAN and LAN network services with a highly intelligent SDN platform. Through advanced discovery, modeling and service orchestration, CPLANE automates not only the low-level infrastructure configuration and management of data center and wide area networks, but also the higher-level, value-add functions such as network virtualization, routing, policy and QoS.   CPLANE delivers network services faster and more reliably on existing network infrastructure. Since CPLANE is a software-only solution with no vendor-specific dependencies, it offers the added advantage of providing a
+path to new network architectures and technologies, and away from vendor lock-in.
+
+For more information see [http://www.cplanenetworks.com/]
+
+# Usage
+
+This charm requires the deployment of the **cplane-controller** charm.
+
+The neutron-openvswitch-cplane charm has several core functions:
+
+ - Install Oracle
+ - Configure oracle
+ - Set a relation with the Cplane controller charm
+
+Instruction for deploying the CPlane openstack bundle is as follows:
+Note: This bundle will install some components of Openstack as well as CPlane charms.
+
+    juju deploy cplane_neutron_ovs_controller_oracle.yaml
+
+# Configuration
+
+ - ***oracle-version***: Version of oracle to be installed.
+ - ***cp-package-url***:  URL for cplane packages
+      if from local repo then "http://xx.xx.xx.xx/cplane_metadata.json".
+ - ***scan-range***: Configures Oracle-12c scan ip ranges  if a oracle charm is deployed .
+ - ***vip-range***: Configures oracle vip ranges 
+   overwritten if a oracle charm is deployed.
+ - ****asm-disk-group**: Configures ASM storage disks for Oracle RAC.
+ - ***oracle-sys-password***: Password for Oracle syaytem.
+
+# Contact Information
+
+www.cplanenetworks.com
+info@cplanenetworks.com
+
