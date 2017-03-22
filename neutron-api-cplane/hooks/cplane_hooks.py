@@ -100,7 +100,7 @@ def install():
     install_cplane_packages()
     python_intall("bitarray")
     create_link()
-    if config('cplane-version') == "1.3.7":
+    if config('cplane-version') == "1.3.7" or "1.3.8":
         configure_policy()
     restart_service()
 

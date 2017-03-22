@@ -78,10 +78,9 @@ class CplaneUtilsTest(CharmTestCase):
         self.open.return_value = None
         m_json_load.return_value = data
         cplane_utils.configure_policy()
-        m_json_dump.assert_called_with({'update_floatingip_quota': 'rule:admin\
-_or_owner', 'delete_ogr': 'rule:admin_only', 'get_floating\
-ip_quotas': '', 'get_ogrs': '', 'update_ogr': 'rule:admin_or_owner', 'get_\
-ogr': '', 'create_floatingip:floating_ip_address': 'rule:admin_or_owner', 'get\
-_floatingip_quota': 'rule:admin_or_owner'}, None, indent=4)
+        m_json_dump.assert_called_with({'update_ogr': 'rule:admin_or_\
+owner', 'get_ogr': '', 'get_ogrs': '', 'delete_ogr': 'rule:admin_\
+only', 'create_floatingip:floating_ip_address': 'rule:admin_or_\
+owner'}, None, indent=4)
 suite = unittest.TestLoader().loadTestsFromTestCase(CplaneUtilsTest)
 unittest.TextTestRunner(verbosity=2).run(suite)
