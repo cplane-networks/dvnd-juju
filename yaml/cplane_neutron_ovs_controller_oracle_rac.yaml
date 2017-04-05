@@ -64,6 +64,8 @@ relations:
   - rac-slave:slave-state
 - - rac-master:oracle
   - cplane-controller:oracle
+- - neutron-api-cplane:cplane-ovs
+  - neutron-openvswitch-cplane:cplane-ovs
 
 series: trusty
 services:

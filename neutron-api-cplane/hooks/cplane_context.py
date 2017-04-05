@@ -21,7 +21,8 @@ def get_overlay_network_type():
 
 class CplaneMl2Context(context.OSContextGenerator):
     def _cplane_context(self):
-        ctxt = {'controller_ip': config('cplane-controller_ip')}
+        ctxt = {'controller_ip': config('cplane-controller_ip'),
+                'cplane_topology_name': config('topology-name')}
         return ctxt
 
     def __call__(self):

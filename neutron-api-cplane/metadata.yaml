@@ -18,6 +18,8 @@ provides:
     scope: container
   cplane-neutron:
     interface: cplane-neutron
+  cplane-ovs:
+    interface: cplane-ovs
 requires:
   container:
     interface: juju-info

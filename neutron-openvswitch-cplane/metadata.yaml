@@ -29,3 +29,6 @@ requires:
     interface: rabbitmq
   identity-service:
     interface: keystone
+  cplane-ovs:
+    interface: cplane-ovs
+

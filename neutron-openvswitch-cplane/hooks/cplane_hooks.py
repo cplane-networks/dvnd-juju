@@ -6,6 +6,7 @@ from charmhelpers.core.hookenv import (
     log,
     relation_set,
     relation_get,
+
 )
 import json
 import subprocess
@@ -97,6 +98,16 @@ def amqp_changed(relation_id=None):
         neutron_config.update({'rabbit_password': relation_get('password')})
         neutron_config.update({'rabbit_host': relation_get('hostname')})
         cplane_config(neutron_config, NEUTRON_CONF, 'oslo_messaging_rabbit')
+        restart_services()
+
+
+@hooks.hook('cplane-ovs-relation-changed')
+def cplane_ovs_relation_changed():
+    topology = relation_get('topology')
+    if topology:
+        key = 'topology=' + topology
+        cmd = ['cp-agentd', 'set-config', key]
+        subprocess.check_call(cmd)
         restart_services()
 
 

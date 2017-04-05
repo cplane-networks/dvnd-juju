@@ -92,6 +92,14 @@ def neutron_api_joined(rid=None):
     relation_set(relation_settings=relation_info)
 
 
+@hooks.hook('cplane-ovs-relation-joined')
+def cplane_ovs(rid=None):
+    relation_info = {
+        'topology': config('topology-name')
+    }
+    relation_set(relation_settings=relation_info)
+
+
 @hooks.hook('install')
 def install():
     apt_update(fatal=True)
