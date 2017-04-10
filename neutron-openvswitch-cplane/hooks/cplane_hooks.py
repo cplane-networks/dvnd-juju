@@ -133,7 +133,8 @@ def install():
                interface=config('data-interface'),
                gw=config('data-gateway'))
     if check_interface(config('tun-interface')):
-        add_bridge('br-tun', config('tun-interface'))
+        add_bridge('br-tun', interface=config('tun-interface'),
+                   gw=config('tun-gateway'))
     else:
         log('Tunnel interface doesnt exist, and will be '
             'used by default by Cplane controller')

@@ -47,6 +47,10 @@ options:
     type: string
     default: "br-eth2"
     description: "Interface to create the br-tun bridge"
+  tun-gateway:
+    type: string
+    default: 192.168.7.254
+    description: "Tunnel network gateway if this cannot be configured in /etc/network/interfaces"
   fip-interface:
     type: string
     default: "br-eth3"
