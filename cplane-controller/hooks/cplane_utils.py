@@ -77,6 +77,7 @@ DVND_CONFIG = OrderedDict([
 ORACLE_HOST = ''
 DB_SERVICE = ''
 DB_PASSWORD = ''
+DB_PATH = ''
 JBOSS_DIR = '/opt/jboss'
 CHARM_LIB_DIR = os.environ.get('CHARM_DIR', '') + "/lib/"
 CPLANE_DIR = '/opt/cplane/bin'
@@ -299,8 +300,7 @@ def prepare_database():
     connect_string = 'system/' + DB_PASSWORD \
         + '@' + host + DB_SERVICE
     if DB_SERVICE == 'XE':
-        execute_sql_command(connect_string, "@cp_create_ts /\
-u01/app/oracle/oradata/XE/")
+        execute_sql_command(connect_string, "@cp_create_ts {}".format(DB_PATH))
     else:
         log('Configuring cplane-OracleDB-ds.xml file')
         cmd = "sed -i 's/:{}/\/{}/g' /opt/jboss/jboss-6.1.0.Final/server/all/\
@@ -310,7 +310,9 @@ deploy/cplane-OracleDB-ds.xml".format(DB_SERVICE, DB_SERVICE)
         cmd = "sed -i 's/:{}/\/{}/g' /opt/jboss/jboss-6.1.0.Final/server/all/\
 conf/quartz.properties".format(DB_SERVICE, DB_SERVICE)
         os.system(cmd)
-        execute_sql_command(connect_string, "@cp_create_ts +DATA")
+        log('Connect String for database is {}'.format(connect_string))
+        log('Database location is  {}'.format(DB_PATH))
+        execute_sql_command(connect_string, "@cp_create_ts {}".format(DB_PATH))
 
     connect_string = 'sys/' + DB_PASSWORD \
         + '@' + host + DB_SERVICE + ' as' + ' sysdba'
@@ -521,10 +523,12 @@ def set_oracle_host():
     global ORACLE_HOST
     global DB_SERVICE
     global DB_PASSWORD
+    global DB_PATH
     if config('jboss-db-on-host'):
         DB_SERVICE = 'XE'
         DB_PASSWORD = config('oracle-password')
         ORACLE_HOST = 'localhost'
+        DB_PATH = '/u01/app/oracle/oradata/XE/'
         return ORACLE_HOST
     for rid in relation_ids('oracle'):
         for unit in related_units(rid):
@@ -536,6 +540,8 @@ service', unit=unit, rid=rid)
 ', unit=unit, rid=rid)
             db_password = relation_get(attribute='db-password\
 ', unit=unit, rid=rid)
+            db_path = relation_get(attribute='db-path\
+', unit=unit, rid=rid)
             if raw_scan_string:
                 scan_string = pickle.loads(raw_scan_string)
                 flush_host()
@@ -545,6 +551,8 @@ service', unit=unit, rid=rid)
                 DB_SERVICE = db_service
             if db_password:
                 DB_PASSWORD = db_password
+            if db_path:
+                DB_PATH = db_path
             if oracle_host:
                 ORACLE_HOST = oracle_host
                 return oracle_host

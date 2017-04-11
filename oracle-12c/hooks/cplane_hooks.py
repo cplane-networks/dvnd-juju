@@ -14,6 +14,7 @@ import os
 import socket
 import pickle
 import json
+import time
 
 from charmhelpers.fetch import (
     yum_install,
@@ -56,6 +57,10 @@ from cplane_utils import (
     get_scan_str,
     set_oracle_env,
     check_node_state,
+    download_cplane_packages,
+    copy_oracle_package,
+    get_db_status,
+
 )
 
 hooks = Hooks()
@@ -63,7 +68,22 @@ hooks = Hooks()
 
 @hooks.hook('config-changed')
 def config_changed():
-    set_name_server()
+    if config('slave-units-number'):
+        set_name_server()
+
+
+@hooks.hook('start')
+def start():
+    if not config('slave-units-number'):
+        download_cplane_packages()
+        copy_oracle_package()
+
+        modify_oracle_db_response_file()
+        if install_db():
+            install_db_root_scripts()
+            set_oracle_env()
+            create_db()
+            juju_log('Database is created and the listerner is started')
 
 
 @hooks.hook('install.real')
@@ -79,13 +99,14 @@ def install():
     cmd = "echo '#Added by cplane' >> /etc/hosts"
     os.system(cmd)
     set_persistent_hostname()
-    flush_host()
-    config_host(generate_host_string('private'), 'private')
-    config_host(generate_host_string('public'), 'public')
-    config_host(generate_host_string('vip'), 'vip')
-    generate_pub_ssh_key()
-    resize_swap_partition()
-    set_ntpd_conf()
+    if config('slave-units-number'):
+        flush_host()
+        config_host(generate_host_string('private'), 'private')
+        config_host(generate_host_string('public'), 'public')
+        config_host(generate_host_string('vip'), 'vip')
+        generate_pub_ssh_key()
+        resize_swap_partition()
+        set_ntpd_conf()
     create_oracle_dir()
 
 
@@ -204,14 +225,37 @@ def slave_state_relation_changed():
 
 @hooks.hook('oracle-relation-changed')
 def oracle_relation_changed(relation_id=None):
-    if check_all_clustered_nodes('final'):
+    if config('slave-units-number'):
+        if check_all_clustered_nodes('final'):
+            relation_info = {
+                'oracle-host': '{}-scan'.format(config('scan-name')),
+                'db-service': '{}'.format(config('db-service')),
+                'scan-string': pickle.dumps(get_scan_str()),
+                'db-password': '{}'.format(config('db-password')),
+                'db-path': '+DATA'
+            }
+            juju_log('Sending relation info to Cplane Controller')
+            relation_set(relation_id=relation_id,
+                         relation_settings=relation_info)
+    else:
+        hostname = socket.gethostname()
         relation_info = {
-            'oracle-host': '{}-scan'.format(config('scan-name')),
+            'oracle-host': hostname,
             'db-service': '{}'.format(config('db-service')),
-            'scan-string': pickle.dumps(get_scan_str()),
-            'db-password': '{}'.format(config('db-password'))
+            'db-password': '{}'.format(config('db-password')),
+            'db-path': '/u01/app/oracle/oradata/CPLANE/'
         }
-        relation_set(relation_id=relation_id, relation_settings=relation_info)
+        for num in range(0, 5):
+            if get_db_status() is False:
+                juju_log("Service is not registered with listener... \
+                          Retry checking it after 60 sec")
+                time.sleep(60)
+            else:
+                juju_log("Service is regitered with listener")
+                juju_log('Sending relation info to Cplane Controller')
+                relation_set(relation_id=relation_id,
+                             relation_settings=relation_info)
+                break
 
 
 def main():

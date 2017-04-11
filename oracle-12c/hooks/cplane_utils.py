@@ -35,6 +35,9 @@ cplane_packages = OrderedDict([
     ('oracle-12c-db', '0'),
 ])
 
+if not config('slave-units-number'):
+    del cplane_packages[config('oracle-version')]
+
 
 CHARM_LIB_DIR = os.environ.get('CHARM_DIR', '') + "/lib/"
 FILES_PATH = CHARM_LIB_DIR + '/filelink'
@@ -104,6 +107,8 @@ GRID_RSP_FILE = '{}/grid/response/grid_\
 install.rsp'.format(os.path.expanduser('~oracle'))
 DB_RSP_FILE = '{}/database/response/db_\
 install.rsp'.format(os.path.expanduser('~oracle'))
+NETCA_RSP_FILE = '{}/database/response/netca\
+.rsp'.format(os.path.expanduser('~oracle'))
 
 
 def download_cplane_packages():
@@ -532,14 +537,15 @@ cloud.cfg'".format(hostname))
 
 def copy_oracle_package():
     filename = json.load(open(FILES_PATH))
-    cmd = "cp {} /home/oracle/.".format(filename[config('oracle-version')])
-    os.system(cmd)
+    if config('slave-units-number'):
+        cmd = "cp {} /home/oracle/.".format(filename[config('oracle-version')])
+        os.system(cmd)
 
-    cmd = "chown oracle.oinstall /home/oracle/oracle-12c-grid.tar"
-    os.system(cmd)
+        cmd = "chown oracle.oinstall /home/oracle/oracle-12c-grid.tar"
+        os.system(cmd)
 
-    cmd = ("su - oracle -c 'tar -xvf oracle-12c-grid.tar'")
-    os.system(cmd)
+        cmd = ("su - oracle -c 'tar -xvf oracle-12c-grid.tar'")
+        os.system(cmd)
 
     cmd = "cp {} /home/oracle/.".format(filename['oracle-12c-db'])
     os.system(cmd)
@@ -789,22 +795,30 @@ def process_clustered_data():
 
 
 def modify_oracle_db_response_file():
-    data = json.load(open(NODE_DATA_FILE))
     hostname = socket.gethostname()
-    node_string = []
-    for node, value in data.items():
-        public = value['public']
-        node_public = public.split()[2]
-        node_string.append("{},".format(node_public))
+    if config('slave-units-number'):
+        data = json.load(open(NODE_DATA_FILE))
+        node_string = []
+        for node, value in data.items():
+            public = value['public']
+            node_public = public.split()[2]
+            node_string.append("{},".format(node_public))
 
-    cluster_nodes = ''.join(node_string)
-    oracle_host_name = data[hostname]['public'].split()[1]
-    cmd = "sed -i '/^ORACLE_HOSTNAME/c\ORACLE_HOSTNAME={}' \
+        cluster_nodes = ''.join(node_string)
+        oracle_host_name = data[hostname]['public'].split()[1]
+        cmd = "sed -i '/^ORACLE_HOSTNAME/c\ORACLE_HOSTNAME={}' \
 {}".format(oracle_host_name, DB_RSP_FILE)
-    os.system(cmd)
-    cmd = "sed -i '/^oracle.install.db.CLUSTER_NODES/c\oracle.install.db.\
+        os.system(cmd)
+        cmd = "sed -i '/^oracle.install.db.CLUSTER_NODES/c\oracle.install.db.\
 CLUSTER_NODES={}' {}".format(cluster_nodes[:-1], DB_RSP_FILE)
-    os.system(cmd)
+        os.system(cmd)
+    else:
+        cmd = "sed -i '/^ORACLE_HOSTNAME/c\ORACLE_HOSTNAME={}' \
+{}".format(hostname, DB_RSP_FILE)
+        os.system(cmd)
+        cmd = "sed -i '/^oracle.install.db.CLUSTER_NODES/c\oracle.install.db.\
+CLUSTER_NODES={}' {}".format("", DB_RSP_FILE)
+        os.system(cmd)
 
 
 def install_db_root_scripts():
@@ -849,12 +863,13 @@ def pre_install():
 
 def create_db():
     import re
-    data = OrderedDict()
-    data = json.load(open(NODE_DATA_FILE))
-    nodes_string = []
-    for node, value in data.items():
-        nodes_string.append("{},".format(node))
-    nodes = ''.join(nodes_string)
+    if config('slave-units-number'):
+        data = OrderedDict()
+        data = json.load(open(NODE_DATA_FILE))
+        nodes_string = []
+        for node, value in data.items():
+            nodes_string.append("{},".format(node))
+        nodes = ''.join(nodes_string)
     path = '/home/oracle/database/response/db_install.rsp'
     if os.path.exists(path):
         with open('{}'.format(path), 'r') as f:
@@ -865,14 +880,26 @@ def create_db():
 #   cmd = "export ORACLE_HOME = {}".format(ORACLE_PATH)
 #   os.system(cmd)
     oracle_bin = "{}/bin/".format(ORACLE_PATH.split('\n')[0])
-    cmd = "su - oracle -c '{}dbca -silent -createDatabase -templateName \
+    if config('slave-units-number'):
+        cmd = "su - oracle -c '{}dbca -silent -createDatabase -templateName \
 General_Purpose.dbc -gdbName {} -adminManaged -sysPassword {} \
 -systemPassword {} -emConfiguration NONE -storageType ASM -diskGroupName DATA \
 -nodelist {} -totalMemory 2400'".format(oracle_bin, config('db-service'),
                                         config('db-password'),
                                         config('db-password'),
                                         nodes[:-1])
-    os.system(cmd)
+        os.system(cmd)
+    else:
+        cmd = "su - oracle -c '{}dbca -silent -createDatabase -templateName \
+General_Purpose.dbc -gdbName {} -adminManaged -sysPassword {} \
+-systemPassword {} -emConfiguration NONE \
+-totalMemory 2400'".format(oracle_bin, config('db-service'),
+                           config('db-password'),
+                           config('db-password'))
+        os.system(cmd)
+        cmd = "su - oracle -c '{}netca -silent -responseFile \
+/home/oracle/database/response/netca.rsp'".format(oracle_bin)
+        os.system(cmd)
 
 
 def get_scan_str():
@@ -886,14 +913,25 @@ def get_scan_str():
 def set_oracle_env():
     cmd = "echo '#!/bin/bash' >> /etc/profile.d/oracle_env.sh"
     os.system(cmd)
-    cmd = "echo 'export ORACLE_HOME=/u01/app/12.1.0.2/grid' >> /etc/profile.d/\
+
+    if config('slave-units-number'):
+        cmd = "echo 'export ORACLE_HOME=/u01/app/12.1.0.2/grid' >> /etc/profile.d/\
 oracle_env.sh"
-    os.system(cmd)
+        os.system(cmd)
+    else:
+        cmd = "echo 'export ORACLE_HOME=/u01/app/oracle/product/12.1.0.2/db_1' >> \
+/etc/profile.d/oracle_env.sh"
+        os.system(cmd)
+
     cmd = "echo 'export PATH=$PATH:$ORACLE_HOME/bin' >> /etc/profile.d/\
 oracle_env.sh"
     os.system(cmd)
-    cmd = "echo 'export ORACLE_SID=+ASM1' >> /etc/profile.d/oracle_env.sh"
-    os.system(cmd)
+    if config('slave-units-number'):
+        cmd = "echo 'export ORACLE_SID=+ASM1' >> /etc/profile.d/oracle_env.sh"
+        os.system(cmd)
+    else:
+        cmd = "echo 'export ORACLE_SID=CPLANE' >> /etc/profile.d/oracle_env.sh"
+        os.system(cmd)
     cmd = "chown oracle.oinstall /etc/profile.d/oracle_env.sh"
     os.system(cmd)
     cmd = "chmod +x /etc/profile.d/oracle_env.sh"
@@ -916,3 +954,13 @@ udev/scsi_id -g -u -d /dev/$parent", RESULT=="{}", OWNER="oracle", GROUP=\
 "oinstall", MODE="0660"'.format(idx)
         cmd = "sed -i '/LABEL=/i{}' {}".format(rule_string, rule_path)
         os.system(cmd)
+
+
+def get_db_status():
+    cmd = "su - oracle -c 'lsnrctl status'"
+    res = commands.getoutput(cmd)
+    juju_log('lsnrctl status:  {}'.format(res))
+    if config('db-service') in res:
+        return True
+    else:
+        return False

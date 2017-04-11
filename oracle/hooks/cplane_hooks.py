@@ -30,7 +30,8 @@ def oracle_relation_joined():
     relation_info = {
         'oracle-host': host,
         'db-password': config('oracle-password'),
-        'db-service': 'XE'
+        'db-service': 'XE',
+        'db-path': '/u01/app/oracle/oradata/XE/'
     }
     relation_set(relation_settings=relation_info)
 

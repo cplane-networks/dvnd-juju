@@ -164,7 +164,7 @@ services:
     annotations:
       gui-x: '1000'
       gui-y: '0'
-    charm: /home/rebaca/13_March/dvnd-juju/neutron-api-cplane 
+    charm: "../neutron-api-cplane"
     num_units: 0
     options:
       cp-package-url: http://192.168.7.113/cplane_metadata.json
@@ -173,7 +173,7 @@ services:
     annotations:
       gui-x: '700'
       gui-y: '0'
-    charm: /home/rebaca/13_March/dvnd-juju/neutron-openvswitch-cplane
+    charm: "../neutron-openvswitch-cplane"
     num_units: 0
     options:
       cp-package-url: http://192.168.7.113/cplane_metadata.json
@@ -182,7 +182,7 @@ services:
     annotations:
       gui-x: '700'
       gui-y: '0'
-    charm: /home/rebaca/13_March/dvnd-juju/cplane-controller
+    charm: "../cplane-controller"
     num_units: 1
     options:
       cp-package-url: http://192.168.7.113/cplane_metadata.json
@@ -195,7 +195,7 @@ services:
     annotations:
       gui-x: '700'
       gui-y: '0'
-    charm: /home/rebaca/13_March/dvnd-juju/oracle-12c
+    charm: "../oracle-12c"
     num_units: 1
     series: centos7
     options:
@@ -208,7 +208,7 @@ services:
     annotations:
       gui-x: '700'
       gui-y: '0'
-    charm: /home/rebaca/13_March/dvnd-juju/oracle-12c
+    charm: "../oracle-12c"
     num_units: *slave_units
     series: centos7
     options:
