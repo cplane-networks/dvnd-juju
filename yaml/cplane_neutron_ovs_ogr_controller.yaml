@@ -89,7 +89,7 @@ services:
     num_units: 1
     options:
       ha-mcastport: 5402
-      openstack-origin: cloud:trusty-liberty
+      openstack-origin: cloud:trusty-mitaka
     to:
     - 'lxc:0'
   keystone:
@@ -101,7 +101,7 @@ services:
     options:
       admin-password: openstack
       ha-mcastport: 5403
-      openstack-origin: cloud:trusty-liberty
+      openstack-origin: cloud:trusty-mitaka
     to:
     - 'lxc:0'
   mysql:
@@ -122,7 +122,7 @@ services:
     num_units: 1
     options:
       neutron-security-groups: true
-      openstack-origin: cloud:trusty-liberty
+      openstack-origin: cloud:trusty-mitaka
       manage-neutron-plugin-legacy-mode: False
     to: 
     - 0
@@ -134,7 +134,7 @@ services:
     num_units: 1
     options:
       network-manager: Neutron
-      openstack-origin: cloud:trusty-liberty
+      openstack-origin: cloud:trusty-mitaka
     to:
     - 'lxc:0'
   nova-compute:
@@ -148,7 +148,7 @@ services:
       enable-resize: true
 #      manage-neutron-plugin-legacy-mode: false
       migration-auth-type: ssh
-      openstack-origin: cloud:trusty-liberty
+      openstack-origin: cloud:trusty-mitaka
       virt-type: qemu
     to:
     - '1'
@@ -159,7 +159,7 @@ services:
     charm: cs:trusty/openstack-dashboard
     num_units: 1
     options:
-      openstack-origin: cloud:trusty-liberty
+      openstack-origin: cloud:trusty-mitaka
     to:
     - 'lxc:0'
   rabbitmq-server:
@@ -169,7 +169,7 @@ services:
     charm: cs:trusty/rabbitmq-server
     num_units: 1
     options:
-      source: cloud:trusty-liberty
+      source: cloud:trusty-mitaka
     to:
     - 'lxc:0'
   neutron-api-cplane:
@@ -179,8 +179,9 @@ services:
     charm: "../neutron-api-cplane" 
     num_units: 0
     options:
-      cp-package-url: http://192.168.7.113/cplane_metadata.json
-      cplane-version: 1.3.7
+      cp-package-url: http://repohost/cplane_metadata.json
+      cplane-version: 1.3.8
+      topology-name: default
   neutron-openvswitch-cplane:
     annotations:
       gui-x: '700'
@@ -188,8 +189,20 @@ services:
     charm: "../neutron-openvswitch-cplane"
     num_units: 0
     options:
-      cp-package-url: http://192.168.7.113/cplane_metadata.json
-      cplane-version: 1.3.7
+      cp-package-url: http://repohost/cplane_metadata.json
+      cplane-version: 1.3.8
+      cp-package-url: http://repohost/cplane_metadata.json
+      cplane-version: 1.3.8
+      mgmt-int: eth2
+      cp-controller-mport: 1901
+      cp-controller-uport: 1902
+      data-interface: eth1.10
+      data-gateway: 192.168.63.1
+#      tun-interface: eth2
+#      tun-gatway: 192.168.34.1
+#      fip-interface: eth3
+#      enable-unicast: true
+      cp-vm-mtu: 1400
   cplane-controller:
     annotations:
       gui-x: '700'
@@ -197,10 +210,14 @@ services:
     charm: "../cplane-controller"
     num_units: 1
     options:
-      cp-package-url: http://192.168.7.113/cplane_metadata.json
-      cplane-version: 1.3.7
-      jboss-db-on-host: True 
-      multicast-intf: br-eth0
+      cp-package-url: http://repohost/cplane_metadata.json
+      cplane-version: 1.3.8
+      jboss-db-on-host: true
+      multicast-intf: eth2
+      multicast-port: 1901
+      unicast-port: 1902
+#      enable-fip: true
+#      use-default-jboss-cluster: true
     to:
     - '2' 
   cplane-compute:
@@ -214,7 +231,7 @@ services:
       enable-resize: true
 #      manage-neutron-plugin-legacy-mode: false
       migration-auth-type: ssh
-      openstack-origin: cloud:trusty-liberty
+      openstack-origin: cloud:trusty-mitaka
       virt-type: qemu
     to:
     - '3'
@@ -224,3 +241,5 @@ services:
       gui-y: '0'
     charm: "../ogr-compute-cplane"
     num_units: 0
+    options:
+        vlan-ranges: 1000:2000
