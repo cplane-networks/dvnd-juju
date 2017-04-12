@@ -154,7 +154,7 @@ services:
     annotations:
       gui-x: '1000'
       gui-y: '0'
-    charm: "../neutron-api-cplane" 
+    charm: cs:~cplane-team/trusty/neutron-api-cplane-1
     num_units: 0
     options:
       cp-package-url: http://repohost/cplane_metadata.json
@@ -164,7 +164,7 @@ services:
     annotations:
       gui-x: '700'
       gui-y: '0'
-    charm: "../neutron-openvswitch-cplane"
+    charm: cs:~cplane-team/trusty/neutron-openvswitch-cplane-1
     num_units: 0 
     options: 
       cp-package-url: http://repohost/cplane_metadata.json
@@ -183,7 +183,7 @@ services:
     annotations:
       gui-x: '700'
       gui-y: '0'
-    charm: "../cplane-controller"
+    charm: cs:~cplane-team/trusty/cplane-controller-1
     num_units: 1
     options:
       cp-package-url: http://repohost/cplane_metadata.json
