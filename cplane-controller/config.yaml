@@ -16,7 +16,7 @@ options:
     type: string
     description: "The oracle instant client sqlplus version"
   cp-package-url:
-    default: "http://192.168.7.103/cplane_metadata.json"
+    default: "http://repohost/cplane_metadata.json"
     type: string
     description: |
       URL for cplane packages
@@ -32,7 +32,7 @@ options:
   oracle-host:
     default: "localhost"
     type: string
-    description: "Oeacle host"  
+    description: "Oracle host"  
   oracle-password:
     default: "password"
     type: string
@@ -74,7 +74,7 @@ options:
     type: string
     description: "Flag to install the reboot scripts"
   cplane-version:
-    default: "1.3.7"
+    default: "1.3.8"
     type: string
     description: "Cplane softwares version"
   use-default-jboss-cluster:
