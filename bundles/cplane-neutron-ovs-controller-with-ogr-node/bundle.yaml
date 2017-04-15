@@ -9,6 +9,11 @@ machines:
   '2':
     constraints: arch=amd64
     series: trusty
+  '3':
+    constraints: arch=amd64
+    series: trusty
+
+
 relations:
 - - nova-compute:amqp
   - rabbitmq-server:amqp
@@ -56,6 +61,23 @@ relations:
   - neutron-openvswitch-cplane:cplane-controller
 - - cplane-controller:cplane-controller
   - neutron-api-cplane:cplane-controller 
+- - cplane-compute:amqp
+  - rabbitmq-server:amqp
+- - cplane-compute:image-service
+  - glance:image-service
+- - nova-cloud-controller:cloud-compute
+  - cplane-compute:cloud-compute
+- - ogr-compute-cplane:neutron-plugin
+  - cplane-compute:neutron-plugin
+- - ogr-compute-cplane:amqp
+  - rabbitmq-server:amqp
+- - ogr-compute-cplane:identity-service
+  - keystone:identity-service
+- - ogr-compute-cplane:cplane-neutron
+  - neutron-api-cplane:cplane-neutron
+- - neutron-api-cplane:cplane-ovs
+  - neutron-openvswitch-cplane:cplane-ovs
+
 
 series: trusty
 services:
@@ -165,9 +187,9 @@ services:
       gui-x: '700'
       gui-y: '0'
     charm: cs:~cplane-team/trusty/neutron-openvswitch-cplane
-    num_units: 0 
-    options: 
-      cp-package-url: http://repohost/cplane_metadata.json
+    num_units: 0
+    options:
+      cp-package-url: http://repohost/cplane_metadata.json 
       cplane-version: 1.3.8
       mgmt-int: eth2
       cp-controller-mport: 1901
@@ -196,3 +218,26 @@ services:
 #      use-default-jboss-cluster: true
     to:
     - '2' 
+  cplane-compute:
+    annotations:
+      gui-x: '350'
+      gui-y: '350'
+    charm: cs:trusty/nova-compute
+    num_units: 1
+    options:
+      enable-live-migration: true
+      enable-resize: true
+#      manage-neutron-plugin-legacy-mode: false
+      migration-auth-type: ssh
+      openstack-origin: cloud:trusty-mitaka
+      virt-type: qemu
+    to:
+    - '3'
+  ogr-compute-cplane:
+    annotations:
+      gui-x: '800'
+      gui-y: '0'
+    charm: cs:~cplane-team/trusty/ogr-compute-cplane
+    num_units: 0
+    options:
+        vlan-ranges: 30:35
