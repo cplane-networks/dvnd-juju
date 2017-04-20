@@ -25,7 +25,7 @@ cplane_install_package = OrderedDict([
     ('dvnd', '0')
 ])
 
-CPLANE_URL = 'http://192.168.7.103/cplane_metadata.json'
+CPLANE_URL = 'http://192.168.7.113/cplane_metadata.json'
 
 
 class CplaneUtilsTest(CharmTestCase):

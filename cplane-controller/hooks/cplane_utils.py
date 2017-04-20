@@ -26,6 +26,11 @@ import re
 import json
 import socket
 import pickle
+from charmhelpers.contrib.openstack.utils import (
+    make_assess_status_func,
+)
+
+import charmhelpers.core.hookenv as hookenv
 
 
 from cplane_package_manager import(
@@ -83,6 +88,15 @@ CHARM_LIB_DIR = os.environ.get('CHARM_DIR', '') + "/lib/"
 CPLANE_DIR = '/opt/cplane/bin'
 DB_DIR = os.environ.get('CHARM_DIR', '') + "/lib/" + 'PKG/pkg/db_init/'
 FILES_PATH = CHARM_LIB_DIR + '/filelink'
+
+if not config('jboss-db-on-host'):
+    REQUIRED_INTERFACES = {
+        'oracle': ['oracle'],
+    }
+else:
+    REQUIRED_INTERFACES = {}
+
+SERVICES = []
 
 
 def determine_packages():
@@ -618,3 +632,42 @@ def config_host(host_string, address_type):
         if address_type == 'scan':
             cmd = ("sed -i '/# SCAN/a{}' {}".format(host_string, host_file))
             os.system(cmd)
+
+
+def check_jboss_status():
+    status = commands.getoutput('bash /opt/cplane/bin/checkJBossServer.sh')
+    if status == "JBoss server is not running!":
+        return False
+    elif status == "JBoss server is running!":
+        return True
+
+
+def assess_status(configs):
+    assess_status_func(configs)()
+    hookenv.application_version_set(
+        config('cplane-version'))
+
+
+def assess_status_func(configs):
+    required_interfaces = REQUIRED_INTERFACES.copy()
+    return make_assess_status_func(
+        configs, required_interfaces, services=SERVICES
+    )
+
+
+class FakeOSConfigRenderer(object):
+    def complete_contexts(self):
+        interfaces = []
+        for key, values in REQUIRED_INTERFACES.items():
+            for value in values:
+                for rid in relation_ids(value):
+                    for unit in related_units(rid):
+                        interfaces.append(value)
+        return interfaces
+
+    def get_incomplete_context_data(self, interfaces):
+        return {}
+
+
+def fake_register_configs():
+    return FakeOSConfigRenderer()

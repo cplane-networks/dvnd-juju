@@ -8,6 +8,7 @@ from charmhelpers.core.hookenv import (
     relation_set,
     relation_ids,
     relation_get,
+    status_set,
 )
 import sys
 import os
@@ -60,7 +61,6 @@ from cplane_utils import (
     download_cplane_packages,
     copy_oracle_package,
     get_db_status,
-
 )
 
 hooks = Hooks()
@@ -75,6 +75,7 @@ def config_changed():
 @hooks.hook('start')
 def start():
     if not config('slave-units-number'):
+        status_set('maintenance', 'Performing Oracle standalone Installation')
         download_cplane_packages()
         copy_oracle_package()
 
@@ -84,6 +85,7 @@ def start():
             set_oracle_env()
             create_db()
             juju_log('Database is created and the listerner is started')
+            status_set('active', 'Unit is ready')
 
 
 @hooks.hook('install.real')
@@ -155,6 +157,7 @@ def master_relation_changed():
 
     juju_log('Setting up the Hoststring in Master in relation-changed')
     if check_all_nodes():
+        status_set('maintenance', 'Performing Oracle RAC Preinstallation')
         if check_node_state() is None:
             juju_log('Received data from Slaves')
             hostname = socket.gethostname()
@@ -187,11 +190,13 @@ def master_state_relation_changed():
     state = relation_get('state')
     if check_all_clustered_nodes(state):
         if state == 'install':
+            status_set('maintenance', 'Installing grid')
             if install_grid():
                 install_root_scripts()
                 send_notification("master-state", "cluster")
         elif state == 'clustered':
             if install_db():
+                status_set('maintenance', 'Installing Database')
                 install_db_root_scripts()
                 send_notification("master-state", "database")
         elif state == 'final':
@@ -201,6 +206,7 @@ def master_state_relation_changed():
                 for rid in relation_ids('oracle'):
                     oracle_relation_changed(relation_id=rid)
                 juju_log("Oracle Rac 12C installation is succeeded on master")
+                status_set('active', 'Unit is ready')
 
 
 @hooks.hook('slave-state-relation-joined')
@@ -214,13 +220,16 @@ def slave_state_relation_changed():
         juju_log('Relationship with master-state not yet complete')
         return
     if relation_get('state') == 'cluster':
+        status_set('maintenance', 'Installing Root scripts')
         install_root_scripts()
         send_notification("slave-state", "clustered")
     if relation_get('state') == 'database':
+        status_set('maintenance', 'Installing DB scripts')
         install_db_root_scripts()
         send_notification("slave-state", "final")
     if relation_get('state') == 'final':
         juju_log("Oracle Rac 12C installation is succeeded on slave")
+        status_set('active', 'Unit is ready')
 
 
 @hooks.hook('oracle-relation-changed')
@@ -263,7 +272,6 @@ def main():
         hooks.execute(sys.argv)
     except UnregisteredHookError as e:
         juju_log('Unknown hook {} - skipping.'.format(e))
-
 
 if __name__ == '__main__':
     main()

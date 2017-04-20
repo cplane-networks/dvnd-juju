@@ -41,6 +41,8 @@ from cplane_utils import (
     set_oracle_env,
     flush_upgrade_type,
     get_unit_ip,
+    assess_status,
+    fake_register_configs,
 )
 
 
@@ -144,7 +146,7 @@ def main():
         hooks.execute(sys.argv)
     except UnregisteredHookError as e:
         juju_log('Unknown hook {} - skipping.'.format(e))
-
+    assess_status(fake_register_configs())
 
 if __name__ == '__main__':
     main()

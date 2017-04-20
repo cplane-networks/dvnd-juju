@@ -70,8 +70,6 @@ def add_bridge(name, interface, gw=None):
     extra_params['bridge_name'] = name
     extra_params = dict([(k, "".join(list(v))) for k, v in extra_params
                          .iteritems()])
-
-
     network_configuration._write_net_config_bridged_iface_br(interface,
                                                              **extra_params)
 

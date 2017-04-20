@@ -29,6 +29,8 @@ from cplane_utils import (
     python_intall,
     migrate_db,
     configure_policy,
+    assess_status,
+    fake_register_configs,
 )
 
 hooks = Hooks()
@@ -62,8 +64,8 @@ def share_db_relation_changed():
     migrate_db()
 
 
-@hooks.hook('amqp-relation-joined')
-def amqp_joined(relation_id=None):
+@hooks.hook('amqp-relation-changed')
+def amqp_changed(relation_id=None):
     relation_set(relation_id=relation_id,
                  username=config('rabbit-user'),
                  vhost=config('rabbit-vhost'))
@@ -118,7 +120,7 @@ def main():
         hooks.execute(sys.argv)
     except UnregisteredHookError as e:
         juju_log('Unknown hook {} - skipping.'.format(e))
-
+    assess_status(fake_register_configs())
 
 if __name__ == '__main__':
     main()

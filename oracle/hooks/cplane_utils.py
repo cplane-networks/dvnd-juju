@@ -5,6 +5,9 @@ from collections import OrderedDict
 from charmhelpers.core.hookenv import (
     config,
     log,
+    relation_ids,
+    related_units,
+
 )
 
 from charmhelpers.fetch import (
@@ -16,6 +19,12 @@ import os
 from cplane_package_manager import(
     CPlanePackageManager
 )
+
+from charmhelpers.contrib.openstack.utils import (
+    make_assess_status_func,
+)
+
+import charmhelpers.core.hookenv as hookenv
 
 
 cplane_packages = OrderedDict([
@@ -35,6 +44,9 @@ DVND_CONFIG = OrderedDict([
 filename = {}
 
 CHARM_LIB_DIR = os.environ.get('CHARM_DIR', '') + "/lib/"
+
+REQUIRED_INTERFACES = {}
+SERVICES = []
 
 
 def determine_packages():
@@ -139,3 +151,34 @@ def configure_oracle():
 def install_reboot_scripts():
     cmd = 'update-rc.d {} defaults 20 '.format(config('oracle-version'))
     os.system(cmd)
+
+
+def assess_status(configs):
+    assess_status_func(configs)()
+    hookenv.application_version_set(
+        config('cplane-version'))
+
+
+def assess_status_func(configs):
+    required_interfaces = REQUIRED_INTERFACES.copy()
+    return make_assess_status_func(
+        configs, required_interfaces, services=SERVICES
+    )
+
+
+class FakeOSConfigRenderer(object):
+    def complete_contexts(self):
+        interfaces = []
+        for key, values in REQUIRED_INTERFACES.items():
+            for value in values:
+                for rid in relation_ids(value):
+                    for unit in related_units(rid):
+                        interfaces.append(value)
+        return interfaces
+
+    def get_incomplete_context_data(self, interfaces):
+        return {}
+
+
+def fake_register_configs():
+    return FakeOSConfigRenderer()

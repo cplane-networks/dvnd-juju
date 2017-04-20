@@ -34,6 +34,8 @@ from cplane_utils import (
     NEUTRON_CONF,
     neutron_config,
     restart_cp_agentd,
+    assess_status,
+    fake_register_configs,
 )
 
 
@@ -145,6 +147,7 @@ def main():
         hooks.execute(sys.argv)
     except UnregisteredHookError as e:
         log('Unknown hook {} - skipping.'.format(e))
+    assess_status(fake_register_configs())
 
 
 if __name__ == '__main__':

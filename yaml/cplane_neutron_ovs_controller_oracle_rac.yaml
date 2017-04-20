@@ -202,6 +202,7 @@ services:
       slave-units-number: *slave_units
       vip-range: 10.14.0.180
       scan-ip-range: 10.14.0.187
+      cp-package-url: http://192.168.7.113/cplane_metadata.json
     constraints:
       tags=oracle-rac
   rac-slave:
@@ -213,5 +214,6 @@ services:
     series: centos7
     options:
       vip-range: 10.14.0.181
+      cp-package-url: http://192.168.7.113/cplane_metadata.json
     constraints:
       tags=oracle-rac

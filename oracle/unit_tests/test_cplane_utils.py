@@ -42,8 +42,11 @@ class CplaneUtilsTest(CharmTestCase):
         self.assertEqual(cplane_utils.determine_packages(),
                          ['alien', 'libaio1', 'python-pexpect'])
 
+    @patch.object(cplane_utils.CPlanePackageManager, "_create_log")
+    @patch.object(cplane_utils.CPlanePackageManager, "_get_pkg_json")
     @patch.object(CPlanePackageManager, "download_package")
-    def test_download_cplane_packages(self, m_download_package):
+    def test_download_cplane_packages(self, m_download_package,
+                                      m_get_pkg_json, m_create_log):
         cplane_utils.CPLANE_URL = 'https://www.dropbox.com/s/h2edle1o0jj1btt/\
 cplane_metadata.json?dl=1'
         cplane_utils.cplane_packages = cplane_install_package

@@ -12,7 +12,11 @@ from charmhelpers.core.hookenv import (
     related_units,
 )
 
+from charmhelpers.contrib.openstack.utils import (
+    make_assess_status_func,
+)
 import cplane_context
+import charmhelpers.core.hookenv as hookenv
 
 from cplane_package_manager import(
     CPlanePackageManager
@@ -58,6 +62,14 @@ if config('cplane-version') == "1.3.7" or "1.3.8":
 PACKAGES = ['neutron-plugin-ml2', 'crudini', 'python-dev']
 
 CPLANE_URL = config('cp-package-url')
+
+REQUIRED_INTERFACES = {
+    'database': ['shared-db'],
+    'cplane-controller': ['cplane-controller'],
+    'messaging': ['amqp'],
+}
+
+SERVICES = ['neutron-server']
 
 
 def determine_packages():
@@ -157,3 +169,34 @@ def configure_policy():
         data["get_floatingip_quota"] = "rule:admin_or_owner"
         data["get_floatingip_quotas"] = ""
     json.dump(data, open(policy_file, 'w'), indent=4)
+
+
+def assess_status(configs):
+    assess_status_func(configs)()
+    hookenv.application_version_set(
+        config('cplane-version'))
+
+
+def assess_status_func(configs):
+    required_interfaces = REQUIRED_INTERFACES.copy()
+    return make_assess_status_func(
+        configs, required_interfaces, services=SERVICES
+    )
+
+
+class FakeOSConfigRenderer(object):
+    def complete_contexts(self):
+        interfaces = []
+        for key, values in REQUIRED_INTERFACES.items():
+            for value in values:
+                for rid in relation_ids(value):
+                    for unit in related_units(rid):
+                        interfaces.append(value)
+        return interfaces
+
+    def get_incomplete_context_data(self, interfaces):
+        return {}
+
+
+def fake_register_configs():
+    return FakeOSConfigRenderer()

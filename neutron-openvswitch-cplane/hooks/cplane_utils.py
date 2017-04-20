@@ -12,6 +12,12 @@ from charmhelpers.core.hookenv import (
     related_units,
 )
 
+from charmhelpers.contrib.openstack.utils import (
+    make_assess_status_func,
+)
+
+import charmhelpers.core.hookenv as hookenv
+
 from charmhelpers.fetch import (
     apt_install,
 )
@@ -54,6 +60,14 @@ NEUTRON_CONF = '/etc/neutron/neutron.conf'
 
 PACKAGES = ['neutron-metadata-agent', 'neutron-plugin-ml2', 'crudini',
             'dkms', 'iputils-arping', 'dnsmasq']
+
+REQUIRED_INTERFACES = {
+    'neutron-api-cplane': ['cplane-ovs'],
+    'cplane-controller': ['cplane-controller'],
+    'messaging': ['amqp'],
+}
+
+SERVICES = ['cp-agentd']
 
 NEUTRON_METADATA_AGENT_CONF = '/etc/neutron/metadata_agent.ini'
 
@@ -217,3 +231,34 @@ def restart_services():
 def restart_cp_agentd():
     cmd = ['service', 'cp-agentd', 'restart']
     subprocess.check_call(cmd)
+
+
+def assess_status(configs):
+    assess_status_func(configs)()
+    hookenv.application_version_set(
+        config('cplane-version'))
+
+
+def assess_status_func(configs):
+    required_interfaces = REQUIRED_INTERFACES.copy()
+    return make_assess_status_func(
+        configs, required_interfaces, services=SERVICES
+    )
+
+
+class FakeOSConfigRenderer(object):
+    def complete_contexts(self):
+        interfaces = []
+        for key, values in REQUIRED_INTERFACES.items():
+            for value in values:
+                for rid in relation_ids(value):
+                    for unit in related_units(rid):
+                        interfaces.append(value)
+        return interfaces
+
+    def get_incomplete_context_data(self, interfaces):
+        return {}
+
+
+def fake_register_configs():
+    return FakeOSConfigRenderer()

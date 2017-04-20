@@ -11,6 +11,13 @@ from charmhelpers.core.hookenv import (
     related_units,
 )
 
+from charmhelpers.contrib.openstack.utils import (
+    make_assess_status_func,
+)
+
+import charmhelpers.core.hookenv as hookenv
+
+
 import cplane_context
 
 TEMPLATES = 'templates/'
@@ -58,6 +65,14 @@ metadata_agent_config = OrderedDict([
                                      config('openstack-controller-ip')),
                                     ('metadata_proxy_shared_secret',
                                      'secret')])
+
+
+REQUIRED_INTERFACES = {
+    'messaging': ['amqp'],
+    'cplane-neutron': ['cplane-neutron'],
+    'identity': ['identity-service'],
+}
+SERVICES = ['nova-compute']
 
 
 def api_ready(relation, key):
@@ -114,3 +129,34 @@ def resource_map(release=None):
     release = release or os_release('neutron-common')
     resource_map = deepcopy(BASE_RESOURCE_MAP)
     return resource_map
+
+
+def assess_status(configs):
+    assess_status_func(configs)()
+    hookenv.application_version_set(
+        config('cplane-version'))
+
+
+def assess_status_func(configs):
+    required_interfaces = REQUIRED_INTERFACES.copy()
+    return make_assess_status_func(
+        configs, required_interfaces, services=SERVICES
+    )
+
+
+class FakeOSConfigRenderer(object):
+    def complete_contexts(self):
+        interfaces = []
+        for key, values in REQUIRED_INTERFACES.items():
+            for value in values:
+                for rid in relation_ids(value):
+                    for unit in related_units(rid):
+                        interfaces.append(value)
+        return interfaces
+
+    def get_incomplete_context_data(self, interfaces):
+        return {}
+
+
+def fake_register_configs():
+    return FakeOSConfigRenderer()

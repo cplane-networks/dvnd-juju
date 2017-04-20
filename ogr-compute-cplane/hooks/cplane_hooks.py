@@ -25,6 +25,8 @@ from cplane_utils import (
     cplane_config,
     register_configs,
     NEUTRON_CONF,
+    assess_status,
+    fake_register_configs,
 )
 
 hooks = Hooks()
@@ -140,6 +142,7 @@ def main():
         hooks.execute(sys.argv)
     except UnregisteredHookError as e:
         juju_log('Unknown hook {} - skipping.'.format(e))
+    assess_status(fake_register_configs())
 
 
 if __name__ == '__main__':
