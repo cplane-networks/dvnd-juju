@@ -13,12 +13,13 @@ from charmhelpers.core.host import (
 from charmhelpers.core.hookenv import (
     status_set,
     config,
+    log as juju_log,
 )
 
 CHARM_LIB_DIR = os.environ.get('CHARM_DIR', '') + "/lib/"
 
 
-class JsonException(Exception):
+class ErrorException(Exception):
     pass
 
 
@@ -45,13 +46,48 @@ class CPlanePackageManager:
         except ValueError as e:
             msg = "JSON Error: {}".format(e.message)
             status_set('blocked', msg)
-            raise JsonException(msg)
+            raise ErrorException(msg)
 
     def _get_pkg_json(self):
         url = self.package_url
-        response = urllib.urlopen(url)
+        response = None
+        try:
+            response = urllib.urlopen(url)
+        except IOError:
+            msg = "Invalid URL: URL metioned for Cplane binaries is not valid"
+            status_set('blocked', msg)
+            raise ErrorException(msg)
+
         logging.info("Package url:%s" % url)
         data = self._validate_json(response.read())
+        if not data.get("{}".format(config("cplane-version"))):
+            msg = "Invalid Cplane version: Invallid Cplane \
+version {}".format(config("cplane-version"))
+            status_set('blocked', msg)
+            raise ErrorException(msg)
+
+        if not data.get("{}".format(config("cplane-version")),
+                        {}).get("ubuntu"):
+            msg = "Invalid Linux flavour: Cplane binaries for Ubuntu not found"
+            status_set('blocked', msg)
+            raise ErrorException(msg)
+
+        if not data.get("{}".format(config("cplane-version")),
+                        {}).get("ubuntu",
+                                {}).get("14.04"):
+            msg = "Invalid OS versions: Cplane version for \
+Ubuntu 14.04 not found"
+            status_set('blocked', msg)
+            raise ErrorException(msg)
+
+        if not data.get("{}".format(config("cplane-version")),
+                        {}).get("ubuntu",
+                                {}).get("14.04",
+                                        {}).get("liberty"):
+            msg = "Invalid Openstack version: Cplane version for \
+Openstack version liberty not found"
+            status_set('blocked', msg)
+            raise ErrorException(msg)
         self.package_data = data.get("{}".format(config("cplane-version")),
                                      {}).get("ubuntu",
                                              {}).get("14.04",
@@ -71,8 +107,10 @@ class CPlanePackageManager:
     def download_package(self, package_name, version):
         version = int(version)
         if package_name not in self.package_data:
-            logging.error("Package name %s doesn't exist" % package_name)
-            return
+            msg = "Invalid Package: Package {} is not found in the \
+Cplane repo".format(package_name)
+            status_set('blocked', msg)
+            raise ErrorException(msg)
 
         package_list = self.package_data.get(package_name)
         version_exist = False
@@ -94,9 +132,10 @@ class CPlanePackageManager:
             logging.info("Package download link %s" % package_dwnld_link)
 
         if not version_exist:
-            logging.error("Version %d doesn't exist for package %s"
-                          % (version, package_name))
-            return
+            msg = "Invalid Version: Version {} doesn't exist for \
+package {}".format(version, package_name)
+            status_set('blocked', msg)
+            raise ErrorException(msg)
 
         mkdir(CHARM_LIB_DIR)
         filename = urlparse.urlsplit(package_dwnld_link).path
@@ -105,11 +144,13 @@ class CPlanePackageManager:
         urllib.urlretrieve(package_dwnld_link, dwnld_package_name)
 
         if self.verify_file_checksum(dwnld_package_name, file_checksum):
-            logging.info("Package %s downloaded successfully"
-                         % dwnld_package_name)
+            juju_log("Package %s downloaded successfully"
+                     % dwnld_package_name)
         else:
-            logging.info("Package %s downloaded, but checksum mismatch"
-                         % dwnld_package_name)
+            msg = "Invalid Checksum: Package {} checksum \
+mismatch".format(dwnld_package_name)
+            status_set('blocked', msg)
+            raise ErrorException(msg)
 
         return dwnld_package_name
 

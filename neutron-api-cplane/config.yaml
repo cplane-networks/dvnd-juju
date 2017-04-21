@@ -52,7 +52,7 @@ options:
     type: string
     description: "Cplane softwares version"
   topology-name:
-    default: "cplane"
+    default: "default"
     type: string
     description: "Name of the topology"
 
