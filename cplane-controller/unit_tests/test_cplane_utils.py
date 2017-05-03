@@ -90,6 +90,7 @@ rc.d/init.d'])
                                        m_download_package, m_get_pkg_json,
                                        m_create_log):
         cplane_utils.CPLANE_URL = CPLANE_URL
+        cplane_utils.CONTROLLER_CONFIG = 'cplane-dvnd-config.yaml'
         cplane_utils.cplane_packages = cplane_install_package
         self.test_config.set('controller-app-mode', 'dvnd')
         cplane_utils.download_cplane_installer()
@@ -190,6 +191,7 @@ jboss-6.1.0.Final')
                                       m_json_dump, m_json_load, m_chdir,
                                       m_prepare_database, m_load_config,
                                       m_check_call):
+        cplane_utils.CONTROLLER_CONFIG = 'cplane-dvnd-config.yaml'
         cplane_utils.cplane_installer()
         m_set_oracle_host.assert_called_with()
         m_check_call.assert_called_with(['sh', 'cpinstaller',
@@ -207,6 +209,7 @@ jboss-6.1.0.Final')
                                       m_json_dump, m_json_load, m_chdir,
                                       m_prepare_database, m_load_config,
                                       m_check_call):
+        cplane_utils.CONTROLLER_CONFIG = 'cplane-dvnd-config.yaml'
         cplane_utils.cplane_installer()
         m_set_oracle_host.assert_called_with()
         m_check_call.assert_called_with(['sh', 'cpinstaller',
@@ -268,6 +271,7 @@ g' .PKG/test.txt")
     @patch("cplane_utils.set_config")
     def test_load_config_default_jbooss_cluster(self, m_set_config):
         self.test_config.set('use-default-jboss-cluster', 'y')
+        cplane_utils.CONTROLLER_CONFIG = 'cplane-dvnd-config.yaml'
         cplane_utils.load_config()
         m_set_config.assert_called_with('multicastServerInterface',
                                         'br-eth2',
@@ -276,6 +280,7 @@ g' .PKG/test.txt")
     @patch("cplane_utils.set_config")
     def test_load_config_diff_jbooss_cluster(self, m_set_config):
         self.test_config.set('use-default-jboss-cluster', 'n')
+        cplane_utils.CONTROLLER_CONFIG = 'cplane-dvnd-config.yaml'
         cplane_utils.load_config()
 #        hostname = socket.gethostname()
         m_set_config.assert_called_with('multicastServerInterface', 'br-eth2',

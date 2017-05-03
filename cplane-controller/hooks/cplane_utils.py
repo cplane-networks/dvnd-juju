@@ -53,6 +53,7 @@ cplane_packages = OrderedDict([
     (config('controller-app-mode'), '0')
 ])
 
+
 if config('jboss-db-on-host') is False:
     del cplane_packages[config('oracle-version')]
 elif config('jboss-db-on-host'):
@@ -79,6 +80,15 @@ DVND_CONFIG = OrderedDict([
     ('enable-fip', 'GatewayBridgeFipExt')
 ])
 
+MSM_CONFIG = OrderedDict([
+    ('jboss-home', 'JBOSS_HOME'),
+    ('db-user', 'DB_USERNAME'),
+    ('db-password', 'DB_PASSWORD'),
+    ('intall-reboot-scripts', 'JBOSS_INSTALL_REBOOT'),
+    ('oracle-host', 'DB_HOSTNAME'),
+    ('jboss-db-on-host', 'JBOSS_DB_ON_HOST'),
+])
+
 ORACLE_HOST = ''
 DB_SERVICE = ''
 DB_PASSWORD = ''
@@ -88,6 +98,12 @@ CHARM_LIB_DIR = os.environ.get('CHARM_DIR', '') + "/lib/"
 CPLANE_DIR = '/opt/cplane/bin'
 DB_DIR = os.environ.get('CHARM_DIR', '') + "/lib/" + 'PKG/pkg/db_init/'
 FILES_PATH = CHARM_LIB_DIR + '/filelink'
+CONTROLLER_CONFIG = ''
+if config('controller-app-mode') == 'dvnd':
+    CONTROLLER_CONFIG = 'cplane-dvnd-config.yaml'
+elif config('controller-app-mode') == 'msm':
+    CONTROLLER_CONFIG = 'cplane-msm-config.yaml'
+    cplane_packages[config('controller-app-mode')] = 262
 
 if not config('jboss-db-on-host'):
     REQUIRED_INTERFACES = {
@@ -353,18 +369,26 @@ def load_config():
         for key, value in DVND_CONFIG.items():
             if key == 'enable-fip':
                 if(config(key)):
-                    set_config(value, 'true', 'cplane-dvnd-config.yaml')
+                    set_config(value, 'true', CONTROLLER_CONFIG)
                 else:
-                    set_config(value, 'false', 'cplane-dvnd-config.yaml')
+                    set_config(value, 'false', CONTROLLER_CONFIG)
             else:
-                set_config(value, config(key), 'cplane-dvnd-config.yaml')
+                set_config(value, config(key), CONTROLLER_CONFIG)
         set_config('multicastServerInterface', config('multicast-intf'),
-                   'cplane-dvnd-config.yaml')
+                   CONTROLLER_CONFIG)
         if config('use-default-jboss-cluster') is False:
             hostname = socket.gethostname()
             cluster_name = 'cplane' + '-' + hostname
             set_config('JBOSS_CLUSTER_NAME', cluster_name,
-                       'cplane-dvnd-config.yaml')
+                       CONTROLLER_CONFIG)
+    elif config('controller-app-mode') == 'msm':
+        for key, value in MSM_CONFIG.items():
+            set_config(value, config(key), CONTROLLER_CONFIG)
+        if config('use-default-jboss-cluster') is False:
+            hostname = socket.gethostname()
+            cluster_name = 'cplane' + '-' + hostname
+            set_config('JBOSS_CLUSTER_NAME', cluster_name,
+                       CONTROLLER_CONFIG)
 
 
 def cplane_installer():
@@ -376,8 +400,8 @@ def cplane_installer():
     load_config()
     set_oracle_host()
     if config('jboss-db-on-host') is False:
-        set_config('DB_HOSTNAME', ORACLE_HOST, 'cplane-dvnd-config.yaml')
-        set_config('DB_SID', DB_SERVICE, 'cplane-dvnd-config.yaml')
+        set_config('DB_HOSTNAME', ORACLE_HOST, CONTROLLER_CONFIG)
+        set_config('DB_SID', DB_SERVICE, CONTROLLER_CONFIG)
     os.chdir('PKG/pkg')
     cmd = ['tar', 'xvf', 'db_init.tar']
     subprocess.check_call(cmd)
@@ -388,7 +412,7 @@ def cplane_installer():
     cmd = ['chmod', '+x', 'cpinstaller']
     subprocess.check_call(cmd)
 
-    cmd = ['sh', 'cpinstaller', 'cplane-dvnd-config.yaml']
+    cmd = ['sh', 'cpinstaller', CONTROLLER_CONFIG]
     subprocess.check_call(cmd)
     os.chdir(saved_path)
 
@@ -507,10 +531,10 @@ def run_cp_installer():
     load_config()
     set_oracle_host()
     if config('jboss-db-on-host') is False:
-        set_config('DB_HOSTNAME', ORACLE_HOST, 'cplane-dvnd-config.yaml')
-        set_config('DB_SID', DB_SERVICE, 'cplane-dvnd-config.yaml')
+        set_config('DB_HOSTNAME', ORACLE_HOST, CONTROLLER_CONFIG)
+        set_config('DB_SID', DB_SERVICE, CONTROLLER_CONFIG)
     os.chdir('PKG')
-    cmd = ['sh', 'cpinstaller', 'cplane-dvnd-config.yaml']
+    cmd = ['sh', 'cpinstaller', CONTROLLER_CONFIG]
     subprocess.check_call(cmd)
     os.chdir(saved_path)
 
