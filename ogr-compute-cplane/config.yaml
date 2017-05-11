@@ -95,7 +95,7 @@ options:
       Space-delimited list of Neutron flat network providers.
   physical-intf-mappings:
     type: string
-    default: physnet1:eth0, physnet2:eth1, physnet2:eth2
+    default: physnet1:eth1, physnet2:eth2, physnet3:eth3
     description: |
       Space-delimited list of <physnet>:<actual interface> 
   vlan-ranges:
