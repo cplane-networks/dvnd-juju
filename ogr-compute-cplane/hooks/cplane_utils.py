@@ -29,6 +29,7 @@ PACKAGES = ['sysfsutils', 'neutron-metadata-agent', 'python-neutronclient',
 METADATA_AGENT_INI = '/etc/neutron/metadata_agent.ini'
 NEUTRON_CONF_DIR = "/etc/neutron"
 NEUTRON_CONF = '%s/neutron.conf' % NEUTRON_CONF_DIR
+ML2_CONFIG = '/etc/neutron/plugins/ml2/ml2_conf.ini'
 
 BASE_RESOURCE_MAP = OrderedDict([
     (NEUTRON_CONF, {
@@ -55,7 +56,10 @@ BASE_RESOURCE_MAP = OrderedDict([
                      service='neutron',
                      service_user='neutron')],
     }),
-
+    (ML2_CONFIG, {
+        'services': ['neutron-server'],
+        'contexts': [cplane_context.CplaneMl2Context(), ]
+    })
 ])
 
 

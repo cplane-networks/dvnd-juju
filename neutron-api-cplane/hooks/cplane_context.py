@@ -33,4 +33,5 @@ class CplaneMl2Context(context.OSContextGenerator):
         ctxt['overlay_network_type'] = get_overlay_network_type()
         ctxt['security_groups'] = config('security-groups')
         ctxt['controller_port'] = config('cplane-controller_port')
+        ctxt['network_vlan_ranges'] = config('vlan-ranges')
         return ctxt

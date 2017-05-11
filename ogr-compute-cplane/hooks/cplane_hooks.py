@@ -27,6 +27,7 @@ from cplane_utils import (
     NEUTRON_CONF,
     assess_status,
     fake_register_configs,
+    ML2_CONFIG,
 )
 
 hooks = Hooks()
@@ -83,6 +84,7 @@ def amqp_changed():
 @hooks.hook('config-changed')
 def config_changed():
     # cplane_config(metadata_agent_config, METADATA_AGENT_INI, 'DEFAULT')
+    CONFIGS.write(ML2_CONFIG)
     restart_services()
 
 
@@ -107,9 +109,9 @@ def identity_joined(rid=None, relation_trigger=False):
                                   api_port('neutron-server'))
     """
 
-    internal_url = 'http://home.com'
-    admin_url = 'http://home.com'
-    public_url = 'http://home.com'
+    internal_url = 'http://cplanenetworks.com'
+    admin_url = 'http://cplanenetworks.com'
+    public_url = 'http://cplanenetworks.com'
 
     rel_settings = {
         'neutron_service': 'neutron',

@@ -129,3 +129,11 @@ class NeutronCCContext(context.NeutronContext):
             ctxt['vlan_ranges'] = ','.join(vlan_ranges.split())
 
         return ctxt
+
+
+class CplaneMl2Context(context.OSContextGenerator):
+
+    def __call__(self):
+        ctxt = {}
+        ctxt['physical_interface_mappings'] = config('physical-intf-mappings')
+        return ctxt

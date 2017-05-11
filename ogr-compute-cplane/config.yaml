@@ -93,9 +93,14 @@ options:
     default:
     description: |
       Space-delimited list of Neutron flat network providers.
+  physical-intf-mappings:
+    type: string
+    default: physnet1:eth0, physnet2:eth1, physnet2:eth2
+    description: |
+      Space-delimited list of <physnet>:<actual interface> 
   vlan-ranges:
     type: string
-    default: "physnet1:1000:2000"
+    default: physnet1:1000:2000 
     description: |
       Space-delimited list of <physical_network>:<vlan_min>:<vlan_max> or
       <physical_network> specifying physical_network names usable for VLAN

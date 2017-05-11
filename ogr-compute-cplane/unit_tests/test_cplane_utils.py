@@ -53,7 +53,8 @@ class CplaneUtilsTest(CharmTestCase):
         templating.OSConfigRenderer.side_effect = _mock_OSConfigRenderer
         _regconfs = cplane_utils.register_configs()
         confs = ['/etc/neutron/neutron.conf',
-                 '/etc/neutron/metadata_agent.ini']
+                 '/etc/neutron/metadata_agent.ini',
+                 '/etc/neutron/plugins/ml2/ml2_conf.ini']
         self.assertItemsEqual(_regconfs.configs, confs)
 
     @patch("subprocess.check_call")
