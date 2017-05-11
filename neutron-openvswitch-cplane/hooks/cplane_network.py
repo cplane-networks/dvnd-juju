@@ -81,6 +81,9 @@ def add_bridge(name, interface, gw=None):
 
 
 def restart_network_service(name, interface):
+    cmd = ['ifconfig', interface, '0.0.0.0']
+    subprocess.check_call(cmd)
+
     cmd = ['ifdown', interface, ]
     subprocess.check_call(cmd)
 #    cmd = ['ip', 'addr', 'flush', 'dev', interface]
