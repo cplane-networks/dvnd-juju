@@ -24,6 +24,7 @@ services:
     options:
       cp-package-url: http://192.168.7.103/cplane_metadata.json
       controller-app-mode: msm
+      msm-version: 262
       cplane-version: 1.3.8
       jboss-db-on-host: False 
       use-default-jboss-cluster: true

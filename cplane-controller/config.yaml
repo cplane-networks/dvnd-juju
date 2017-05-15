@@ -7,6 +7,10 @@ options:
     default: "dvnd"
     type: string
     description: "The same installation can be use to install DVND(dvnd) as well as MSM(msm)"
+  msm-version:
+    default: 262
+    type: int
+    description: "Msm version to download"
   oracle-client-basic:
     default: "12"
     type: string
