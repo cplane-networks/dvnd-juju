@@ -1,0 +1,22 @@
+series: trusty
+machines:
+  '0':
+    constraints: arch=amd64
+    series: trusty
+
+series: trusty
+services:
+  cplane-msm:
+    annotations:
+      gui-x: '700'
+      gui-y: '0'
+    charm: cs:~cplane-team/trusty/cplane-controller
+    num_units: 1
+    options:
+      cp-package-url: http://repohost/cplane_metadata.json
+      controller-app-mode: msm
+      cplane-version: 1.3.8
+      jboss-db-on-host: True
+      use-default-jboss-cluster: true
+    to:
+    - '0' 
