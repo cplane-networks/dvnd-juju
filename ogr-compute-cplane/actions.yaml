@@ -1,0 +1,97 @@
+# actions.yaml
+neutron-agent-list:
+  description: List all the neutron agents
+
+neutron-agent-show:
+  description: List the details of the neutron-agent
+  params:
+    id:
+      type: string
+      description: ID of the network-agent
+  required: [id]
+  additionalProperties: false
+
+create-ogr-zone:
+  description: Create OGR availabililty zone
+  params:
+    aggregate-name:
+      type: string
+      description: OGR aggregate name
+    avail-zone:
+      type: string
+      description: OGR availability zone 
+    ogr-compute:
+      type: string
+      description: OGR compute node hostname
+  required: [aggregate-name, avail-zone, ogr-compute]
+  additionalProperties: false
+
+delete-ogr-zone:
+  description: Delete OGR availabililty zone
+  params:
+    aggregate-name:
+      type: string
+      description: OGR aggregate name
+    ogr-compute:
+      type: string
+      description: OGR compute node hostname
+  required: [aggregate-name, ogr-compute]
+  additionalProperties: false
+
+ogr-zone-detail:
+  description: Details of the OGR availabililty zone
+  params:
+    aggregate-name:
+      type: string
+      description: OGR aggregate name
+  required: [aggregate-name]
+  additionalProperties: false
+
+create-network:
+  description: Create management and data networks
+  params:
+    net-name:
+      type: string
+      description: Name of the network
+    net-type:
+      type: string
+      description: Type of the providers network
+    phys-net:
+      type: string
+      description: Physical interface of the network
+  required: [net-name, net-type, phys-net]
+  additionalProperties: false
+
+create-subnet:
+  description: Create subnet for a networks
+  params:
+    sub-name:
+      type: string
+      description: Name of the subnet
+    net-name:
+      type: string
+      description: Name of the network
+    cidr:
+      type: string
+      description: CIDR of the subnet
+    pool-start:
+      type: string
+      description: Start address of the allocation  pool
+    pool-end:
+      type: string
+      description: End address of the allocation pool
+  required: [sub-name, net-name, cidr, pool-start, pool-end]
+  additionalProperties: false
+
+add-ogr-vm:
+  description: Add a OGR-vm to the glance
+  params:
+    name:
+      type: string
+      description: Name of the OGR VM
+    image-path:
+      type: string
+      description: Path to the VM image file
+  required: [name, image-path]
+  additionalProperties: false
+

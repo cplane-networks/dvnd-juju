@@ -103,7 +103,7 @@ if config('controller-app-mode') == 'dvnd':
     CONTROLLER_CONFIG = 'cplane-dvnd-config.yaml'
 elif config('controller-app-mode') == 'msm':
     CONTROLLER_CONFIG = 'cplane-msm-config.yaml'
-    cplane_packages[config('controller-app-mode')] = 262
+    cplane_packages[config('controller-app-mode')] = config('msm-version')
 
 if not config('jboss-db-on-host'):
     REQUIRED_INTERFACES = {
@@ -668,8 +668,10 @@ def check_jboss_status():
 
 def assess_status(configs):
     assess_status_func(configs)()
-    hookenv.application_version_set(
-        config('cplane-version'))
+    if config('controller-app-mode') == 'dvnd':
+        hookenv.application_version_set(config('cplane-version'))
+    else:
+        hookenv.application_version_set(str(config('msm-version')))
 
 
 def assess_status_func(configs):
