@@ -13,7 +13,6 @@ machines:
     constraints: "arch=amd64 tags=OGR"
     series: trusty
 
-
 relations:
 - - nova-compute:amqp
   - rabbitmq-server:amqp
