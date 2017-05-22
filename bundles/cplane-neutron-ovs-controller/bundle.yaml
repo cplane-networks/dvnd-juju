@@ -59,7 +59,6 @@ relations:
 - - neutron-api-cplane:cplane-ovs
   - neutron-openvswitch-cplane:cplane-ovs
 
-
 series: trusty
 services:
   glance:
@@ -68,83 +67,56 @@ services:
       gui-y: '0'
     charm: cs:trusty/glance
     num_units: 1
-    bindings:
-       public: public-64
-       admin: public-64
-       internal: internal
-       shared-db: public-64
     options:
       ha-mcastport: 5402
       openstack-origin: cloud:trusty-mitaka
     to:
-    - 'lxd:0' 
+    - 'lxc:0'
   keystone:
     annotations:
       gui-x: '500'
       gui-y: '0'
     charm: cs:trusty/keystone
     num_units: 1
-    bindings:
-       public: public-64
-       admin: public-64
-       internal: internal
-       shared-db: public-64
     options:
-      os-admin-network: 192.168.64.0/24
       admin-password: openstack
       ha-mcastport: 5403
       openstack-origin: cloud:trusty-mitaka
     to:
-    - 'lxd:0'
+    - 'lxc:0'
   mysql:
     annotations:
       gui-x: '0'
       gui-y: '250'
     charm: cs:trusty/percona-cluster
     num_units: 1
-    bindings:
-       shared-db: public-64
-       access: public-64
     options:
-      access-network: 192.168.64.0/24
       max-connections: 20000
     to:
-    - 'lxd:0'
+    - 'lxc:0'
   neutron-api:
     annotations:
       gui-x: '500'
       gui-y: '500'
     charm: cs:trusty/neutron-api
     num_units: 1
-    bindings:
-       public: public-64
-       admin: public-64
-       internal: internal
-       shared-db: public-64
     options:
-      os-internal-network: 192.168.64.0/24
       neutron-security-groups: true
       openstack-origin: cloud:trusty-mitaka
       manage-neutron-plugin-legacy-mode: False
     to: 
-    - 'lxd:0' 
+    - 0
   nova-cloud-controller:
     annotations:
       gui-x: '0'
       gui-y: '500'
     charm: cs:trusty/nova-cloud-controller
     num_units: 1
-    bindings:
-       public: public-64
-       admin: public-64
-       internal: internal
-       shared-db: public-64
     options:
       network-manager: Neutron
-      os-internal-network: 192.168.64.0/24
       openstack-origin: cloud:trusty-mitaka
     to:
-    - 'lxd:0'
+    - 'lxc:0'
   nova-compute:
     annotations:
       gui-x: '250'
@@ -157,7 +129,6 @@ services:
 #      manage-neutron-plugin-legacy-mode: false
       migration-auth-type: ssh
       openstack-origin: cloud:trusty-mitaka
-      os-internal-network: 192.168.64.0/24
       virt-type: qemu
     to:
     - '1'
@@ -167,27 +138,20 @@ services:
       gui-y: '-250'
     charm: cs:trusty/openstack-dashboard
     num_units: 1
-    bindings:
-      website: public-64
-      shared-db: public-64
-      cluster: public-64
     options:
       openstack-origin: cloud:trusty-mitaka
     to:
-    - 'lxd:0'
+    - 'lxc:0'
   rabbitmq-server:
     annotations:
       gui-x: '500'
       gui-y: '250'
     charm: cs:trusty/rabbitmq-server
     num_units: 1
-    bindings:
-      amqp: public-64
     options:
-      access-network: 192.168.64.0/24
       source: cloud:trusty-mitaka
     to:
-    - 'lxd:0'
+    - 'lxc:0'
   neutron-api-cplane:
     annotations:
       gui-x: '1000'
@@ -207,7 +171,7 @@ services:
     options: 
       cp-package-url: http://repohost/cplane_metadata.json
       cplane-version: 1.3.8
-      mgmt-int: eth1.11
+      mgmt-int: eth2
       cp-controller-mport: 1901
       cp-controller-uport: 1902
       data-interface: eth1.10
@@ -227,7 +191,7 @@ services:
       cp-package-url: http://repohost/cplane_metadata.json
       cplane-version: 1.3.8
       jboss-db-on-host: true
-      multicast-intf: eth1.11
+      multicast-intf: eth2
       multicast-port: 1901
       unicast-port: 1902
 #      enable-fip: true
