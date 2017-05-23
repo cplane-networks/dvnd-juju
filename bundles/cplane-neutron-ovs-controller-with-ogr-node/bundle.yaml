@@ -275,4 +275,4 @@ services:
     charm: cs:~cplane-team/trusty/ogr-compute-cplane
     num_units: 0
     options:
-        physical-intf-mappings: "physnet1:ens4.11, physnet2:ens4.10, physnet3:en6"
+        physical-intf-mappings: "physnet1:ens4.11, physnet2:ens4.10, physnet3:ens6"
