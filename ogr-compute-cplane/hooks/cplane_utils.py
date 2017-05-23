@@ -21,7 +21,7 @@ import charmhelpers.core.hookenv as hookenv
 import cplane_context
 
 TEMPLATES = 'templates/'
-
+release = os_release('nova-common')
 PACKAGES = ['sysfsutils', 'neutron-metadata-agent', 'python-neutronclient',
             'crudini', 'conntrack', 'neutron-plugin-ml2',
             'neutron-plugin-linuxbridge-agent']
@@ -29,7 +29,10 @@ PACKAGES = ['sysfsutils', 'neutron-metadata-agent', 'python-neutronclient',
 METADATA_AGENT_INI = '/etc/neutron/metadata_agent.ini'
 NEUTRON_CONF_DIR = "/etc/neutron"
 NEUTRON_CONF = '%s/neutron.conf' % NEUTRON_CONF_DIR
+
 ML2_CONFIG = '/etc/neutron/plugins/ml2/ml2_conf.ini'
+if release >= 'mitaka':
+    ML2_CONFIG = '/etc/neutron/plugins/ml2/linuxbridge_agent.ini'
 
 BASE_RESOURCE_MAP = OrderedDict([
     (NEUTRON_CONF, {
