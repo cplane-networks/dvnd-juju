@@ -89,9 +89,6 @@ add-ogr-vm:
     name:
       type: string
       description: Name of the OGR VM
-    image-path:
-      type: string
-      description: Path to the VM image file
-  required: [name, image-path]
+  required: [name]
   additionalProperties: false
 

@@ -2,7 +2,9 @@
 from mock import MagicMock, patch, call
 from test_utils import CharmTestCase, unittest
 from charmhelpers.core import hookenv
+from charmhelpers.contrib.openstack import utils
 hookenv.config = MagicMock()
+utils.os_release = MagicMock()
 import cplane_utils
 import charmhelpers.contrib.openstack.templating as templating
 templating.OSConfigRenderer = MagicMock()
