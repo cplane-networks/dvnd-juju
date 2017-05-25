@@ -243,4 +243,6 @@ services:
     charm: "../ogr-compute-cplane"
     num_units: 0
     options:
+      cplane-version: 1.3.8
+      cp-package-url: https://repohost/cplane_metadata.json
       physical-intf-mappings: "physnet1:eth1, physnet2:eth2, physnet3:eth3"

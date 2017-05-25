@@ -275,4 +275,6 @@ services:
     charm: cs:~cplane-team/trusty/ogr-compute-cplane
     num_units: 0
     options:
-        physical-intf-mappings: "physnet1:ens4.11, physnet2:ens4.10, physnet3:ens6"
+      cp-package-url: http://repohost/cplane_metadata.json
+      cplane-version: 1.3.8
+      physical-intf-mappings: "physnet1:ens4.11, physnet2:ens4.10, physnet3:ens6"
