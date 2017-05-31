@@ -82,14 +82,14 @@ options:
     type: int
     description: "MTU for vm-mtu interface"
   intf-mtu:
-    default: "br-ext=9000"
+    default:
     type: string
-    description: "MTU for node interface"
+    description: "MTU for node interface. Eg. br-ext=9000,eth0=9000"
   tso-flag:
-    default: "eth1.10=off,br-ext=off"
+    default:
     type: string
-    description: "Flag to trun off the TSO for an interface"
+    description: "Flag to trun off the TSO for an interface. Eg. eth1.10=off,br-ext=off"
   gso-flag:
-    default: "eth1.10=off,br-ext=off"
+    default:
     type: string
-    description: "Flag to trun off the GSO for an interface"
+    description: "Flag to trun off the GSO for an interface. Eg. eth1.10=off,br-ext=off"
