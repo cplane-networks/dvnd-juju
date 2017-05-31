@@ -42,6 +42,7 @@ from cplane_utils import (
 from cplane_network import (
     add_bridge,
     check_interface,
+    change_iface_config,
 )
 
 hooks = Hooks()
@@ -121,6 +122,33 @@ def config_changed():
     subprocess.check_call(cmd)
     CONFIGS.write_all()
     restart_services()
+
+    mtu_string = config('intf-mtu')
+    if mtu_string:
+        intf_mtu = mtu_string.split(',')
+        for line in intf_mtu:
+            interface = line.split('=')
+            log("Change request for mtu for interface {} = {}"
+                .format(interface[0], interface[1]))
+            change_iface_config(interface[0], 'mtu', interface[1])
+
+    tso_string = config('tso-flag')
+    if tso_string:
+        intf_tso = tso_string.split(',')
+        for line in intf_tso:
+            interface = line.split('=')
+            log("Change request for tso for interface {} = {}"
+                .format(interface[0], interface[1]))
+            change_iface_config(interface[0], 'tso', interface[1])
+
+    gso_string = config('gso-flag')
+    if gso_string:
+        intf_gso = gso_string.split(',')
+        for line in intf_gso:
+            interface = line.split('=')
+            log("Change request for gso for interface {} = {}"
+                .format(interface[0], interface[1]))
+            change_iface_config(interface[0], 'gso', interface[1])
 
 
 @hooks.hook('upgrade-charm')

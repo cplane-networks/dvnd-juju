@@ -125,3 +125,15 @@ options:
     description: |
       URL for cplane packages
       if from local repo then "http://xx.xx.xx.xx/cplane_metadata.json"
+  intf-mtu:
+    default: "eth1.10=9000"
+    type: string
+    description: "MTU for node interface"
+  tso-flag:
+    default: "eth1.10=off"
+    type: string
+    description: "Flag to trun off the TSO for an interface"
+  gso-flag:
+    default: "eth1.10=off"
+    type: string
+    description: "Flag to trun off the GSO for an interface"

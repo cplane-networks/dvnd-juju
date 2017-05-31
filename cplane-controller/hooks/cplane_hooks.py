@@ -4,6 +4,7 @@ from charmhelpers.core.hookenv import (
     UnregisteredHookError,
     config,
     log as juju_log,
+    log,
     relation_set,
     relation_ids,
 )
@@ -43,6 +44,10 @@ from cplane_utils import (
     get_unit_ip,
     assess_status,
     fake_register_configs,
+)
+
+from cplane_network import (
+    change_iface_config,
 )
 
 
@@ -139,6 +144,33 @@ def config_changed():
         start_services('config-change')
     for r_id in relation_ids('cplane-controller'):
         cplane_controller_relation_joined(rid=r_id)
+
+    mtu_string = config('intf-mtu')
+    if mtu_string:
+        intf_mtu = mtu_string.split(',')
+        for line in intf_mtu:
+            interface = line.split('=')
+            log("Change request for mtu for interface {} = {}"
+                .format(interface[0], interface[1]))
+            change_iface_config(interface[0], 'mtu', interface[1])
+
+    tso_string = config('tso-flag')
+    if tso_string:
+        intf_tso = tso_string.split(',')
+        for line in intf_tso:
+            interface = line.split('=')
+            log("Change request for tso for interface {} = {}"
+                .format(interface[0], interface[1]))
+            change_iface_config(interface[0], 'tso', interface[1])
+
+    gso_string = config('gso-flag')
+    if gso_string:
+        intf_gso = gso_string.split(',')
+        for line in intf_gso:
+            interface = line.split('=')
+            log("Change request for gso for interface {} = {}"
+                .format(interface[0], interface[1]))
+            change_iface_config(interface[0], 'gso', interface[1])
 
 
 def main():
