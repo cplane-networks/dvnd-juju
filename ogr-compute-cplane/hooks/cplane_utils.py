@@ -16,6 +16,9 @@ from charmhelpers.contrib.openstack.utils import (
 )
 
 import charmhelpers.core.hookenv as hookenv
+from cplane_package_manager import(
+    CPlanePackageManager
+)
 
 
 import cplane_context
@@ -65,6 +68,9 @@ BASE_RESOURCE_MAP = OrderedDict([
     })
 ])
 
+cplane_packages = OrderedDict([('ogr-img', -1)])
+
+CPLANE_URL = config('cp-package-url')
 
 metadata_agent_config = OrderedDict([
                                     ('auth_region', config('region')),
@@ -80,6 +86,15 @@ REQUIRED_INTERFACES = {
     'identity': ['identity-service'],
 }
 SERVICES = ['nova-compute']
+
+
+def download_ogr_image():
+    cp_package = CPlanePackageManager(CPLANE_URL)
+    filename = ''
+    for key, value in cplane_packages.items():
+        filename = cp_package.download_package(key, value)
+    if filename:
+        return filename
 
 
 def api_ready(relation, key):

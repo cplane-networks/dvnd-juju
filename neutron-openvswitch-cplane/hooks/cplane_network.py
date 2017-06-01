@@ -115,3 +115,13 @@ def get_int_config(interface, af=AF_INET):
         msg = "Interface {} does not exist.".format(interface)
         status_set("blocked", msg)
         raise InterfaceConfigurationException(msg)
+
+
+def change_iface_config(interface, field, value):
+    network_configuration = UbuntuIntfMgmt()
+    if check_interface(interface):
+        network_configuration.change_iface_config(interface, field, value)
+        cmd = ['ifdown', interface, ]
+        subprocess.check_call(cmd)
+        cmd = ['ifup', interface, ]
+        subprocess.check_call(cmd)
