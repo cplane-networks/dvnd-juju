@@ -82,8 +82,9 @@ services:
     annotations:
       gui-x: '500'
       gui-y: '0'
-    charm: cs:trusty/keystone
+    charm: cs:~cplane-team/trusty/keystone
     num_units: 1
+    series: trusty
     options:
       admin-password: openstack
       ha-mcastport: 5403
