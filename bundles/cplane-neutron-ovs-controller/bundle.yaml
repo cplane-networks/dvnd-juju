@@ -95,6 +95,7 @@ services:
       admin-password: openstack
       ha-mcastport: 5403
       openstack-origin: cloud:trusty-mitaka
+      preferred-api-version: 3 
     to:
     - 'lxd:0'
   mysql:
