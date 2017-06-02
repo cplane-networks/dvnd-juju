@@ -82,8 +82,9 @@ services:
     annotations:
       gui-x: '500'
       gui-y: '0'
-    charm: cs:trusty/keystone
+    charm: cs:~cplane-team/trusty/keystone
     num_units: 1
+    series: trusty
     bindings:
        public: public-64
        admin: public-64
