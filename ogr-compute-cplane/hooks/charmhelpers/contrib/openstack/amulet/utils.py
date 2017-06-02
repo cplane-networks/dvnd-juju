@@ -329,10 +329,10 @@ class OpenStackAmuletUtils(AmuletUtils):
         else:
             ep = base_ep + "/v3"
             auth = keystone_id_v3.Password(
-                user_domain_name='admin_domain',
+                user_domain_name='default',
                 username=user,
                 password=password,
-                domain_name='admin_domain',
+                domain_name='default',
                 auth_url=ep,
             )
             sess = keystone_session.Session(auth=auth)
