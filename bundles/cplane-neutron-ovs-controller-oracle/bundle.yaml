@@ -73,11 +73,16 @@ services:
       gui-y: '0'
     charm: cs:trusty/glance
     num_units: 1
+    bindings:
+       public: public-64
+       admin: public-64
+       internal: internal
+       shared-db: public-64
     options:
       ha-mcastport: 5402
       openstack-origin: cloud:trusty-mitaka
     to:
-    - 'lxc:0'
+    - 'lxd:0' 
   keystone:
     annotations:
       gui-x: '500'
@@ -85,45 +90,67 @@ services:
     charm: cs:~cplane-team/trusty/keystone
     num_units: 1
     series: trusty
+    bindings:
+       public: public-64
+       admin: public-64
+       internal: internal
+       shared-db: public-64
     options:
+      os-admin-network: 192.168.64.0/24
       admin-password: openstack
       ha-mcastport: 5403
       openstack-origin: cloud:trusty-mitaka
     to:
-    - 'lxc:0'
+    - 'lxd:0'
   mysql:
     annotations:
       gui-x: '0'
       gui-y: '250'
     charm: cs:trusty/percona-cluster
     num_units: 1
+    bindings:
+       shared-db: public-64
+       access: public-64
     options:
+      access-network: 192.168.64.0/24
       max-connections: 20000
     to:
-    - 'lxc:0'
+    - 'lxd:0'
   neutron-api:
     annotations:
       gui-x: '500'
       gui-y: '500'
     charm: cs:trusty/neutron-api
     num_units: 1
+    bindings:
+       public: public-64
+       admin: public-64
+       internal: internal
+       shared-db: public-64
     options:
+      os-internal-network: 192.168.64.0/24
       neutron-security-groups: true
       openstack-origin: cloud:trusty-mitaka
       manage-neutron-plugin-legacy-mode: False
     to: 
-    - 0
+    - 'lxd:0' 
   nova-cloud-controller:
     annotations:
       gui-x: '0'
       gui-y: '500'
     charm: cs:trusty/nova-cloud-controller
     num_units: 1
+    bindings:
+       public: public-64
+       admin: public-64
+       internal: internal
+       shared-db: public-64
     options:
       network-manager: Neutron
+      os-internal-network: 192.168.64.0/24
       openstack-origin: cloud:trusty-mitaka
     to:
-    - 'lxc:0'
+    - 'lxd:0'
   nova-compute:
     annotations:
       gui-x: '250'
@@ -136,6 +163,7 @@ services:
 #      manage-neutron-plugin-legacy-mode: false
       migration-auth-type: ssh
       openstack-origin: cloud:trusty-mitaka
+      os-internal-network: 192.168.64.0/24
       virt-type: qemu
     to:
     - '1'
@@ -145,20 +173,27 @@ services:
       gui-y: '-250'
     charm: cs:trusty/openstack-dashboard
     num_units: 1
+    bindings:
+      website: public-64
+      shared-db: public-64
+      cluster: public-64
     options:
       openstack-origin: cloud:trusty-mitaka
     to:
-    - 'lxc:0'
+    - 'lxd:0'
   rabbitmq-server:
     annotations:
       gui-x: '500'
       gui-y: '250'
     charm: cs:trusty/rabbitmq-server
     num_units: 1
+    bindings:
+      amqp: public-64
     options:
+      access-network: 192.168.64.0/24
       source: cloud:trusty-mitaka
     to:
-    - 'lxc:0'
+    - 'lxd:0'
   neutron-api-cplane:
     annotations:
       gui-x: '1000'
@@ -178,16 +213,19 @@ services:
     options:
       cp-package-url: http://repohost/cplane_metadata.json
       cplane-version: 1.3.8
-      mgmt-int: eth0
+      mgmt-int: eth1.11
       cp-controller-mport: 1901
       cp-controller-uport: 1902
-      data-interface: eth1
-      data-gateway: 192.168.61.1
-#      tun-interface: br-eth2
+      data-interface: eth1.10
+      data-gateway: 192.168.63.1
+#      tun-interface: eth2
 #      tun-gatway: 192.168.34.1
-#      fip-interface: br-eth3
+#      fip-interface: eth3
 #      enable-unicast: true
       cp-vm-mtu: 1400
+      intf-mtu: "eth1.10=1500,br-ext=1500"
+      tso-flag: "eth1.10=off,br-ext=off"
+      gso-flag: "eth1.10=off,br-ext=off"
   cplane-controller:
     annotations:
       gui-x: '700'
@@ -198,11 +236,14 @@ services:
       cp-package-url: http://repohost/cplane_metadata.json
       cplane-version: 1.3.8
       jboss-db-on-host: false
-      multicast-intf: eth0
+      multicast-intf: eth1.11
       multicast-port: 1901
       unicast-port: 1902
 #      enable-fip: true
 #      use-default-jboss-cluster: true
+#      intf-mtu: "eth1.10=1500"
+#      tso-flag: "eth1.10=off"
+#      gso-flag: "eth1.10=off"
     to:
     - '2' 
   oracle:

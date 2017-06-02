@@ -237,6 +237,9 @@ services:
 #      fip-interface: eth3
 #      enable-unicast: true
       cp-vm-mtu: 1400
+      intf-mtu: "eth1.10=1500,br-ext=1500"
+      tso-flag: "eth1.10=off,br-ext=off"
+      gso-flag: "eth1.10=off,br-ext=off"
   cplane-controller:
     annotations:
       gui-x: '700'
@@ -252,6 +255,9 @@ services:
       unicast-port: 1902
 #      enable-fip: true
 #      use-default-jboss-cluster: true
+#      intf-mtu: "eth1.10=1500"
+#      tso-flag: "eth1.10=off"
+#      gso-flag: "eth1.10=off"
     to:
     - '2' 
   cplane-compute:
@@ -279,3 +285,6 @@ services:
       cp-package-url: http://repohost/cplane_metadata.json
       cplane-version: 1.3.8
       physical-intf-mappings: "physnet1:ens4.11, physnet2:ens4.10, physnet3:ens6"
+      intf-mtu: "ens4.10=1500"
+      tso-flag: "ens4.10=off"
+      gso-flag: "ens4.10=off"

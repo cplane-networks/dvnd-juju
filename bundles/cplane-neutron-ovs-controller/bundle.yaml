@@ -218,6 +218,9 @@ services:
 #      fip-interface: eth3
 #      enable-unicast: true
       cp-vm-mtu: 1400
+      intf-mtu: "eth1.10=1500,br-ext=1500"
+      tso-flag: "eth1.10=off,br-ext=off"
+      gso-flag: "eth1.10=off,br-ext=off"
   cplane-controller:
     annotations:
       gui-x: '700'
@@ -233,6 +236,9 @@ services:
       unicast-port: 1902
 #      enable-fip: true
 #      use-default-jboss-cluster: true
+#      intf-mtu: "eth1.10=1500"
+#      tso-flag: "eth1.10=off"
+#      gso-flag: "eth1.10=off"
     to:
     - '2' 
 
