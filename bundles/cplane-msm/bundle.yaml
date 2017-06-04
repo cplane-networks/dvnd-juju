@@ -1,3 +1,4 @@
+cplane-repo: &cplane_repo http://repohost.local/cplane_metadata.json
 series: trusty
 machines:
   '0':
@@ -13,7 +14,7 @@ services:
     charm: cs:~cplane-team/trusty/cplane-controller
     num_units: 1
     options:
-      cp-package-url: http://repohost/cplane_metadata.json
+      cp-package-url: *cplane_repo
       controller-app-mode: msm
       msm-version: 262
       cplane-version: 1.3.8
