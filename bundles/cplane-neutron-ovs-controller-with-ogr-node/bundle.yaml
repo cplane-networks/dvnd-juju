@@ -113,6 +113,7 @@ services:
       os-admin-network: 192.168.64.0/24
       ha-mcastport: 5403
       openstack-origin: cloud:trusty-mitaka
+      preferred-api-version: 3
     to:
     - 'lxd:0'
   mysql:

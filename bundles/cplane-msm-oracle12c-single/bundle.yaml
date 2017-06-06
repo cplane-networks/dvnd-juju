@@ -1,9 +1,14 @@
 cplane-repo: &cplane_repo http://repohost.local/cplane_metadata.json
+num-of-slave-units: &slave_units 0
 series: trusty
 machines:
   '0':
     constraints: arch=amd64
     series: trusty
+
+relations:
+- - rac-master:oracle
+  - cplane-msm:oracle
 
 series: trusty
 services:
@@ -18,7 +23,21 @@ services:
       controller-app-mode: msm
       msm-version: 262
       cplane-version: 1.3.8
-      jboss-db-on-host: True
+      jboss-db-on-host: False 
       use-default-jboss-cluster: true
     to:
-    - '0' 
+    - '0'
+  rac-master:
+    annotations:
+      gui-x: '700'
+      gui-y: '0'
+    charm: cs:~cplane-team/trusty/oracle-12c
+    num_units: 1
+    series: centos7
+    options:
+      slave-units-number: *slave_units
+      vip-range: 10.14.0.180
+      scan-ip-range: 10.14.0.187
+      cp-package-url: *cplane_repo
+    constraints:
+      tags=oracle-rac
