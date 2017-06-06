@@ -194,7 +194,7 @@ def generate_host_string(address_type):
     domain_name = config('domain-name')
 
     if address_type == 'private':
-        private_address = get_ip('eth1')
+        private_address = get_ip(config('private-interface'))
         host_string = private_address + '\t' + hostname + "-priv." + \
             domain_name + '\t' + hostname + "-priv"
     elif address_type == 'public':

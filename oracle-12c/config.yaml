@@ -57,4 +57,7 @@ options:
     default: "cplane123"
     type: string
     description: "Password to access the database"
-
+  private-interface:
+    default: "eth0"
+    type: string
+    description: "Private interface of the Oracle node"
