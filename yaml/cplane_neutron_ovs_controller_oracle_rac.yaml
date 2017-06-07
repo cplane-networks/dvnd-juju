@@ -213,6 +213,7 @@ services:
     num_units: *slave_units
     series: centos7
     options:
+      private-interface: eth1.11
       vip-range: 10.14.0.181
       cp-package-url: http://192.168.7.113/cplane_metadata.json
     constraints:

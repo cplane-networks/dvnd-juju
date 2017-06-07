@@ -34,6 +34,7 @@ services:
     num_units: 1
     series: centos7
     options:
+      private-interface: eth1.11
       slave-units-number: *slave_units
       vip-range: 10.14.0.180
       scan-ip-range: 10.14.0.187
