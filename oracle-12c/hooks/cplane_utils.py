@@ -99,7 +99,9 @@ PACKAGES = ['ntp',
             'make',
             'sysstat',
             'unixODBC',
-            'unixODBC-devel']
+            'unixODBC-devel',
+            'epel-release',
+            'python34']
 
 NODE_DATA_FILE = os.environ.get('CHARM_DIR', '') + '/node_data'
 NODE_CLUSTER_FILE = os.environ.get('CHARM_DIR', '') + '/node_cluster'
