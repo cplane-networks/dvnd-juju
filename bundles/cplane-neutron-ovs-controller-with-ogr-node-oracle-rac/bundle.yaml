@@ -1,5 +1,5 @@
 cplane-repo: &cplane_repo http://repohost.local/cplane_metadata.json
-num-of-slave-units: &slave_units 0
+num-of-slave-units: &slave_units 1
 series: trusty
 machines:
   '0':
@@ -76,6 +76,10 @@ relations:
   - keystone:identity-service
 - - ogr-compute-cplane:cplane-neutron
   - neutron-api-cplane:cplane-neutron
+- - rac-slave:slave
+  - rac-master:master
+- - rac-master:master-state
+  - rac-slave:slave-state
 - - rac-master:oracle
   - cplane-controller:oracle
 - - neutron-api-cplane:cplane-ovs
@@ -179,8 +183,8 @@ services:
       enable-resize: true
 #      manage-neutron-plugin-legacy-mode: false
       migration-auth-type: ssh
-      os-internal-network: 192.168.64.0/24
       openstack-origin: cloud:trusty-mitaka
+      os-internal-network: 192.168.64.0/24
       virt-type: qemu
     to:
     - '1'
@@ -276,6 +280,19 @@ services:
       slave-units-number: *slave_units
       vip-range: 10.1.0.180
       scan-ip-range: 10.1.0.187
+      cp-package-url: *cplane_repo
+    constraints:
+      tags=oracle-rac
+  rac-slave:
+    annotations:
+      gui-x: '700'
+      gui-y: '0'
+    charm: cs:~cplane-team/centos7/oracle-12c
+    num_units: *slave_units
+    series: centos7
+    options:
+      private-interface: eth2.11
+      vip-range: 10.1.0.181
       cp-package-url: *cplane_repo
     constraints:
       tags=oracle-rac
