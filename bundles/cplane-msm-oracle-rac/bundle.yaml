@@ -57,6 +57,7 @@ services:
     num_units: *slave_units
     series: centos7
     options:
+      private-interface: eth2.11
       vip-range: 10.1.0.181
       cp-package-url: *cplane_repo
     constraints:
