@@ -10,3 +10,4 @@ Multi-Site OpenStack consists of the following environment.
 - This bundle can only be deployed after signing a cplane license agreement with embedded oracle
 - Oracle12c runs on a centos7 host
 - Special OGR Compute Node on which OGR VMs can be deployed. Can be used with CPLANE Multi-Site Manger Product
+- NOTE: OGR Nodes requires 4 physical NIC cards.

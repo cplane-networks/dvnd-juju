@@ -5,4 +5,5 @@ Multi-Site OpenStack consists of the following environment.
 - OpenStack Controller with CPLANE Neutron Plugin
 - OpenStack Compute Node with CPLANE OVS Compute node
 - Special OGR Compute Node on which OGR VMs can be deployed. Can be used with CPLANE Multi-Site Manger Product
+- NOTE: OGR Nodes requires 4 physical NIC cards. 
 
