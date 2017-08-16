@@ -125,7 +125,9 @@ def cplane_config(data, config_file, section):
 
 
 def restart_services():
-    cmd = ['service', 'nova-compute', 'restart']
+    cmd = ['service', 'neutron-linuxbridge-agent', 'restart']
+    subprocess.check_call(cmd)
+    cmd = ['service', 'neutron-metadata-agent', 'restart']
     subprocess.check_call(cmd)
 
 

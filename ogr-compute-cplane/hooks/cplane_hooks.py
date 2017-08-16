@@ -83,6 +83,7 @@ def amqp_changed():
         log('amqp relation incomplete. Peer not ready?')
         return
     CONFIGS.write(NEUTRON_CONF)
+    restart_services()
 
 
 @hooks.hook('config-changed')
@@ -168,6 +169,7 @@ def identity_changed():
         return
     CONFIGS.write(NEUTRON_CONF)
     CONFIGS.write(METADATA_AGENT_INI)
+    restart_services()
 
 
 def main():

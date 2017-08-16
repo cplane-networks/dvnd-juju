@@ -9,8 +9,8 @@ options:
     description: Enable verbose logging.
   rabbit-user:
     type: string
-    default: "nova"
-    description: "Nova rabbit user name"
+    default: "neutron"
+    description: "Neutron rabbit user name"
   rabbit-vhost:
     type: string
     default: "openstack"
