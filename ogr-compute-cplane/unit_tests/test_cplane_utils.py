@@ -63,7 +63,8 @@ class CplaneUtilsTest(CharmTestCase):
     def test_restart_services(self, m_check_call):
         cplane_utils.restart_services()
         self.assertEqual(m_check_call.call_args,
-                         call(['service', 'nova-compute', 'restart']))
+                         call(['service', 'neutron-metadata-agent',
+                               'restart']))
 
     @patch("subprocess.check_call")
     def test_remmove_sql_lite(self, m_check_call):

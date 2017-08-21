@@ -67,4 +67,27 @@ options:
     default:
     type: string
     description: "Flag to trun off the GSO for an interface. Eg. eth1.10=off,br-ext=off"
-
+  rx-flag:
+    default:
+    type: string
+    description: "Flag to trun off the RX for an interface. Eg. eth1.10=off,br-ext=off"
+  tx-flag:
+    default:
+    type: string
+    description: "Flag to trun off the TX for an interface. Eg. eth1.10=off,br-ext=off"
+  sg-flag:
+    default:
+    type: string
+    description: "Flag to trun off the SG for an interface. Eg. eth1.10=off,br-ext=off"
+  ufo-flag:
+    default:
+    type: string
+    description: "Flag to trun off the UFO for an interface. Eg. eth1.10=off,br-ext=off"
+  gro-flag:
+    default:
+    type: string
+    description: "Flag to trun off the GRO for an interface. Eg. eth1.10=off,br-ext=off"
+  lro-flag:
+    default:
+    type: string
+    description: "Flag to trun off the LRO for an interface. Eg. eth1.10=off,br-ext=off"

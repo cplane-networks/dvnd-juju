@@ -334,9 +334,65 @@ class UbuntuIntfMgmt(object):
                                                      'gso',
                                                      '{}'.format(value)]
 
+                elif field == 'rx':
+                    if 'rx' in self.config_params:
+                        self.config_params['rx'][4] = value
+                    else:
+                        self.config_params['rx'] = ['/sbin/ethtool',
+                                                    '-K', '{}'.format(ifname),
+                                                    'rx',
+                                                    '{}'.format(value)]
+
+                elif field == 'tx':
+                    if 'tx' in self.config_params:
+                        self.config_params['tx'][4] = value
+                    else:
+                        self.config_params['tx'] = ['/sbin/ethtool',
+                                                    '-K', '{}'.format(ifname),
+                                                    'tx',
+                                                    '{}'.format(value)]
+
+                elif field == 'sg':
+                    if 'sg' in self.config_params:
+                        self.config_params['sg'][4] = value
+                    else:
+                        self.config_params['sg'] = ['/sbin/ethtool',
+                                                    '-K', '{}'.format(ifname),
+                                                    'sg',
+                                                    '{}'.format(value)]
+
+                elif field == 'ufo':
+                    if 'ufo' in self.config_params:
+                        self.config_params['ufo'][4] = value
+                    else:
+                        self.config_params['ufo'] = ['/sbin/ethtool',
+                                                     '-K', '{}'.format(ifname),
+                                                     'ufo',
+                                                     '{}'.format(value)]
+
+                elif field == 'gro':
+                    if 'gro' in self.config_params:
+                        self.config_params['gro'][4] = value
+                    else:
+                        self.config_params['gro'] = ['/sbin/ethtool',
+                                                     '-K', '{}'.format(ifname),
+                                                     'gro',
+                                                     '{}'.format(value)]
+
+                elif field == 'lro':
+                    if 'lro' in self.config_params:
+                        self.config_params['lro'][4] = value
+                    else:
+                        self.config_params['lro'] = ['/sbin/ethtool',
+                                                     '-K', '{}'.format(ifname),
+                                                     'lro',
+                                                     '{}'.format(value)]
+
                 for key, value in self.config_params.iteritems():
                     if type(value) is list:
-                        if key == 'tso' or key == 'gso':
+                        if key == 'tso' or key == 'gso' or key == 'rx' or \
+                           key == 'tx' or key == 'sg' or key == 'ufo' or \
+                           key == 'gro' or key == 'lro':
                             if value[-1] == 'on':
                                 continue
                             else:
