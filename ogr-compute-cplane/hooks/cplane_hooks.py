@@ -26,6 +26,7 @@ from cplane_utils import (
     register_configs,
     NEUTRON_CONF,
     assess_status,
+    disable_bridge_fw,
     fake_register_configs,
     ML2_CONFIG,
 )
@@ -180,6 +181,7 @@ def install():
     # disable_neutron_agent()
     pkgs = determine_packages()
     apt_install(pkgs, fatal=True)
+    disable_bridge_fw()
 
 
 @hooks.hook('identity-service-relation-joined')

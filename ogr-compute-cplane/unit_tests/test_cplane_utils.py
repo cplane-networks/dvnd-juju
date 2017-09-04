@@ -67,8 +67,8 @@ class CplaneUtilsTest(CharmTestCase):
                                'restart']))
 
     @patch("subprocess.check_call")
-    def test_remmove_sql_lite(self, m_check_call):
-        cplane_utils.remmove_sql_lite()
+    def test_remove_sql_lite(self, m_check_call):
+        cplane_utils.remove_sql_lite()
         self.assertEqual(m_check_call.call_args,
                          call(['rm', '-f', '/var/lib/nova/nova.sqlite']))
 
@@ -79,6 +79,13 @@ class CplaneUtilsTest(CharmTestCase):
         confs = [cplane_utils.NEUTRON_CONF]
         [self.assertIn(q_conf, _map.keys()) for q_conf in confs]
         self.assertEqual(_map[cplane_utils.NEUTRON_CONF]['services'], svcs)
+
+    @patch("subprocess.check_call")
+    def test_disable_bridge_fw(self, m_check_call):
+        cplane_utils.disable_bridge_fw()
+        self.assertEqual(m_check_call.call_args,
+                         call(['service', 'ebtables', 'stop']))
+
 
 suite = unittest.TestLoader().loadTestsFromTestCase(CplaneUtilsTest)
 unittest.TextTestRunner(verbosity=2).run(suite)

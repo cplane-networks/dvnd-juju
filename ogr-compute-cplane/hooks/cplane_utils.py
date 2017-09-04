@@ -131,7 +131,7 @@ def restart_services():
     subprocess.check_call(cmd)
 
 
-def remmove_sql_lite():
+def remove_sql_lite():
     cmd = ['rm', '-f', '/var/lib/nova/nova.sqlite']
     subprocess.check_call(cmd)
 
@@ -184,3 +184,10 @@ class FakeOSConfigRenderer(object):
 
 def fake_register_configs():
     return FakeOSConfigRenderer()
+
+
+def disable_bridge_fw():
+    cmd = ['update-rc.d', 'ebtables', 'disable']
+    subprocess.check_call(cmd)
+    cmd = ['service', 'ebtables', 'stop']
+    subprocess.check_call(cmd)
