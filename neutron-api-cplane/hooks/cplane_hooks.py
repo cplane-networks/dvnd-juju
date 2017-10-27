@@ -8,6 +8,9 @@ from charmhelpers.core.hookenv import (
     config,
     relation_set,
     relation_get,
+    relation_ids,
+    related_units,
+
 )
 import json
 import sys
@@ -132,6 +135,17 @@ def config_changed():
             log("Change request for lro for interface {} = {}"
                 .format(interface[0], interface[1]))
             change_iface_config(interface[0], 'lro', interface[1])
+
+    for rid in relation_ids('cplane-controller'):
+        for unit in related_units(rid):
+            data = relation_get(rid=rid, unit=unit)
+            cplane_controller = data['private-address']
+            mport = data['mport']
+            if mport:
+                cmd = "sed -ie 's/cplane_controller_hosts.*/cplane_controller_\
+hosts = {}/g' /etc/neutron/plugins/ml2/ml2_conf.ini".format(cplane_controller)
+                os.system(cmd)
+                restart_service()
 
 
 @hooks.hook('cplane-controller-relation-changed')
