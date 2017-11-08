@@ -1,4 +1,5 @@
 import subprocess
+import commands
 
 from charmhelpers.contrib.openstack.utils import os_release
 from charmhelpers.contrib.openstack import templating
@@ -61,6 +62,7 @@ NEUTRON_CONF = '/etc/neutron/neutron.conf'
 PACKAGES = ['neutron-metadata-agent', 'neutron-plugin-ml2', 'crudini',
             'dkms', 'iputils-arping', 'dnsmasq']
 
+
 REQUIRED_INTERFACES = {
     'neutron-api-cplane': ['cplane-ovs'],
     'cplane-controller': ['cplane-controller'],
@@ -115,6 +117,8 @@ def is_neutron_api_ready():
 
 
 def determine_packages():
+    if get_os_release() == '16.04':
+        PACKAGES.extend(['bc'])
     return PACKAGES
 
 
@@ -262,3 +266,8 @@ class FakeOSConfigRenderer(object):
 
 def fake_register_configs():
     return FakeOSConfigRenderer()
+
+
+def get_os_release():
+    ubuntu_release = commands.getoutput('lsb_release -r')
+    return ubuntu_release.split()[1]

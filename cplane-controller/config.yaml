@@ -125,4 +125,7 @@ options:
     default:
     type: string
     description: "Flag to trun off the LRO for an interface. Eg. eth1.10=off,br-ext=off"
-
+  openstack-version:
+    default: "liberty"
+    type: string
+    description: "Openstack version eg. liberty, mitaka, ocata"

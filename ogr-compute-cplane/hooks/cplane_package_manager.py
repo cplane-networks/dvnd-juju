@@ -5,6 +5,7 @@ import urllib
 import json
 import hashlib
 import urlparse
+import commands
 
 from charmhelpers.core.host import (
     mkdir,
@@ -74,24 +75,25 @@ version {}".format(config("cplane-version"))
 
         if not data.get("{}".format(config("cplane-version")),
                         {}).get("ubuntu",
-                                {}).get("14.04"):
+                                {}).get(self.get_os_release()):
             msg = "Invalid OS versions: Cplane version for \
-Ubuntu 14.04 not found"
+Ubuntu version {} not found".format(self.get_os_release())
             status_set('blocked', msg)
             raise ErrorException(msg)
 
         if not data.get("{}".format(config("cplane-version")),
                         {}).get("ubuntu",
-                                {}).get("14.04",
-                                        {}).get("liberty"):
+                                {}).get(self.get_os_release(),
+                                        {}).get(config("openstack-version")):
             msg = "Invalid Openstack version: Cplane version for \
-Openstack version liberty not found"
+Openstack version {} not found".format(config("openstack-version"))
             status_set('blocked', msg)
             raise ErrorException(msg)
         self.package_data = data.get("{}".format(config("cplane-version")),
                                      {}).get("ubuntu",
-                                             {}).get("14.04",
-                                                     {}).get("liberty")
+                                             {}).get(self.get_os_release(),
+                                                     {}).get(config("openstack\
+-version"))
 
     def verify_file_checksum(self, file_name, file_md5sum):
         hash_md5 = hashlib.md5()
@@ -154,6 +156,10 @@ mismatch".format(dwnld_package_name)
             raise ErrorException(msg)
 
         return dwnld_package_name
+
+    def get_os_release(self):
+        ubuntu_release = commands.getoutput('lsb_release -r')
+        return ubuntu_release.split()[1]
 
 
 def get_opts_and_args(args):

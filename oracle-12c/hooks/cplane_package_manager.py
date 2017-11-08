@@ -74,24 +74,26 @@ version {}".format(config("cplane-version"))
 
         if not data.get("{}".format(config("cplane-version")),
                         {}).get("ubuntu",
-                                {}).get("14.04"):
+                                {}).get(config("ubuntu-release-json")):
             msg = "Invalid OS versions: Cplane version for \
-Ubuntu 14.04 not found"
+Ubuntu vesion {} not found".format(config("ubuntu-release-json"))
             status_set('blocked', msg)
             raise ErrorException(msg)
 
         if not data.get("{}".format(config("cplane-version")),
                         {}).get("ubuntu",
-                                {}).get("14.04",
-                                        {}).get("liberty"):
+                                {}).get(config("ubuntu-release-json"),
+                                        {}).get(config("openstack-version")):
             msg = "Invalid Openstack version: Cplane version for \
-Openstack version liberty not found"
+Openstack version {} not found".format(config("openstack-version"))
             status_set('blocked', msg)
             raise ErrorException(msg)
         self.package_data = data.get("{}".format(config("cplane-version")),
                                      {}).get("ubuntu",
-                                             {}).get("14.04",
-                                                     {}).get("liberty")
+                                             {}).get(config("ubuntu-release\
+-json"),
+                                                     {}).get(config("openstack\
+-version"))
 
     def verify_file_checksum(self, file_name, file_md5sum):
         hash_md5 = hashlib.md5()

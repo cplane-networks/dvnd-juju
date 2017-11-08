@@ -77,7 +77,7 @@ libstdc++.i686', 'libstdc++-devel', 'libstdc++-devel.i686', 'libaio', 'libaio.\
 i686', 'libaio-devel', 'libaio-devel.i686', 'libXext', 'libXext.i686', '\
 libXtst', 'libXtst.i686', 'libX11', 'libX11.i686', 'libXau', 'libXau.i686', '\
 libxcb', 'libxcb.i686', 'libXi', 'libXi.i686', 'make', 'sysstat', '\
-unixODBC', 'unixODBC-devel'])
+unixODBC', 'unixODBC-devel', 'epel-release', 'python34'])
 
     @patch.object(cplane_utils.CPlanePackageManager, "_create_log")
     @patch.object(cplane_utils.CPlanePackageManager, "_get_pkg_json")

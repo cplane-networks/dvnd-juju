@@ -36,7 +36,9 @@ class CplaneUtilsTest(CharmTestCase):
     def tearDown(self):
         super(CplaneUtilsTest, self).tearDown()
 
-    def test_determine_packages(self):
+    @patch.object(cplane_utils, "get_os_release")
+    def test_determine_packages(self, m_get_os_release):
+        m_get_os_release.return_value = '14.04'
         self.assertEqual(cplane_utils.determine_packages(),
                          ['alien', 'libaio1', 'zlib1g-dev', 'libxml2-dev',
                           'libxml-libxml-perl', 'unzip', 'python-pexpect',
@@ -100,7 +102,7 @@ rc.d/init.d'])
     def test_oracle_configure_init(self, m_spawn):
         cplane_utils.oracle_configure_init()
         m_spawn.assert_called_with('/etc/init.d/oracle-xe configure',
-                                   timeout=300)
+                                   timeout=900)
 
     @patch("subprocess.check_call")
     @patch("os.system")
@@ -370,6 +372,11 @@ config.yaml'])
         with self.assertRaises(cplane_utils.UnconfiguredInterface):
             cplane_utils.get_unit_ip()
 
+    @patch("commands.getoutput")
+    def test_get_os_release(self, m_getoutput):
+        cplane_utils.get_os_release()
+        self.assertEqual(m_getoutput.call_args,
+                         call('lsb_release -r'))
 
 suite = unittest.TestLoader().loadTestsFromTestCase(CplaneUtilsTest)
 unittest.TextTestRunner(verbosity=2).run(suite)

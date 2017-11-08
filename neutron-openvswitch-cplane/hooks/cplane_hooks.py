@@ -36,6 +36,7 @@ from cplane_utils import (
     restart_cp_agentd,
     assess_status,
     fake_register_configs,
+    get_os_release,
 )
 
 
@@ -118,6 +119,9 @@ def cplane_ovs_relation_changed():
 def config_changed():
     set_cp_agent()
     cplane_config(system_config, SYSTEM_CONF, '')
+    if get_os_release() == '16.04':
+        cmd = ['modprobe', 'br_netfilter']
+        subprocess.check_call(cmd)
     cmd = ['sysctl', '-p']
     subprocess.check_call(cmd)
     CONFIGS.write_all()

@@ -30,7 +30,9 @@ class CplaneUtilsTest(CharmTestCase):
         super(CplaneUtilsTest, self).tearDown()
         call(["rm", "-f", "/tmp/cplane.ini"])
 
-    def test_determine_packages(self):
+    @patch.object(cplane_utils, "get_os_release")
+    def test_determine_packages(self, m_get_os_release):
+        m_get_os_release.return_value = '14.04'
         self.assertEqual(cplane_utils.determine_packages(),
                          ['neutron-metadata-agent', 'neutron-plugin-ml2',
                           'crudini', 'dkms', 'iputils-arping', 'dnsmasq'])
@@ -114,5 +116,11 @@ class CplaneUtilsTest(CharmTestCase):
                          call(['service', 'cp-agentd',
                                'restart']))
 
+    @patch("commands.getoutput")
+    def test_get_os_release(self, m_getoutput):
+        cplane_utils.get_os_release()
+        self.assertEqual(m_getoutput.call_args,
+                         call('lsb_release -r'))
+
 suite = unittest.TestLoader().loadTestsFromTestCase(CplaneUtilsTest)
-unittest.TextTestRunner(verbosity=2).run(suite)
+unittest.TextTestRunner(verbosity=1).run(suite)

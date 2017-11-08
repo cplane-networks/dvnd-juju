@@ -1,7 +1,7 @@
 #!/usr/bin/python
 from test_utils import CharmTestCase, unittest
 
-from mock import MagicMock, patch
+from mock import MagicMock, patch, call
 import charmhelpers.contrib.openstack.templating as templating
 from charmhelpers.core import hookenv
 hookenv.config = MagicMock()
@@ -38,7 +38,9 @@ class CplaneUtilsTest(CharmTestCase):
     def tearDown(self):
         super(CplaneUtilsTest, self).tearDown()
 
-    def test_determine_packages(self):
+    @patch.object(cplane_utils, "get_os_release")
+    def test_determine_packages(self, m_get_os_release):
+        m_get_os_release.return_value = '14.04'
         self.assertEqual(cplane_utils.determine_packages(),
                          ['alien', 'libaio1', 'python-pexpect'])
 
@@ -57,7 +59,7 @@ cplane_metadata.json?dl=1'
     def test_oracle_configure_init(self, m_spawn):
         cplane_utils.oracle_configure_init()
         m_spawn.assert_called_with('/etc/init.d/oracle-xe configure',
-                                   timeout=300)
+                                   timeout=900)
 
     @patch("subprocess.check_call")
     def test_deb_convert_install(self, m_check_call):
@@ -82,6 +84,11 @@ cplane_metadata.json?dl=1'
         cplane_utils.configure_oracle()
         m_check_call.assert_called_with(['chmod', '+x', 'oracle-xe'])
 
+    @patch("commands.getoutput")
+    def test_get_os_release(self, m_getoutput):
+        cplane_utils.get_os_release()
+        self.assertEqual(m_getoutput.call_args,
+                         call('lsb_release -r'))
 
 suite = unittest.TestLoader().loadTestsFromTestCase(CplaneUtilsTest)
 unittest.TextTestRunner(verbosity=2).run(suite)

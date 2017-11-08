@@ -37,4 +37,7 @@ options:
     default: "1.3.8"
     type: string
     description: "Cplane softwares version"
-
+  openstack-version:
+    default: "liberty"
+    type: string
+    description: "Openstack version eg. liberty, mitaka, ocata"

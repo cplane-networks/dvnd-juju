@@ -65,6 +65,7 @@ PACKAGES = ['alien', 'libaio1', 'zlib1g-dev', 'libxml2-dev',
             'libxml-libxml-perl', 'unzip', 'python-pexpect',
             'libyaml-perl']
 
+
 CPLANE_URL = config('cp-package-url')
 
 DVND_CONFIG = OrderedDict([
@@ -116,6 +117,8 @@ SERVICES = []
 
 
 def determine_packages():
+    if get_os_release() == '16.04':
+        PACKAGES.extend(['bc', 'unixodbc'])
     return PACKAGES
 
 
@@ -140,13 +143,20 @@ def download_cplane_installer():
 
 def oracle_configure_init():
     import pexpect
-    child = pexpect.spawn("/etc/init.d/oracle-xe configure", timeout=300)
+    if get_os_release() == '16.04':
+        cmd = "sed -i 's/memory_target=*/#memory_target=/g' \
+/u01/app/oracle/product/11.2.0/xe/config/scripts/init.ora"
+        os.system(cmd)
+        cmd = "sed -i 's/memory_target=*/#memory_target=/g' \
+/u01/app/oracle/product/11.2.0/xe/config/scripts/initXETemp.ora"
+        os.system(cmd)
+    child = pexpect.spawn("/etc/init.d/oracle-xe configure", timeout=900)
     child.sendline(config('oracle-http-port'))
     child.sendline(config('oracle-listener-port'))
     child.sendline(config('oracle-password'))
     child.sendline(config('oracle-password'))
     child.sendline(config('oracle-db-enable'))
-    child.timeout = 300
+    child.timeout = 900
     child.expect(pexpect.EOF)
     log('{}'.format(child.before))
 
@@ -697,3 +707,8 @@ class FakeOSConfigRenderer(object):
 
 def fake_register_configs():
     return FakeOSConfigRenderer()
+
+
+def get_os_release():
+    ubuntu_release = commands.getoutput('lsb_release -r')
+    return ubuntu_release.split()[1]
