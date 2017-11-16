@@ -562,7 +562,10 @@ def copy_oracle_package():
 def resize_swap_partition():
     cmd = "swapon -s | tail -n1"
     swap_string = commands.getoutput(cmd)
-    swap_name = swap_string.split()[0]
+    if swap_string == '':
+        swap_name = ''
+    else:
+        swap_name = swap_string.split()[0]
     print swap_name
     if swap_name:
         swap_mem = int(swap_string.split()[2])/1024
