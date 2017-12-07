@@ -1,4 +1,5 @@
 cplane-repo: &cplane_repo http://repohost.local/cplane_metadata.json
+openstack-version: &openstack_version mitaka
 num-of-slave-units: &slave_units 1
 series: trusty
 machines:
@@ -27,6 +28,7 @@ services:
       controller-app-mode: msm
       msm-version: 262
       cplane-version: 1.3.8
+      openstack-version: *openstack_version
       jboss-db-on-host: False
       use-default-jboss-cluster: true
 #      intf-mtu: "eth1.10=1500"
@@ -42,6 +44,8 @@ services:
     num_units: 1
     series: centos7
     options:
+      cplane-version: 1.3.8
+      openstack-version: *openstack_version
       private-interface: eth2.11
       slave-units-number: *slave_units
       vip-range: 10.1.0.180
@@ -57,6 +61,8 @@ services:
     num_units: *slave_units
     series: centos7
     options:
+      cplane-version: 1.3.8
+      openstack-version: *openstack_version
       private-interface: eth2.11
       vip-range: 10.1.0.181
       cp-package-url: *cplane_repo

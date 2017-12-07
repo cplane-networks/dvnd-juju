@@ -1,4 +1,5 @@
 cplane-repo: &cplane_repo http://repohost.local/cplane_metadata.json
+openstack-version: &openstack_version mitaka
 num-of-slave-units: &slave_units 1
 series: trusty
 machines:
@@ -224,6 +225,7 @@ services:
     options:
       cp-package-url: *cplane_repo
       cplane-version: 1.3.8
+      openstack-version: *openstack_version
       topology-name: default
       vlan-ranges: "physnet1:11:11, physnet2:10:10, physnet3:12:13"
   neutron-openvswitch-cplane:
@@ -235,6 +237,7 @@ services:
     options:
       cp-package-url: *cplane_repo
       cplane-version: 1.3.8
+      openstack-version: *openstack_version
       mgmt-int: eth1.11
       cp-controller-mport: 1901
       cp-controller-uport: 1902
@@ -257,6 +260,7 @@ services:
     options:
       cp-package-url: *cplane_repo
       cplane-version: 1.3.8
+      openstack-version: *openstack_version
       jboss-db-on-host: false
       multicast-intf: eth1.11
       multicast-port: 1901
@@ -276,6 +280,8 @@ services:
     num_units: 1
     series: centos7
     options:
+      cplane-version: 1.3.8
+      openstack-version: *openstack_version
       private-interface: eth2.11
       slave-units-number: *slave_units
       vip-range: 10.1.0.180
@@ -291,6 +297,8 @@ services:
     num_units: *slave_units
     series: centos7
     options:
+      cplane-version: 1.3.8
+      openstack-version: *openstack_version
       private-interface: eth2.11
       vip-range: 10.1.0.181
       cp-package-url: *cplane_repo
@@ -320,6 +328,7 @@ services:
     options:
       cp-package-url: *cplane_repo
       cplane-version: 1.3.8
+      openstack-version: *openstack_version
       physical-intf-mappings: "physnet1:ens2, physnet2:ens3, physnet3:ens4"
       intf-mtu: "ens3=1500"
       tso-flag: "ens3=off"

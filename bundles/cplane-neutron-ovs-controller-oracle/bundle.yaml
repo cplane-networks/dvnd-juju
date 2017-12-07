@@ -1,4 +1,5 @@
 cplane-repo: &cplane_repo http://repohost.local/cplane_metadata.json
+openstack-version: &openstack_version mitaka
 series: trusty
 machines:
   '0':
@@ -205,6 +206,7 @@ services:
     options:
       cp-package-url: *cplane_repo
       cplane-version: 1.3.8
+      openstack-version: *openstack_version
       topology-name: default
   neutron-openvswitch-cplane:
     annotations:
@@ -215,6 +217,7 @@ services:
     options: 
       cp-package-url: *cplane_repo
       cplane-version: 1.3.8
+      openstack-version: *openstack_version
       mgmt-int: eth1.11
       cp-controller-mport: 1901
       cp-controller-uport: 1902
@@ -237,6 +240,7 @@ services:
     options:
       cp-package-url: *cplane_repo
       cplane-version: 1.3.8
+      openstack-version: *openstack_version
       jboss-db-on-host: false
       multicast-intf: eth1.11
       multicast-port: 1901
@@ -257,5 +261,6 @@ services:
     options:
       cp-package-url: *cplane_repo
       cplane-version: 1.3.8
+      openstack-version: *openstack_version
     to:
     - '3'
