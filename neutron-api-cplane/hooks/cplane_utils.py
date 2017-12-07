@@ -59,7 +59,7 @@ if config('cplane-version') == "1.3.5":
 if config('cplane-version') == "1.3.7" or "1.3.8":
     del cplane_packages['neutronclient']
 
-PACKAGES = ['neutron-plugin-ml2', 'crudini', 'python-dev']
+PACKAGES = ['neutron-plugin-ml2', 'crudini', 'python-bitarray']
 
 CPLANE_URL = config('cp-package-url')
 
@@ -141,11 +141,6 @@ def create_link():
 
 def restart_service():
     cmd = ['service', 'neutron-server', 'restart']
-    subprocess.check_call(cmd)
-
-
-def python_intall(package):
-    cmd = ['pip', 'install', package]
     subprocess.check_call(cmd)
 
 

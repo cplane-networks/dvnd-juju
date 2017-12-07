@@ -30,7 +30,6 @@ from cplane_utils import (
     neutron_config,
     create_link,
     restart_service,
-    python_intall,
     migrate_db,
     configure_policy,
     assess_status,
@@ -208,7 +207,6 @@ def install():
     pkgs = determine_packages()
     apt_install(pkgs, fatal=True)
     install_cplane_packages()
-    python_intall("bitarray")
     create_link()
     if config('cplane-version') == "1.3.7" or "1.3.8":
         configure_policy()
