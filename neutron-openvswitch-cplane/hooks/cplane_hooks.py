@@ -210,7 +210,7 @@ def config_changed():
 
 
 @hooks.hook('upgrade-charm')
-@hooks.hook('install')
+@hooks.hook('install.real')
 def install():
     apt_update(fatal=True)
 #    disable_neutron_agent()

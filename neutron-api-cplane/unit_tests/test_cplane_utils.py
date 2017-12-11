@@ -29,7 +29,7 @@ class CplaneUtilsTest(CharmTestCase):
 
     def test_determine_packages(self):
         self.assertEqual(cplane_utils.determine_packages(),
-                         ['neutron-plugin-ml2', 'crudini', 'python-dev'])
+                         ['neutron-plugin-ml2', 'crudini', 'python-bitarray'])
 
     def test_register_configs(self):
         class _mock_OSConfigRenderer():

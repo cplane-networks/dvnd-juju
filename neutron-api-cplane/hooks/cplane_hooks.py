@@ -201,7 +201,7 @@ def cplane_ovs(rid=None):
     relation_set(relation_settings=relation_info)
 
 
-@hooks.hook('install')
+@hooks.hook('install.real')
 def install():
     apt_update(fatal=True)
     pkgs = determine_packages()
