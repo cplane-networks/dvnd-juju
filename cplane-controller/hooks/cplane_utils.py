@@ -12,6 +12,10 @@ from charmhelpers.core.hookenv import (
     related_units,
     unit_get,
     network_get_primary_address,
+    is_leader,
+    leader_get,
+    leader_set,
+
 )
 
 from charmhelpers.fetch import (
@@ -441,15 +445,17 @@ def start_jboss_service():
 
 
 def initialize_programs(install_type):
-    import pexpect
-    child = pexpect.spawn("bash startInitializePrograms.sh", timeout=1500)
-    child.sendline(install_type)
-    if install_type == 'I':
-        child.sendline('y')
-    child.timeout = 3000
-    child.expect(pexpect.EOF)
-    log('{}'.format(child.before))
-    log("Initialize programs Completed")
+    if is_leader():
+        import pexpect
+        child = pexpect.spawn("bash startInitializePrograms.sh", timeout=1500)
+        child.sendline(install_type)
+        if install_type == 'I':
+            child.sendline('y')
+        child.timeout = 3000
+        child.expect(pexpect.EOF)
+        log('{}'.format(child.before))
+        log("Initialize programs Completed")
+        notify_clients()
 
 
 def stop_jboss_service():
@@ -463,7 +469,9 @@ def start_services(install_type):
     saved_path = os.getcwd()
     os.chdir(CPLANE_DIR)
 
-    status = start_jboss_service()
+    status = False
+    if is_leader() or is_leader_ready():
+        status = start_jboss_service()
 
     if status is True:
         if install_type == 'reuse-db':
@@ -472,10 +480,10 @@ def start_services(install_type):
             initialize_programs('I')
         elif install_type == 'create-db':
             initialize_programs('I')
-
-        cmd = ['bash', 'startStartupPrograms.sh']
-        subprocess.check_call(cmd)
-        os.chdir(saved_path)
+        if is_leader_ready():
+            cmd = ['bash', 'startStartupPrograms.sh']
+            subprocess.check_call(cmd)
+            os.chdir(saved_path)
     else:
         log("Setup not completed")
 
@@ -712,3 +720,30 @@ def fake_register_configs():
 def get_os_release():
     ubuntu_release = commands.getoutput('lsb_release -r')
     return ubuntu_release.split()[1]
+
+
+def is_leader_ready():
+    db_status = leader_get('status')
+    if db_status == 'db_created':
+        log('Response from leader for DB status {}'.format(db_status))
+        return True
+    else:
+        log('Waiting from leader for DB status {}'.format(db_status))
+        return False
+
+
+def notify_clients():
+    if is_leader():
+        leader_set({'status': "db_created"})
+
+
+def is_oracle_relation_joined():
+    for rid in relation_ids('oracle'):
+        for unit in related_units(rid):
+            oracle_host = relation_get(attribute='oracle-\
+host', unit=unit, rid=rid)
+
+    if oracle_host:
+        return True
+    else:
+        return False

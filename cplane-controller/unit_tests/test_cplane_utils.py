@@ -19,6 +19,7 @@ TO_PATCH = [
     'unit_get',
     'network_get_primary_address',
     'ni',
+    'is_leader',
 ]
 
 cplane_install_package = OrderedDict([
@@ -226,7 +227,8 @@ jboss-6.1.0.Final')
         m_getoutput.assert_called_with('bash checkJBossServer.sh')
 
     @patch('pexpect.spawn')
-    def test_initialize_programs(self, m_spawn):
+    @patch('cplane_utils.notify_clients')
+    def test_initialize_programs(self, m_notify_clients, m_spawn):
         cplane_utils.initialize_programs('I')
         m_spawn.assert_called_with('bash startInitializePrograms.sh',
                                    timeout=1500)
@@ -242,7 +244,9 @@ jboss-6.1.0.Final')
     @patch("subprocess.check_call")
     @patch("cplane_utils.start_jboss_service")
     @patch("cplane_utils.initialize_programs")
-    def test_start_services_reuse_db(self, m_initialize_program,
+    @patch("cplane_utils.is_leader_ready")
+    def test_start_services_reuse_db(self, m_leader_ready,
+                                     m_initialize_program,
                                      m_start_jboss_service, m_check_call,
                                      m_chdir):
         m_start_jboss_service.return_value = True
@@ -255,7 +259,9 @@ jboss-6.1.0.Final')
     @patch("subprocess.check_call")
     @patch("cplane_utils.start_jboss_service")
     @patch("cplane_utils.initialize_programs")
-    def test_start_services_clean_db(self, m_initialize_program,
+    @patch("cplane_utils.is_leader_ready")
+    def test_start_services_clean_db(self, m_leader_ready,
+                                     m_initialize_program,
                                      m_start_jboss_service, m_check_call,
                                      m_chdir):
         m_start_jboss_service.return_value = True

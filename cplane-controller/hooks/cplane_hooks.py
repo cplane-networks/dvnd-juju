@@ -7,6 +7,8 @@ from charmhelpers.core.hookenv import (
     log,
     relation_set,
     relation_ids,
+    is_leader,
+    leader_set,
 )
 import sys
 import commands
@@ -44,6 +46,8 @@ from cplane_utils import (
     get_unit_ip,
     assess_status,
     fake_register_configs,
+    is_leader_ready,
+    is_oracle_relation_joined,
 )
 
 from cplane_network import (
@@ -78,7 +82,9 @@ def upgrade_charm():
     upgrade_type = get_upgrade_type()
     stop_jboss_service()
     if upgrade_type == 'clean-db':
-        clean_create_db()
+        if is_leader():
+            leader_set({'status': "db_cleaned"})
+            clean_create_db()
     cplane_installer()
     if config('intall-reboot-scripts') == 'y':
         install_reboot_scripts()
@@ -127,7 +133,8 @@ def oracle_relation_changed():
                 cplane_installer()
                 if config('intall-reboot-scripts') == 'y':
                     install_reboot_scripts()
-                prepare_database()
+                if is_leader():
+                    prepare_database()
                 start_services('create-db')
 
 
@@ -225,6 +232,12 @@ def config_changed():
             log("Change request for lro for interface {} = {}"
                 .format(interface[0], interface[1]))
             change_iface_config(interface[0], 'lro', interface[1])
+
+
+@hooks.hook('leader-settings-changed')
+def leader_settings_changed():
+    if not is_leader() and is_leader_ready() and is_oracle_relation_joined():
+        start_services('create-db')
 
 
 def main():
