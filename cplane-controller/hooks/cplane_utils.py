@@ -346,14 +346,7 @@ def prepare_database():
     if DB_SERVICE == 'XE':
         execute_sql_command(connect_string, "@cp_create_ts {}".format(DB_PATH))
     else:
-        log('Configuring cplane-OracleDB-ds.xml file')
-        cmd = "sed -i 's/:{}/\/{}/g' /opt/jboss/jboss-6.1.0.Final/server/all/\
-deploy/cplane-OracleDB-ds.xml".format(DB_SERVICE, DB_SERVICE)
-        os.system(cmd)
-        log('Configuring quartz.properties file')
-        cmd = "sed -i 's/:{}/\/{}/g' /opt/jboss/jboss-6.1.0.Final/server/all/\
-conf/quartz.properties".format(DB_SERVICE, DB_SERVICE)
-        os.system(cmd)
+        set_data_source()
         log('Connect String for database is {}'.format(connect_string))
         log('Database location is  {}'.format(DB_PATH))
         execute_sql_command(connect_string, "@cp_create_ts {}".format(DB_PATH))
@@ -747,3 +740,15 @@ host', unit=unit, rid=rid)
         return True
     else:
         return False
+
+
+def set_data_source():
+    if DB_SERVICE != 'XE':
+        log('Configuring cplane-OracleDB-ds.xml file')
+        cmd = "sed -i 's/:{}/\/{}/g' /opt/jboss/jboss-6.1.0.Final/server/all/\
+deploy/cplane-OracleDB-ds.xml".format(DB_SERVICE, DB_SERVICE)
+        os.system(cmd)
+        log('Configuring quartz.properties file')
+        cmd = "sed -i 's/:{}/\/{}/g' /opt/jboss/jboss-6.1.0.Final/server/all/\
+conf/quartz.properties".format(DB_SERVICE, DB_SERVICE)
+        os.system(cmd)

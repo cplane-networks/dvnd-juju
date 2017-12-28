@@ -48,6 +48,7 @@ from cplane_utils import (
     fake_register_configs,
     is_leader_ready,
     is_oracle_relation_joined,
+    set_data_source,
 )
 
 from cplane_network import (
@@ -237,6 +238,8 @@ def config_changed():
 @hooks.hook('leader-settings-changed')
 def leader_settings_changed():
     if not is_leader() and is_leader_ready() and is_oracle_relation_joined():
+        set_oracle_host()
+        set_data_source()
         start_services('create-db')
 
 
