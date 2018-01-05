@@ -38,7 +38,7 @@ def oracle_relation_joined():
     relation_set(relation_settings=relation_info)
 
 
-@hooks.hook('install')
+@hooks.hook('install.real')
 def install():
     pkgs = determine_packages()
     apt_install(pkgs, fatal=True)
