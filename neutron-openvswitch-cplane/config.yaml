@@ -57,7 +57,7 @@ options:
     description: "Interface to create the br-fip bridge"
   cp-agent-log-level:
     type: string
-    default: "dbg"
+    default: "file:info"
     description: "Log level for CP agent dbg,info"
   cp-package-url:
     default: "http://repohost/cplane_metadata.json"

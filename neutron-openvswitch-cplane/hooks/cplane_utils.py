@@ -11,6 +11,7 @@ from charmhelpers.core.hookenv import (
     relation_ids,
     relation_get,
     related_units,
+    hook_name,
 )
 
 from charmhelpers.contrib.openstack.utils import (
@@ -165,6 +166,7 @@ def manage_fip():
 
 
 def set_cp_agent():
+    juju_log('Settig cp-agentd configuration for {} hook'.format(hook_name()))
     mport = 0
     for rid in relation_ids('cplane-controller'):
         for unit in related_units(rid):
@@ -189,7 +191,7 @@ def set_cp_agent():
                 key = 'ucast-port=' + uport
                 cmd = ['cp-agentd', 'set-config', key]
                 subprocess.check_call(cmd)
-                key = 'log-level=file:' + str(config('cp-agent-log-level'))
+                key = 'log-level=' + str(config('cp-agent-log-level'))
                 cmd = ['cp-agentd', 'set-config', key]
                 subprocess.check_call(cmd)
                 key = 'vm-mtu=' + str(config('cp-vm-mtu'))
@@ -210,7 +212,7 @@ def set_cp_agent():
     key = 'ucast-port=' + str(config('cp-controller-uport'))
     cmd = ['cp-agentd', 'set-config', key]
     subprocess.check_call(cmd)
-    key = 'log-level=file:' + str(config('cp-agent-log-level'))
+    key = 'log-level=' + str(config('cp-agent-log-level'))
     cmd = ['cp-agentd', 'set-config', key]
     subprocess.check_call(cmd)
     key = 'vm-mtu=' + str(config('cp-vm-mtu'))
@@ -223,6 +225,7 @@ def restart_services():
     subprocess.check_call(cmd)
     cmd = ['service', 'openvswitch-switch', 'restart']
     subprocess.check_call(cmd)
+    juju_log('Restarting cp-agentd service for {} hook'.format(hook_name()))
     cmd = ['service', 'cp-agentd', 'stop']
     subprocess.check_call(cmd)
     cmd = ['service', 'cp-agentd', 'start']
@@ -233,6 +236,7 @@ def restart_services():
 
 
 def restart_cp_agentd():
+    juju_log('Restarting cp-agentd service for {} hook'.format(hook_name()))
     cmd = ['service', 'cp-agentd', 'restart']
     subprocess.check_call(cmd)
 
