@@ -182,6 +182,13 @@ def prepare_env():
     cmd = ['ln', '-sf', '/etc/init.d', '/etc/rc.d/init.d']
     subprocess.check_call(cmd)
 
+    f = open("/etc/sysctl.d/10-network-security.conf", "a")
+    f.write("net.core.wmem_max = 1048576\n")
+    f.write("net.core.rmem_max = 26214400\n")
+    f.close()
+    cmd = ['sysctl', '-p', '/etc/sysctl.d/10-network-security.conf']
+    subprocess.check_call(cmd)
+
 
 def install_jboss():
     filename = json.load(open(FILES_PATH))
