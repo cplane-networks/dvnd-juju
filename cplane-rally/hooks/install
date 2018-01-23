@@ -1,0 +1,30 @@
+#!/bin/bash
+
+set -eux
+
+
+declare -a DEPS=('pip')
+
+check_and_install() {
+    pkg="${1}-${2}"
+    if ! dpkg -s ${pkg} 2>&1 > /dev/null; then
+        apt-get -y install ${pkg}
+    fi
+}
+
+PYTHON="python"
+
+for dep in ${DEPS[@]}; do
+    check_and_install ${PYTHON} ${dep}
+done
+
+# The most secure way to install software!
+
+status-set maintenance "installing apache2" || juju-log "installing apache2"
+
+apt-get install -y apache2
+rm -f /var/www/html/index.html
+mkdir -p /var/www/html/rally
+service apache2 restart
+
+status-set waiting "need to install rally" || true
