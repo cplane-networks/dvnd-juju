@@ -35,10 +35,6 @@ options:
     type: string
     default: "192.168.5.22"
     description: "Cplane-nutron IP"
-  region:
-    type: string
-    default: "RegionOne"
-    description: "Openstack region"
   neutron-plugin:
     default: ovs
     type: string
@@ -165,3 +161,8 @@ options:
     default: "liberty"
     type: string
     description: "Openstack version eg. liberty, mitaka, ocata"
+  metadata-shared-secret:
+    type: string
+    default:
+    description: "Metadata shared secret"
+

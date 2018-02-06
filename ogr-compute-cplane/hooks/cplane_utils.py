@@ -46,9 +46,7 @@ BASE_RESOURCE_MAP = OrderedDict([
                          database=config('database'),
                          ssl_dir=NEUTRON_CONF_DIR),
                      context.PostgresqlDBContext(database=config('database')),
-                     cplane_context.IdentityServiceContext(
-                         service='neutron',
-                         service_user='neutron'),
+                     cplane_context.IdentityServiceContext(),
                      cplane_context.NeutronCCContext(),
                      context.SyslogContext(),
                      context.ZeroMQContext(),
@@ -58,9 +56,8 @@ BASE_RESOURCE_MAP = OrderedDict([
     }),
     (METADATA_AGENT_INI, {
         'services': ['metadata-agent'],
-        'contexts': [cplane_context.IdentityServiceContext(
-                     service='neutron',
-                     service_user='neutron')],
+        'contexts': [cplane_context.SharedSecretContext(),
+                     cplane_context.IdentityServiceContext(), ]
     }),
     (ML2_CONFIG, {
         'services': ['neutron-server'],
@@ -73,17 +70,14 @@ cplane_packages = OrderedDict([('ogr-img', -1)])
 CPLANE_URL = config('cp-package-url')
 
 metadata_agent_config = OrderedDict([
-                                    ('auth_region', config('region')),
                                     ('nova_metadata_ip',
-                                     config('openstack-controller-ip')),
-                                    ('metadata_proxy_shared_secret',
-                                     'secret')])
+                                     config('openstack-controller-ip'))])
 
 
 REQUIRED_INTERFACES = {
     'messaging': ['amqp'],
-    'cplane-neutron': ['cplane-neutron'],
-    'identity': ['identity-service'],
+    'nova-cloud-controller': ['cloud-controller'],
+    'neutron-api': ['neutron-plugin-api'],
 }
 SERVICES = ['nova-compute']
 

@@ -21,10 +21,10 @@ requires:
   container:
     interface: juju-info
     scope: container
-  cplane-neutron:
-    interface: cplane-neutron
+  cloud-controller:
+    interface: nova 
   amqp:
     interface: rabbitmq
-  identity-service:
-    interface: keystone
+  neutron-plugin-api:
+    interface: neutron-plugin-api
 

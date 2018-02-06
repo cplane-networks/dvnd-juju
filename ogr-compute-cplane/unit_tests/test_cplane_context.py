@@ -1,7 +1,6 @@
 #!/usr/bin/python
 from test_utils import CharmTestCase, unittest
 import cplane_context
-import charmhelpers
 
 from mock import patch
 
@@ -9,7 +8,24 @@ TO_PATCH = [
     'config',
     'log',
     'os_release',
+    'relation_ids',
+    'relation_get',
+    'related_units',
 ]
+
+IDENTITY_CONTEXT = {
+    'auth_port': '5000',
+    'auth_protocol': 'http',
+    'service_port': '5000',
+    'service_protocol': 'http',
+    'service_tenant': 'admin',
+    'service_username': 'admin',
+    'service_password': 'openstack',
+    'service_host': 'keystone_host',
+    'auth_host': 'keystone_host',
+    'api_version': '2.0',
+    'region': 'region'
+}
 
 
 class GeneralTest(CharmTestCase):
@@ -125,38 +141,31 @@ class IdentityServiceContext(CharmTestCase):
     def setUp(self):
         super(IdentityServiceContext, self).setUp(cplane_context, TO_PATCH)
         self.config.side_effect = self.test_config.get
-        self.test_config.set('region', 'region457')
+        self.relation_get.side_effect = self.test_relation.get
+        self.host_uuid = 'e46e530d-18ae-4a67-9ff0-e6e2ba7c60a7'
 
-    @patch.object(charmhelpers.contrib.openstack.context, 'format_ipv6_addr')
-    @patch.object(charmhelpers.contrib.openstack.context, 'context_complete')
-    @patch.object(charmhelpers.contrib.openstack.context, 'relation_get')
-    @patch.object(charmhelpers.contrib.openstack.context, 'related_units')
-    @patch.object(charmhelpers.contrib.openstack.context, 'relation_ids')
-    @patch.object(charmhelpers.contrib.openstack.context, 'log')
-    def test_ids_ctxt(self, _log, _rids, _runits, _rget, _ctxt_comp,
-                      format_ipv6_addr):
-        _rids.return_value = 'rid1'
-        _runits.return_value = 'runit'
-        _ctxt_comp.return_value = True
-        id_data = {
-            'service_port': 9876,
-            'service_host': '127.0.0.4',
-            'auth_host': '127.0.0.5',
-            'auth_port': 5432,
-            'service_tenant': 'ten',
-            'service_username': 'admin',
-            'service_password': 'adminpass',
-        }
-        _rget.return_value = id_data
+    def test_identity_context(self):
+        self.relation_ids.return_value = 'neutron-plugin-api:0'
+        self.related_units.return_value = 'neutron-api/0'
+        self.test_relation.set(IDENTITY_CONTEXT)
         ids_ctxt = cplane_context.IdentityServiceContext()
-        self.assertEquals(ids_ctxt()['region'], 'region457')
+        id_data = {'auth_port': '5000',
+                   'auth_protocol': 'http',
+                   'service_port': '5000',
+                   'service_protocol': 'http',
+                   'service_tenant': 'admin',
+                   'service_username': 'admin',
+                   'service_password': 'openstack',
+                   'service_host': 'keystone_host',
+                   'auth_host': 'keystone_host',
+                   'api_version': '2.0',
+                   'auth_region': 'region'}
+        self.assertEquals(ids_ctxt(), id_data)
 
-    @patch.object(charmhelpers.contrib.openstack.context, 'relation_ids')
-    @patch.object(charmhelpers.contrib.openstack.context, 'log')
-    def test_ids_ctxt_no_rels(self, _log, _rids):
-        _rids.return_value = []
+    def test_ids_ctxt_no_rels(self):
+        self.related_units.return_value = None
         ids_ctxt = cplane_context.IdentityServiceContext()
-        self.assertEquals(ids_ctxt(), None)
+        self.assertEquals(ids_ctxt(), {})
 
 
 class NeutronCCContextTest(CharmTestCase):

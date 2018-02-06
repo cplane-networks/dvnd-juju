@@ -5,9 +5,9 @@ auth_url = {{ auth_protocol }}://{{ auth_host }}:{{ auth_port }}
 auth_plugin = password
 project_domain_id = default
 user_domain_id = default
-project_name = {{ admin_tenant_name }}
-username = {{ admin_user }}
-password = {{ admin_password }}
+project_name = {{ service_tenant }}
+username = {{ service_username }}
+password = {{ service_password }}
 signing_dir = {{ signing_dir }}
 {% endif -%}
 

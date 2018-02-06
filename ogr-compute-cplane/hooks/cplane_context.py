@@ -1,6 +1,11 @@
+import os
+import uuid
 from charmhelpers.core.hookenv import (
     config,
     log,
+    relation_ids,
+    related_units,
+    relation_get,
 )
 from charmhelpers.contrib.openstack import context
 from charmhelpers.contrib.openstack.utils import (
@@ -11,6 +16,7 @@ VLAN = 'vlan'
 VXLAN = 'vxlan'
 GRE = 'gre'
 OVERLAY_NET_TYPES = [VXLAN, GRE]
+SHARED_SECRET = "/var/lib/juju/metadata-secret"
 
 
 def get_l2population():
@@ -61,13 +67,63 @@ def get_dvr():
         return False
 
 
-class IdentityServiceContext(context.IdentityServiceContext):
+def get_shared_secret():
+    secret = config('metadata-shared-secret') or str(uuid.uuid4())
+    if not os.path.exists(SHARED_SECRET):
+        with open(SHARED_SECRET, 'w') as secret_file:
+            secret_file.write(secret)
+    else:
+        with open(SHARED_SECRET, 'r') as secret_file:
+            secret = secret_file.read().strip()
+    return secret
+
+
+class SharedSecretContext(context.OSContextGenerator):
 
     def __call__(self):
-        ctxt = super(IdentityServiceContext, self).__call__()
-        if not ctxt:
-            return
-        ctxt['region'] = config('region')
+        ctxt = {
+            'shared_secret': get_shared_secret(),
+        }
+        return ctxt
+
+
+class IdentityServiceContext(context.OSContextGenerator):
+    def __call__(self):
+        ctxt = self.identity_context()
+        return ctxt
+
+    def identity_context(self):
+        # generate config context for neutron or quantum. these get converted
+        # directly into flags in nova.conf
+        # NOTE: Its up to release templates to set correct driver
+        ctxt = {}
+        for rid in relation_ids('neutron-plugin-api'):
+            for unit in related_units(rid):
+                rel = {'rid': rid, 'unit': unit}
+                ctxt = {
+                    'auth_protocol': relation_get(
+                        'auth_protocol', **rel) or 'http',
+                    'service_protocol': relation_get(
+                        'service_protocol', **rel) or 'http',
+                    'service_port': relation_get(
+                        'service_port', **rel) or '5000',
+                    'auth_host': relation_get(
+                        'auth_host', **rel),
+                    'service_host': relation_get(
+                        'service_host', **rel) or 'http',
+                    'auth_port': relation_get(
+                        'auth_port', **rel),
+                    'service_tenant': relation_get(
+                        'service_tenant', **rel),
+                    'service_username': relation_get(
+                        'service_username', **rel),
+                    'service_password': relation_get(
+                        'service_password', **rel),
+                    'api_version': relation_get(
+                        'api_version', **rel) or '2.0',
+                    'auth_region': relation_get(
+                        'region', **rel),
+                }
         return ctxt
 
 

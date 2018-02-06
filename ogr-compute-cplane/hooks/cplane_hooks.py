@@ -10,11 +10,14 @@ from charmhelpers.core.hookenv import (
 )
 import json
 import sys
-import uuid
 
 from charmhelpers.fetch import (
     apt_install,
     apt_update,
+)
+
+from cplane_context import (
+    get_shared_secret,
 )
 
 from cplane_utils import (
@@ -40,13 +43,11 @@ hooks = Hooks()
 CONFIGS = register_configs()
 
 
-@hooks.hook('cplane-neutron-relation-changed')
-def cplane_neutron_relation_changed():
+@hooks.hook('cloud-controller-relation-changed')
+def cloud_controller_relation_changed():
     controller = relation_get('private-address')
     if controller:
         metadata_agent_config.update({'nova_metadata_ip': controller})
-        metadata_agent_config.update({'auth_url': 'http://' + controller +
-                                      ':5000/v2.0'})
         cplane_config(metadata_agent_config, METADATA_AGENT_INI, 'DEFAULT')
 
 
@@ -67,6 +68,7 @@ def neutron_plugin_relation_joined(rid=None):
     relation_info = {
         'neutron-plugin': 'cplane',
         'subordinate_configuration': json.dumps(principle_config),
+        'metadata-shared-secret': get_shared_secret(),
     }
     relation_set(relation_settings=relation_info)
 
@@ -184,45 +186,8 @@ def install():
     disable_bridge_fw()
 
 
-@hooks.hook('identity-service-relation-joined')
-def identity_joined(rid=None, relation_trigger=False):
-    """
-    Needs to check why this section od code is not working
-
-    public_url = '{}:{}'.format(canonical_url(CONFIGS, PUBLIC),
-                             api_port('neutron-server'))
-    admin_url = '{}:{}'.format(canonical_url(CONFIGS, ADMIN),
-                               api_port('neutron-server'))
-    internal_url = '{}:{}'.format(canonical_url(CONFIGS, INTERNAL),
-                                  api_port('neutron-server'))
-    """
-
-    internal_url = 'http://cplanenetworks.com'
-    admin_url = 'http://cplanenetworks.com'
-    public_url = 'http://cplanenetworks.com'
-
-    rel_settings = {
-        'neutron_service': 'neutron',
-        'neutron_region': config('region'),
-        'neutron_public_url': public_url,
-        'neutron_admin_url': admin_url,
-        'neutron_internal_url': internal_url,
-        'quantum_service': None,
-        'quantum_region': None,
-        'quantum_public_url': None,
-        'quantum_admin_url': None,
-        'quantum_internal_url': None,
-    }
-    if relation_trigger:
-        rel_settings['relation_trigger'] = str(uuid.uuid4())
-    relation_set(relation_id=rid, relation_settings=rel_settings)
-
-
-@hooks.hook('identity-service-relation-changed')
-def identity_changed():
-    if 'identity-service' not in CONFIGS.complete_contexts():
-        log('identity-service relation incomplete. Peer not ready?')
-        return
+@hooks.hook('neutron-plugin-api-relation-changed')
+def neutron_plugin_api_changed():
     CONFIGS.write(NEUTRON_CONF)
     CONFIGS.write(METADATA_AGENT_INI)
     restart_services()
