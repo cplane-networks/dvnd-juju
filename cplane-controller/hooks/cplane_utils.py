@@ -342,6 +342,27 @@ def execute_sql_command(connect_string, sql_command):
     log('{}'.format(session.communicate()))
 
 
+def configure_database():
+    set_oracle_host()
+    host = ORACLE_HOST + '/'
+    log('Configuring the Database')
+    connect_string = 'sys/' + DB_PASSWORD \
+        + '@' + host + DB_SERVICE + ' as' + ' sysdba'
+    if DB_SERVICE == 'XE':
+        execute_sql_command(connect_string, "alter system set \
+processes={} scope=spfile;".format(config('db-process')))
+        execute_sql_command(connect_string, "alter system set \
+session_cached_cursors={} scope=spfile;".format(config('db-ses-cach-cur')))
+        execute_sql_command(connect_string, "alter system set \
+session_max_open_files={} scope=spfile;".format(config('db-ses-max-op-file')))
+        execute_sql_command(connect_string, "alter system set \
+sessions={} scope=spfile;".format(config('db-session')))
+        execute_sql_command(connect_string, "alter system set \
+license_max_sessions={} scope=spfile;".format(config('db-lic-max-ses')))
+        execute_sql_command(connect_string, "alter system set \
+license_sessions_warning={} scope=spfile;".format(config('db-lic-ses-war')))
+
+
 def prepare_database():
     saved_path = os.getcwd()
     set_oracle_host()
@@ -536,11 +557,21 @@ def check_jboss_service():
     saved_path = os.getcwd()
     os.chdir(CPLANE_DIR)
     status = commands.getoutput('bash checkJBossServer.sh')
+    ret_val = ''
     if status == "JBoss server is not running!":
-        return False
+        ret_val = False
     else:
+        os.chdir(saved_path)
         return True
-    os.chdir(saved_path)
+
+    if ret_val is False:
+        time.sleep(120)
+        status = commands.getoutput('bash checkJBossServer.sh')
+        os.chdir(saved_path)
+        if status == "JBoss server is not running!":
+            return False
+        else:
+            return True
 
 
 def run_cp_installer():

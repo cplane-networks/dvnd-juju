@@ -49,6 +49,7 @@ from cplane_utils import (
     is_leader_ready,
     is_oracle_relation_joined,
     set_data_source,
+    configure_database,
 )
 
 from cplane_network import (
@@ -121,6 +122,7 @@ def start():
         oracle_host = set_oracle_host()
         if oracle_host:
             set_oracle_env()
+            configure_database()
             prepare_database()
             start_services('create-db')
 
@@ -135,6 +137,7 @@ def oracle_relation_changed():
                 if config('intall-reboot-scripts') == 'y':
                     install_reboot_scripts()
                 if is_leader():
+                    configure_database()
                     prepare_database()
                 start_services('create-db')
 
@@ -240,7 +243,10 @@ def leader_settings_changed():
     if not is_leader() and is_leader_ready() and is_oracle_relation_joined():
         set_oracle_host()
         set_data_source()
-        start_services('create-db')
+        if check_jboss_service() is True:
+            pass
+        else:
+            start_services('create-db')
 
 
 def main():
