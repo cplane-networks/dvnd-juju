@@ -8,14 +8,11 @@ from charmhelpers.core.hookenv import (
     config,
     relation_set,
     relation_get,
-    relation_ids,
-    related_units,
-
 )
+
 import json
 import sys
 import uuid
-import os
 
 from charmhelpers.fetch import (
     apt_install,
@@ -34,6 +31,7 @@ from cplane_utils import (
     configure_policy,
     assess_status,
     fake_register_configs,
+    add_controller_ip,
 )
 
 from cplane_network import (
@@ -135,27 +133,14 @@ def config_changed():
                 .format(interface[0], interface[1]))
             change_iface_config(interface[0], 'lro', interface[1])
 
-    for rid in relation_ids('cplane-controller'):
-        for unit in related_units(rid):
-            data = relation_get(rid=rid, unit=unit)
-            cplane_controller = data['private-address']
-            mport = data['mport']
-            if mport:
-                cmd = "sed -ie 's/cplane_controller_hosts.*/cplane_controller_\
-hosts = {}/g' /etc/neutron/plugins/ml2/ml2_conf.ini".format(cplane_controller)
-                os.system(cmd)
-                restart_service()
+    add_controller_ip()
 
 
 @hooks.hook('cplane-controller-relation-changed')
 def cplane_controller_relation_changed():
     mport = relation_get('mport')
-    cplane_controller = relation_get('private-address')
     if mport:
-        cmd = "sed -ie 's/cplane_controller_hosts.*/cplane_controller_\
-hosts = {}/g' /etc/neutron/plugins/ml2/ml2_conf.ini".format(cplane_controller)
-        os.system(cmd)
-        restart_service()
+        add_controller_ip()
 
 
 @hooks.hook('shared-db-relation-changed')

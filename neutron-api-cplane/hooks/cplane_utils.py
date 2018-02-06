@@ -195,3 +195,21 @@ class FakeOSConfigRenderer(object):
 
 def fake_register_configs():
     return FakeOSConfigRenderer()
+
+
+def add_controller_ip():
+    cplane_controller = ''
+    for rid in relation_ids('cplane-controller'):
+        for unit in related_units(rid):
+            data = relation_get(rid=rid, unit=unit)
+            if cplane_controller == '':
+                cplane_controller = data['private-address']
+            else:
+                cplane_controller = (cplane_controller + ',' +
+                                     data['private-address'])
+            mport = data['mport']
+            if mport:
+                cmd = "sed -ie 's/cplane_controller_hosts.*/cplane_controller_\
+hosts = {}/g' /etc/neutron/plugins/ml2/ml2_conf.ini".format(cplane_controller)
+                os.system(cmd)
+                restart_service()
