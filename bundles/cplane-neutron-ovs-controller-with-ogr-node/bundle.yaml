@@ -72,10 +72,10 @@ relations:
   - cplane-compute:neutron-plugin
 - - ogr-compute-cplane:amqp
   - rabbitmq-server:amqp
-- - ogr-compute-cplane:identity-service
-  - keystone:identity-service
-- - ogr-compute-cplane:cplane-neutron
-  - neutron-api-cplane:cplane-neutron
+- - ogr-compute-cplane:neutron-plugin-api
+  - neutron-api:neutron-plugin-api
+- - nova-cloud-controller:cloud-controller
+  - ogr-compute-cplane:cloud-controller
 - - neutron-api-cplane:cplane-ovs
   - neutron-openvswitch-cplane:cplane-ovs
 
