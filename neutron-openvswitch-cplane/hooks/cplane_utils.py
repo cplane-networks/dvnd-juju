@@ -43,13 +43,13 @@ cplane_packages = OrderedDict([
     ('openvswitch-common', -1),
     ('openvswitch-datapath-dkms', -1),
     ('openvswitch-switch', -1),
-    ('cplane_notification_driver', -1),
+    ('cplane-notification-driver', -1),
     ('cp-agentd', -1),
 ])
 
 if config('cplane-version') == "1.3.5":
     cplane_packages['cplane-neutron-plugin'] = 439
-    del cplane_packages['cplane_notification_driver']
+    del cplane_packages['cplane-notification-driver']
 
 neutron_config = {
     'rabbit_userid': config('rabbit-user'),
