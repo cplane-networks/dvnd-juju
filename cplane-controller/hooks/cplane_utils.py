@@ -769,6 +769,7 @@ def notify_clients():
 
 
 def is_oracle_relation_joined():
+    oracle_host = ''
     for rid in relation_ids('oracle'):
         for unit in related_units(rid):
             oracle_host = relation_get(attribute='oracle-\
