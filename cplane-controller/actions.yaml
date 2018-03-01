@@ -1,0 +1,4 @@
+# actions.yaml
+drop-cplane-data:
+  description: Clean the database uses and cplane table space from oracle
+               Stop Jboss and startup program from Cplane controller
