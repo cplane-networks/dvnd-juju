@@ -548,7 +548,7 @@ def copy_oracle_package():
 
         cmd = ("su - oracle -c 'tar -xvf oracle-12c-grid.tar'")
         os.system(cmd)
-   
+
         cmd = ("su - oracle -c 'rm -f oracle-12c-grid.tar'")
         os.system(cmd)
 

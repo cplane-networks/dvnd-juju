@@ -450,6 +450,8 @@ def cplane_installer():
     cmd = ['sh', 'cpinstaller', CONTROLLER_CONFIG]
     subprocess.check_call(cmd)
     os.chdir(saved_path)
+    if DB_SERVICE is not 'XE':
+        set_data_source()
 
 
 def start_jboss_service():
