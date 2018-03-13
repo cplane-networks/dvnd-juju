@@ -192,8 +192,11 @@ def set_cp_agent():
                 cmd = ['cp-agentd', 'set-config', key]
                 subprocess.check_call(cmd)
                 key = 'log-level=' + str(config('cp-agent-log-level'))
-                cmd = ['cp-agentd', 'set-config', key]
-                subprocess.check_call(cmd)
+                with open('/etc/cplane/cp-config.json', 'r') as file:
+                    filedata = file.read()
+                if '"{}"'.format(config('cp-agent-log-level')) not in filedata:
+                    cmd = ['cp-agentd', 'set-config', key]
+                    subprocess.check_call(cmd)
                 key = 'vm-mtu=' + str(config('cp-vm-mtu'))
                 cmd = ['cp-agentd', 'set-config', key]
                 subprocess.check_call(cmd)
@@ -213,8 +216,11 @@ def set_cp_agent():
     cmd = ['cp-agentd', 'set-config', key]
     subprocess.check_call(cmd)
     key = 'log-level=' + str(config('cp-agent-log-level'))
-    cmd = ['cp-agentd', 'set-config', key]
-    subprocess.check_call(cmd)
+    with open('/etc/cplane/cp-config.json', 'r') as file:
+        filedata = file.read()
+    if '"{}"'.format(config('cp-agent-log-level')) not in filedata:
+        cmd = ['cp-agentd', 'set-config', key]
+        subprocess.check_call(cmd)
     key = 'vm-mtu=' + str(config('cp-vm-mtu'))
     cmd = ['cp-agentd', 'set-config', key]
     subprocess.check_call(cmd)

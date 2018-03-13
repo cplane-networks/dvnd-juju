@@ -14,6 +14,7 @@ TO_PATCH = [
     'config',
     'add_bridge',
     'check_interface',
+    'open'
 ]
 
 
