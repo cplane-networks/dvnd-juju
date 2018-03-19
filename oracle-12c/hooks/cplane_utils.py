@@ -979,7 +979,8 @@ def get_db_status():
 
 
 def execute_sql_command(connect_string, sql_command):
-    session = subprocess.Popen(['sqlplus', '-S', connect_string], stdin=PIPE,
+    session = subprocess.Popen("su - oracle  -c 'sqlplus -S {}'".format(
+                               connect_string), shell=True, stdin=PIPE,
                                stdout=PIPE, stderr=PIPE)
     session.stdin.write(sql_command)
     log('{}'.format(session.communicate()))
@@ -1005,5 +1006,7 @@ session_max_open_files={} scope=spfile;".format(
                         config('rac-db-ses-max-op-file')))
     execute_sql_command(connect_string, "alter system set \
 sessions={} scope=spfile;".format(config('rac-db-session')))
-    os.system('srvctl stop database -d {}'.format('db-service'))
-    os.system('srvctl start database -d {}'.format('db-service'))
+    os.system("su - oracle -c 'srvctl stop database -d {}'".format(
+              config('db-service')))
+    os.system("su - oracle -c 'srvctl start database -d {}'".format(
+              config('db-service')))
