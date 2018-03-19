@@ -54,7 +54,7 @@ cplane_packages = OrderedDict([
     ('jdk', '0'),
     ('oracle-client-basic', config('oracle-client-basic')),
     ('oracle-sqlplus', config('oracle-sqlplus')),
-    (config('controller-app-mode'), '0')
+    (config('controller-app-mode'), '-1')
 ])
 
 
@@ -82,7 +82,8 @@ DVND_CONFIG = OrderedDict([
     ('intall-reboot-scripts', 'JBOSS_INSTALL_REBOOT'),
     ('oracle-host', 'DB_HOSTNAME'),
     ('jboss-db-on-host', 'JBOSS_DB_ON_HOST'),
-    ('enable-fip', 'GatewayBridgeFipExt')
+    ('enable-fip', 'GatewayBridgeFipExt'),
+    ('production', 'PRODUCTION')
 ])
 
 MSM_CONFIG = OrderedDict([
@@ -350,17 +351,20 @@ def configure_database():
         + '@' + host + DB_SERVICE + ' as' + ' sysdba'
     if DB_SERVICE == 'XE':
         execute_sql_command(connect_string, "alter system set \
-processes={} scope=spfile;".format(config('db-process')))
+processes={} scope=spfile;".format(config('xe-db-process')))
         execute_sql_command(connect_string, "alter system set \
-session_cached_cursors={} scope=spfile;".format(config('db-ses-cach-cur')))
+session_cached_cursors={} scope=spfile;".format(config('xe-db-ses-cach-cur')))
         execute_sql_command(connect_string, "alter system set \
-session_max_open_files={} scope=spfile;".format(config('db-ses-max-op-file')))
+session_max_open_files={} scope=spfile;".format(
+                            config('xe-db-ses-max-op-file')))
         execute_sql_command(connect_string, "alter system set \
-sessions={} scope=spfile;".format(config('db-session')))
+sessions={} scope=spfile;".format(config('xe-db-session')))
         execute_sql_command(connect_string, "alter system set \
-license_max_sessions={} scope=spfile;".format(config('db-lic-max-ses')))
+license_max_sessions={} scope=spfile;".format(config('xe-db-lic-max-ses')))
         execute_sql_command(connect_string, "alter system set \
-license_sessions_warning={} scope=spfile;".format(config('db-lic-ses-war')))
+license_sessions_warning={} scope=spfile;".format(config('xe-db-lic-ses-war')))
+        execute_sql_command(connect_string, "SHUTDOWN IMMEDIATE")
+        execute_sql_command(connect_string, "STARTUP")
 
 
 def prepare_database():

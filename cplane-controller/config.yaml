@@ -129,27 +129,31 @@ options:
     default: "liberty"
     type: string
     description: "Openstack version eg. liberty, mitaka, ocata"
-  db-process:
+  xe-db-process:
     default: 500
     type: int
-    description: "Max processes for oracle DB"
-  db-ses-cach-cur:
+    description: "Max processes for oracle XE DB"
+  xe-db-ses-cach-cur:
     default: 200
     type: int
-    description: "Max session_cached_cursors for oracle DB"
-  db-ses-max-op-file:
+    description: "Max session_cached_cursors for oracle XE DB"
+  xe-db-ses-max-op-file:
     default: 500
     type: int
-    description: "Max session_max_open_files for oracle DB"
-  db-session:
+    description: "Max session_max_open_files for oracle XE DB"
+  xe-db-session:
     default: 500
     type: int
-    description: "Max sessions for oracle DB"
-  db-lic-max-ses:
+    description: "Max sessions for oracle XE DB"
+  xe-db-lic-max-ses:
     default: 500
     type: int
-    description: "Max license_max_sessions for oracle DB"
-  db-lic-ses-war:
+    description: "Max license_max_sessions for oracle XE DB"
+  xe-db-lic-ses-war:
     default: 500
     type: int
-    description: "Warning limit for license_sessions_warning for oracle DB"
+    description: "Warning limit for license_sessions_warning for oracle XE DB"
+  production:
+    default: "y"
+    type: string
+    description: "Flag to indicate the production deployment"
