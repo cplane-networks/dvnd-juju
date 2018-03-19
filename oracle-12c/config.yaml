@@ -69,3 +69,19 @@ options:
     default: "14.04"
     type: string
     description: "Ubuntu release, so that the Oracle rac can point to the proper section for binaries"
+  rac-db-process:
+    default: 1000
+    type: int
+    description: "Max processes for oracle RAC DB"
+  rac-db-ses-cach-cur:
+    default: 500
+    type: int
+    description: "Max session_cached_cursors for oracle RAC DB"
+  rac-db-ses-max-op-file:
+    default: 500
+    type: int
+    description: "Max session_max_open_files for oracle RAC DB"
+  rac-db-session:
+    default: 1248
+    type: int
+    description: "Max sessions for oracle RAC DB"

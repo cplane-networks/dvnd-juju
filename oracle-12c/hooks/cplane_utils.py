@@ -11,6 +11,7 @@ from netaddr import IPNetwork
 import netifaces
 import ipaddr
 
+from subprocess import PIPE
 from collections import OrderedDict
 from charmhelpers.core.hookenv import (
     config,
@@ -975,3 +976,34 @@ def get_db_status():
         return True
     else:
         return False
+
+
+def execute_sql_command(connect_string, sql_command):
+    session = subprocess.Popen(['sqlplus', '-S', connect_string], stdin=PIPE,
+                               stdout=PIPE, stderr=PIPE)
+    session.stdin.write(sql_command)
+    log('{}'.format(session.communicate()))
+
+
+def configure_database():
+    log('Configuring the Database')
+    host = None
+
+    if config('slave-units-number'):
+        host = config('scan-name') + '-scan/'
+    else:
+        host = socket.gethostname()
+
+    connect_string = 'sys/' + config('db-password') + '@' \
+        + host + config('db-service') + ' as' + ' sysdba'
+    execute_sql_command(connect_string, "alter system set \
+processes={} scope=spfile;".format(config('rac-db-process')))
+    execute_sql_command(connect_string, "alter system set \
+session_cached_cursors={} scope=spfile;".format(config('rac-db-ses-cach-cur')))
+    execute_sql_command(connect_string, "alter system set \
+session_max_open_files={} scope=spfile;".format(
+                        config('rac-db-ses-max-op-file')))
+    execute_sql_command(connect_string, "alter system set \
+sessions={} scope=spfile;".format(config('rac-db-session')))
+    os.system('srvctl stop database -d {}'.format('db-service'))
+    os.system('srvctl start database -d {}'.format('db-service'))

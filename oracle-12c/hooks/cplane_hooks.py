@@ -61,6 +61,7 @@ from cplane_utils import (
     download_cplane_packages,
     copy_oracle_package,
     get_db_status,
+    configure_database,
 )
 
 hooks = Hooks()
@@ -84,6 +85,7 @@ def start():
             install_db_root_scripts()
             set_oracle_env()
             create_db()
+            configure_database()
             juju_log('Database is created and the listerner is started')
             status_set('active', 'Unit is ready')
 
@@ -203,6 +205,7 @@ def master_state_relation_changed():
                 send_notification("master-state", "final")
                 set_oracle_env()
                 create_db()
+                configure_database()
                 for rid in relation_ids('oracle'):
                     oracle_relation_changed(relation_id=rid)
                 juju_log("Oracle Rac 12C installation is succeeded on master")
