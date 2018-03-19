@@ -201,13 +201,13 @@ def add_controller_ip():
     cplane_controller = ''
     for rid in relation_ids('cplane-controller'):
         for unit in related_units(rid):
+            mport = relation_get(attribute='mport', unit=unit, rid=rid)
             data = relation_get(rid=rid, unit=unit)
             if cplane_controller == '':
                 cplane_controller = data['private-address']
             else:
                 cplane_controller = (cplane_controller + ',' +
                                      data['private-address'])
-            mport = data['mport']
             if mport:
                 cmd = "sed -ie 's/cplane_controller_hosts.*/cplane_controller_\
 hosts = {}/g' /etc/neutron/plugins/ml2/ml2_conf.ini".format(cplane_controller)
