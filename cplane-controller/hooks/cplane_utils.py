@@ -571,7 +571,7 @@ def check_jboss_service():
         return True
 
     if ret_val is False:
-        time.sleep(120)
+        time.sleep(150)
         status = commands.getoutput('bash checkJBossServer.sh')
         os.chdir(saved_path)
         if status == "JBoss server is not running!":
@@ -592,6 +592,8 @@ def run_cp_installer():
     cmd = ['sh', 'cpinstaller', CONTROLLER_CONFIG]
     subprocess.check_call(cmd)
     os.chdir(saved_path)
+    if DB_SERVICE is not 'XE':
+        set_data_source()
 
 
 def install_reboot_scripts():
