@@ -17,7 +17,17 @@ provides:
     interface: cplane-controller
     scope: global
 requires:
+  ha:
+    interface: hacluster
+    scope: container
   oracle:
    interface: oracle
    scope: global
+peers:
+  cluster:
+    interface: cplane-msm-ha
+    
+
+
+
 

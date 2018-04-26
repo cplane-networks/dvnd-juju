@@ -22,10 +22,12 @@ from __future__ import print_function
 import copy
 from distutils.version import LooseVersion
 from functools import wraps
+from collections import namedtuple
 import glob
 import os
 import json
 import yaml
+import re
 import subprocess
 import sys
 import errno
@@ -38,11 +40,13 @@ if not six.PY3:
 else:
     from collections import UserDict
 
+
 CRITICAL = "CRITICAL"
 ERROR = "ERROR"
 WARNING = "WARNING"
 INFO = "INFO"
 DEBUG = "DEBUG"
+TRACE = "TRACE"
 MARKER = object()
 
 cache = {}
@@ -64,7 +68,7 @@ def cached(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         global cache
-        key = str((func, args, kwargs))
+        key = json.dumps((func, args, kwargs), sort_keys=True, default=str)
         try:
             return cache[key]
         except KeyError:
@@ -202,6 +206,29 @@ def service_name():
     return local_unit().split('/')[0]
 
 
+def principal_unit():
+    """Returns the principal unit of this unit, otherwise None"""
+    # Juju 2.2 and above provides JUJU_PRINCIPAL_UNIT
+    principal_unit = os.environ.get('JUJU_PRINCIPAL_UNIT', None)
+    # If it's empty, then this unit is the principal
+    if principal_unit == '':
+        return os.environ['JUJU_UNIT_NAME']
+    elif principal_unit is not None:
+        return principal_unit
+    # For Juju 2.1 and below, let's try work out the principle unit by
+    # the various charms' metadata.yaml.
+    for reltype in relation_types():
+        for rid in relation_ids(reltype):
+            for unit in related_units(rid):
+                md = _metadata_unit(unit)
+                if not md:
+                    continue
+                subordinate = md.pop('subordinate', None)
+                if not subordinate:
+                    return unit
+    return None
+
+
 @cached
 def remote_service_name(relid=None):
     """The remote service name for a given relation-id (or the current relation)"""
@@ -319,6 +346,7 @@ class Config(dict):
 
         """
         with open(self.path, 'w') as f:
+            os.fchmod(f.fileno(), 0o600)
             json.dump(self, f)
 
     def _implicit_save(self):
@@ -326,19 +354,30 @@ class Config(dict):
             self.save()
 
 
-@cached
+_cache_config = None
+
+
 def config(scope=None):
-    """Juju charm configuration"""
-    config_cmd_line = ['config-get']
-    if scope is not None:
-        config_cmd_line.append(scope)
-    config_cmd_line.append('--format=json')
+    """
+    Get the juju charm configuration (scope==None) or individual key,
+    (scope=str).  The returned value is a Python data structure loaded as
+    JSON from the Juju config command.
+
+    :param scope: If set, return the value for the specified key.
+    :type scope: Optional[str]
+    :returns: Either the whole config as a Config, or a key from it.
+    :rtype: Any
+    """
+    global _cache_config
+    config_cmd_line = ['config-get', '--all', '--format=json']
     try:
-        config_data = json.loads(
-            subprocess.check_output(config_cmd_line).decode('UTF-8'))
+        if _cache_config is None:
+            config_data = json.loads(
+                subprocess.check_output(config_cmd_line).decode('UTF-8'))
+            _cache_config = Config(config_data)
         if scope is not None:
-            return config_data
-        return Config(config_data)
+            return _cache_config.get(scope)
+        return _cache_config
     except ValueError:
         return None
 
@@ -476,6 +515,24 @@ def metadata():
         return yaml.safe_load(md)
 
 
+def _metadata_unit(unit):
+    """Given the name of a unit (e.g. apache2/0), get the unit charm's
+    metadata.yaml. Very similar to metadata() but allows us to inspect
+    other units. Unit needs to be co-located, such as a subordinate or
+    principal/primary.
+
+    :returns: metadata.yaml as a python object.
+
+    """
+    basedir = os.sep.join(charm_dir().split(os.sep)[:-2])
+    unitdir = 'unit-{}'.format(unit.replace(os.sep, '-'))
+    joineddir = os.path.join(basedir, unitdir, 'charm', 'metadata.yaml')
+    if not os.path.exists(joineddir):
+        return None
+    with open(joineddir) as md:
+        return yaml.safe_load(md)
+
+
 @cached
 def relation_types():
     """Get a list of relation types supported by this charm"""
@@ -600,18 +657,56 @@ def is_relation_made(relation, keys='private-address'):
     return False
 
 
+def _port_op(op_name, port, protocol="TCP"):
+    """Open or close a service network port"""
+    _args = [op_name]
+    icmp = protocol.upper() == "ICMP"
+    if icmp:
+        _args.append(protocol)
+    else:
+        _args.append('{}/{}'.format(port, protocol))
+    try:
+        subprocess.check_call(_args)
+    except subprocess.CalledProcessError:
+        # Older Juju pre 2.3 doesn't support ICMP
+        # so treat it as a no-op if it fails.
+        if not icmp:
+            raise
+
+
 def open_port(port, protocol="TCP"):
     """Open a service network port"""
-    _args = ['open-port']
-    _args.append('{}/{}'.format(port, protocol))
-    subprocess.check_call(_args)
+    _port_op('open-port', port, protocol)
 
 
 def close_port(port, protocol="TCP"):
     """Close a service network port"""
-    _args = ['close-port']
-    _args.append('{}/{}'.format(port, protocol))
+    _port_op('close-port', port, protocol)
+
+
+def open_ports(start, end, protocol="TCP"):
+    """Opens a range of service network ports"""
+    _args = ['open-port']
+    _args.append('{}-{}/{}'.format(start, end, protocol))
     subprocess.check_call(_args)
+
+
+def close_ports(start, end, protocol="TCP"):
+    """Close a range of service network ports"""
+    _args = ['close-port']
+    _args.append('{}-{}/{}'.format(start, end, protocol))
+    subprocess.check_call(_args)
+
+
+def opened_ports():
+    """Get the opened ports
+
+    *Note that this will only show ports opened in a previous hook*
+
+    :returns: Opened ports as a list of strings: ``['8080/tcp', '8081-8083/tcp']``
+    """
+    _args = ['opened-ports', '--format=json']
+    return json.loads(subprocess.check_output(_args).decode('UTF-8'))
 
 
 @cached
@@ -735,8 +830,15 @@ class Hooks(object):
         return wrapper
 
 
+class NoNetworkBinding(Exception):
+    pass
+
+
 def charm_dir():
     """Return the root directory of the current charm"""
+    d = os.environ.get('JUJU_CHARM_DIR')
+    if d is not None:
+        return d
     return os.environ.get('CHARM_DIR')
 
 
@@ -951,7 +1053,6 @@ def juju_version():
                                    universal_newlines=True).strip()
 
 
-@cached
 def has_juju_version(minimum_version):
     """Return True if the Juju version is at least the provided version"""
     return LooseVersion(juju_version()) >= LooseVersion(minimum_version)
@@ -1011,6 +1112,8 @@ def _run_atexit():
 @translate_exc(from_exc=OSError, to_exc=NotImplementedError)
 def network_get_primary_address(binding):
     '''
+    Deprecated since Juju 2.3; use network_get()
+
     Retrieve the primary network address for a named binding
 
     :param binding: string. The name of a relation of extra-binding
@@ -1018,4 +1121,159 @@ def network_get_primary_address(binding):
     :raise: NotImplementedError if run on Juju < 2.0
     '''
     cmd = ['network-get', '--primary-address', binding]
-    return subprocess.check_output(cmd).decode('UTF-8').strip()
+    try:
+        response = subprocess.check_output(
+            cmd,
+            stderr=subprocess.STDOUT).decode('UTF-8').strip()
+    except CalledProcessError as e:
+        if 'no network config found for binding' in e.output.decode('UTF-8'):
+            raise NoNetworkBinding("No network binding for {}"
+                                   .format(binding))
+        else:
+            raise
+    return response
+
+
+def network_get(endpoint, relation_id=None):
+    """
+    Retrieve the network details for a relation endpoint
+
+    :param endpoint: string. The name of a relation endpoint
+    :param relation_id: int. The ID of the relation for the current context.
+    :return: dict. The loaded YAML output of the network-get query.
+    :raise: NotImplementedError if request not supported by the Juju version.
+    """
+    if not has_juju_version('2.2'):
+        raise NotImplementedError(juju_version())  # earlier versions require --primary-address
+    if relation_id and not has_juju_version('2.3'):
+        raise NotImplementedError  # 2.3 added the -r option
+
+    cmd = ['network-get', endpoint, '--format', 'yaml']
+    if relation_id:
+        cmd.append('-r')
+        cmd.append(relation_id)
+    response = subprocess.check_output(
+        cmd,
+        stderr=subprocess.STDOUT).decode('UTF-8').strip()
+    return yaml.safe_load(response)
+
+
+def add_metric(*args, **kwargs):
+    """Add metric values. Values may be expressed with keyword arguments. For
+    metric names containing dashes, these may be expressed as one or more
+    'key=value' positional arguments. May only be called from the collect-metrics
+    hook."""
+    _args = ['add-metric']
+    _kvpairs = []
+    _kvpairs.extend(args)
+    _kvpairs.extend(['{}={}'.format(k, v) for k, v in kwargs.items()])
+    _args.extend(sorted(_kvpairs))
+    try:
+        subprocess.check_call(_args)
+        return
+    except EnvironmentError as e:
+        if e.errno != errno.ENOENT:
+            raise
+    log_message = 'add-metric failed: {}'.format(' '.join(_kvpairs))
+    log(log_message, level='INFO')
+
+
+def meter_status():
+    """Get the meter status, if running in the meter-status-changed hook."""
+    return os.environ.get('JUJU_METER_STATUS')
+
+
+def meter_info():
+    """Get the meter status information, if running in the meter-status-changed
+    hook."""
+    return os.environ.get('JUJU_METER_INFO')
+
+
+def iter_units_for_relation_name(relation_name):
+    """Iterate through all units in a relation
+
+    Generator that iterates through all the units in a relation and yields
+    a named tuple with rid and unit field names.
+
+    Usage:
+    data = [(u.rid, u.unit)
+            for u in iter_units_for_relation_name(relation_name)]
+
+    :param relation_name: string relation name
+    :yield: Named Tuple with rid and unit field names
+    """
+    RelatedUnit = namedtuple('RelatedUnit', 'rid, unit')
+    for rid in relation_ids(relation_name):
+        for unit in related_units(rid):
+            yield RelatedUnit(rid, unit)
+
+
+def ingress_address(rid=None, unit=None):
+    """
+    Retrieve the ingress-address from a relation when available.
+    Otherwise, return the private-address.
+
+    When used on the consuming side of the relation (unit is a remote
+    unit), the ingress-address is the IP address that this unit needs
+    to use to reach the provided service on the remote unit.
+
+    When used on the providing side of the relation (unit == local_unit()),
+    the ingress-address is the IP address that is advertised to remote
+    units on this relation. Remote units need to use this address to
+    reach the local provided service on this unit.
+
+    Note that charms may document some other method to use in
+    preference to the ingress_address(), such as an address provided
+    on a different relation attribute or a service discovery mechanism.
+    This allows charms to redirect inbound connections to their peers
+    or different applications such as load balancers.
+
+    Usage:
+    addresses = [ingress_address(rid=u.rid, unit=u.unit)
+                 for u in iter_units_for_relation_name(relation_name)]
+
+    :param rid: string relation id
+    :param unit: string unit name
+    :side effect: calls relation_get
+    :return: string IP address
+    """
+    settings = relation_get(rid=rid, unit=unit)
+    return (settings.get('ingress-address') or
+            settings.get('private-address'))
+
+
+def egress_subnets(rid=None, unit=None):
+    """
+    Retrieve the egress-subnets from a relation.
+
+    This function is to be used on the providing side of the
+    relation, and provides the ranges of addresses that client
+    connections may come from. The result is uninteresting on
+    the consuming side of a relation (unit == local_unit()).
+
+    Returns a stable list of subnets in CIDR format.
+    eg. ['192.168.1.0/24', '2001::F00F/128']
+
+    If egress-subnets is not available, falls back to using the published
+    ingress-address, or finally private-address.
+
+    :param rid: string relation id
+    :param unit: string unit name
+    :side effect: calls relation_get
+    :return: list of subnets in CIDR format. eg. ['192.168.1.0/24', '2001::F00F/128']
+    """
+    def _to_range(addr):
+        if re.search(r'^(?:\d{1,3}\.){3}\d{1,3}$', addr) is not None:
+            addr += '/32'
+        elif ':' in addr and '/' not in addr:  # IPv6
+            addr += '/128'
+        return addr
+
+    settings = relation_get(rid=rid, unit=unit)
+    if 'egress-subnets' in settings:
+        return [n.strip() for n in settings['egress-subnets'].split(',') if n.strip()]
+    if 'ingress-address' in settings:
+        return [_to_range(settings['ingress-address'])]
+    if 'private-address' in settings:
+        return [_to_range(settings['private-address'])]
+    return []  # Should never happen

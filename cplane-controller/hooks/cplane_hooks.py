@@ -7,16 +7,34 @@ from charmhelpers.core.hookenv import (
     log,
     relation_set,
     relation_ids,
+    relation_get,
     is_leader,
     leader_set,
+    WARNING,
 )
 import sys
 import commands
 import os
+import json
 
 from charmhelpers.fetch import (
     apt_install,
     apt_update,
+)
+
+from charmhelpers.contrib.hahelpers.cluster import (
+    get_hacluster_config,
+)
+
+from charmhelpers.contrib.openstack.ha.utils import (
+    update_dns_ha_resource_params,
+)
+
+from charmhelpers.contrib.network.ip import (
+    get_iface_for_address,
+    get_netmask_for_address,
+    is_ipv6,
+    get_relation_ip,
 )
 
 from cplane_utils import (
@@ -50,14 +68,17 @@ from cplane_utils import (
     is_oracle_relation_joined,
     set_data_source,
     configure_database,
+    register_configs,
+    HAPROXY_CONF,
 )
 
 from cplane_network import (
     change_iface_config,
 )
 
-
 hooks = Hooks()
+if config('controller-app-mode') == 'msm':
+    configs = register_configs()
 
 
 @hooks.hook('cplane-controller-relation-joined')
@@ -144,6 +165,9 @@ def oracle_relation_changed():
 
 @hooks.hook('config-changed')
 def config_changed():
+    if config('controller-app-mode') == 'msm':
+        configs.write_all()
+
     upgrade_type = get_upgrade_type()
     if upgrade_type == 'clean-db' or upgrade_type == 'reuse-db':
         flush_upgrade_type()
@@ -247,6 +271,116 @@ def leader_settings_changed():
             pass
         else:
             start_services('create-db')
+
+
+@hooks.hook('ha-relation-joined')
+def ha_joined(relation_id=None):
+    if config('controller-app-mode') == 'msm':
+        cluster_config = get_hacluster_config()
+        resources = {
+            'res_msm_haproxy': 'lsb:haproxy',
+        }
+        resource_params = {
+            'res_msm_haproxy': 'op monitor interval="5s"'
+        }
+        if config('dns-ha'):
+            update_dns_ha_resource_params(relation_id=relation_id,
+                                          resources=resources,
+                                          resource_params=resource_params)
+        else:
+            vip_group = []
+            for vip in cluster_config['vip'].split():
+                if is_ipv6(vip):
+                    res_msm_vip = 'ocf:heartbeat:IPv6addr'
+                    vip_params = 'ipv6addr'
+                else:
+                    res_msm_vip = 'ocf:heartbeat:IPaddr2'
+                    vip_params = 'ip'
+
+                iface = (get_iface_for_address(vip) or
+                         config('vip_iface'))
+                netmask = (get_netmask_for_address(vip) or
+                           config('vip_cidr'))
+
+                if iface is not None:
+                    vip_key = 'res_msm_{}_vip'.format(iface)
+                    if vip_key in vip_group:
+                        if vip not in resource_params[vip_key]:
+                            vip_key = '{}_{}'.format(vip_key, vip_params)
+                        else:
+                            log("Resource '%s' (vip='%s') already exists in "
+                                "vip group - skipping" % (vip_key,
+                                                          vip), WARNING)
+                            continue
+
+                    resources[vip_key] = res_msm_vip
+                    resource_params[vip_key] = (
+                        'params {ip}="{vip}" cidr_netmask="{netmask}" '
+                        'nic="{iface}"'.format(ip=vip_params,
+                                               vip=vip,
+                                               iface=iface,
+                                               netmask=netmask)
+                    )
+                    vip_group.append(vip_key)
+
+            if len(vip_group) >= 1:
+                relation_set(
+                    relation_id=relation_id,
+                    json_groups=json.dumps({
+                        'grp_msm_vips': ' '.join(vip_group)
+                    }, sort_keys=True)
+                )
+
+        init_services = {
+            'res_msm_haproxy': 'haproxy'
+        }
+        clones = {
+            'cl_msm_haproxy': 'res_msm_haproxy'
+        }
+        relation_set(relation_id=relation_id,
+                     corosync_bindiface=cluster_config['ha-bindiface'],
+                     corosync_mcastport=cluster_config['ha-mcastport'],
+                     json_init_services=json.dumps(init_services,
+                                                   sort_keys=True),
+                     json_resources=json.dumps(resources,
+                                               sort_keys=True),
+                     json_resource_params=json.dumps(resource_params,
+                                                     sort_keys=True),
+                     json_clones=json.dumps(clones,
+                                            sort_keys=True))
+
+        # NOTE(jamespage): Clear any non-json based keys
+        relation_set(relation_id=relation_id,
+                     groups=None, init_services=None,
+                     resources=None, resource_params=None,
+                     clones=None)
+
+
+@hooks.hook('ha-relation-changed')
+def ha_changed():
+    if config('controller-app-mode') == 'msm':
+        clustered = relation_get('clustered')
+        if not clustered or clustered in [None, 'None', '']:
+            log('ha_changed: hacluster subordinate'
+                ' not fully clustered: %s' % clustered)
+            return
+        log('Cluster configured, notifying other services and updating '
+            'all relations')
+
+
+@hooks.hook('cluster-relation-joined')
+def cluster_joined(relation_id=None):
+    if config('controller-app-mode') == 'msm':
+        private_addr = get_relation_ip('cluster')
+        relation_set(relation_id=relation_id,
+                     relation_settings={'private-address': private_addr})
+
+
+@hooks.hook('cluster-relation-departed',
+            'cluster-relation-changed')
+def cluster_relation():
+    if config('controller-app-mode') == 'msm':
+        configs.write(HAPROXY_CONF)
 
 
 def main():

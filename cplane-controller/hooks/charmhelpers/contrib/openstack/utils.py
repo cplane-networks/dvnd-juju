@@ -23,19 +23,17 @@ import sys
 import re
 import itertools
 import functools
-import shutil
 
 import six
-import tempfile
 import traceback
 import uuid
 import yaml
 
+from charmhelpers import deprecate
+
 from charmhelpers.contrib.network import ip
 
-from charmhelpers.core import (
-    unitdata,
-)
+from charmhelpers.core import unitdata
 
 from charmhelpers.core.hookenv import (
     action_fail,
@@ -43,16 +41,18 @@ from charmhelpers.core.hookenv import (
     config,
     log as juju_log,
     charm_dir,
-    DEBUG,
     INFO,
     ERROR,
     related_units,
     relation_ids,
     relation_set,
-    service_name,
     status_set,
-    hook_name
+    hook_name,
+    application_version_set,
+    cached,
 )
+
+from charmhelpers.core.strutils import BasicStringComparator
 
 from charmhelpers.contrib.storage.linux.lvm import (
     deactivate_lvm_volume_group,
@@ -66,11 +66,6 @@ from charmhelpers.contrib.network.ip import (
     port_has_listener,
 )
 
-from charmhelpers.contrib.python.packages import (
-    pip_create_virtualenv,
-    pip_install,
-)
-
 from charmhelpers.core.host import (
     lsb_release,
     mounts,
@@ -80,7 +75,21 @@ from charmhelpers.core.host import (
     service_resume,
     restart_on_change_helper,
 )
-from charmhelpers.fetch import apt_install, apt_cache, install_remote
+from charmhelpers.fetch import (
+    apt_cache,
+    import_key as fetch_import_key,
+    add_source as fetch_add_source,
+    SourceConfigError,
+    GPGKeyError,
+    get_upstream_version
+)
+
+from charmhelpers.fetch.snap import (
+    snap_install,
+    snap_refresh,
+    valid_snap_channel,
+)
+
 from charmhelpers.contrib.storage.linux.utils import is_block_device, zap_disk
 from charmhelpers.contrib.storage.linux.loopback import ensure_loopback_device
 from charmhelpers.contrib.openstack.exceptions import OSContextError
@@ -90,6 +99,24 @@ CLOUD_ARCHIVE_KEY_ID = '5EDB1B62EC4926EA'
 
 DISTRO_PROPOSED = ('deb http://archive.ubuntu.com/ubuntu/ %s-proposed '
                    'restricted main multiverse universe')
+
+OPENSTACK_RELEASES = (
+    'diablo',
+    'essex',
+    'folsom',
+    'grizzly',
+    'havana',
+    'icehouse',
+    'juno',
+    'kilo',
+    'liberty',
+    'mitaka',
+    'newton',
+    'ocata',
+    'pike',
+    'queens',
+    'rocky',
+)
 
 UBUNTU_OPENSTACK_RELEASE = OrderedDict([
     ('oneiric', 'diablo'),
@@ -103,7 +130,9 @@ UBUNTU_OPENSTACK_RELEASE = OrderedDict([
     ('wily', 'liberty'),
     ('xenial', 'mitaka'),
     ('yakkety', 'newton'),
-    ('zebra', 'ocata'),  # TODO: upload with real Z name
+    ('zesty', 'ocata'),
+    ('artful', 'pike'),
+    ('bionic', 'queens'),
 ])
 
 
@@ -120,6 +149,8 @@ OPENSTACK_CODENAMES = OrderedDict([
     ('2016.1', 'mitaka'),
     ('2016.2', 'newton'),
     ('2017.1', 'ocata'),
+    ('2017.2', 'pike'),
+    ('2018.1', 'queens'),
 ])
 
 # The ugly duckling - must list releases oldest to newest
@@ -145,7 +176,13 @@ SWIFT_CODENAMES = OrderedDict([
     ('mitaka',
         ['2.5.0', '2.6.0', '2.7.0']),
     ('newton',
-        ['2.8.0', '2.9.0']),
+        ['2.8.0', '2.9.0', '2.10.0']),
+    ('ocata',
+        ['2.11.0', '2.12.0', '2.13.0']),
+    ('pike',
+        ['2.13.0', '2.15.0']),
+    ('queens',
+        ['2.16.0', '2.17.0']),
 ])
 
 # >= Liberty version->codename mapping
@@ -155,78 +192,96 @@ PACKAGE_CODENAMES = {
         ('13', 'mitaka'),
         ('14', 'newton'),
         ('15', 'ocata'),
+        ('16', 'pike'),
+        ('17', 'queens'),
+        ('18', 'rocky'),
     ]),
     'neutron-common': OrderedDict([
         ('7', 'liberty'),
         ('8', 'mitaka'),
         ('9', 'newton'),
         ('10', 'ocata'),
+        ('11', 'pike'),
+        ('12', 'queens'),
+        ('13', 'rocky'),
     ]),
     'cinder-common': OrderedDict([
         ('7', 'liberty'),
         ('8', 'mitaka'),
         ('9', 'newton'),
         ('10', 'ocata'),
+        ('11', 'pike'),
+        ('12', 'queens'),
+        ('13', 'rocky'),
     ]),
     'keystone': OrderedDict([
         ('8', 'liberty'),
         ('9', 'mitaka'),
         ('10', 'newton'),
         ('11', 'ocata'),
+        ('12', 'pike'),
+        ('13', 'queens'),
+        ('14', 'rocky'),
     ]),
     'horizon-common': OrderedDict([
         ('8', 'liberty'),
         ('9', 'mitaka'),
         ('10', 'newton'),
         ('11', 'ocata'),
+        ('12', 'pike'),
+        ('13', 'queens'),
+        ('14', 'rocky'),
     ]),
     'ceilometer-common': OrderedDict([
         ('5', 'liberty'),
         ('6', 'mitaka'),
         ('7', 'newton'),
         ('8', 'ocata'),
+        ('9', 'pike'),
+        ('10', 'queens'),
+        ('11', 'rocky'),
     ]),
     'heat-common': OrderedDict([
         ('5', 'liberty'),
         ('6', 'mitaka'),
         ('7', 'newton'),
         ('8', 'ocata'),
+        ('9', 'pike'),
+        ('10', 'queens'),
+        ('11', 'rocky'),
     ]),
     'glance-common': OrderedDict([
         ('11', 'liberty'),
         ('12', 'mitaka'),
         ('13', 'newton'),
         ('14', 'ocata'),
+        ('15', 'pike'),
+        ('16', 'queens'),
+        ('17', 'rocky'),
     ]),
     'openstack-dashboard': OrderedDict([
         ('8', 'liberty'),
         ('9', 'mitaka'),
         ('10', 'newton'),
         ('11', 'ocata'),
+        ('12', 'pike'),
+        ('13', 'queens'),
+        ('14', 'rocky'),
     ]),
 }
 
-GIT_DEFAULT_REPOS = {
-    'requirements': 'git://github.com/openstack/requirements',
-    'cinder': 'git://github.com/openstack/cinder',
-    'glance': 'git://github.com/openstack/glance',
-    'horizon': 'git://github.com/openstack/horizon',
-    'keystone': 'git://github.com/openstack/keystone',
-    'networking-hyperv': 'git://github.com/openstack/networking-hyperv',
-    'neutron': 'git://github.com/openstack/neutron',
-    'neutron-fwaas': 'git://github.com/openstack/neutron-fwaas',
-    'neutron-lbaas': 'git://github.com/openstack/neutron-lbaas',
-    'neutron-vpnaas': 'git://github.com/openstack/neutron-vpnaas',
-    'nova': 'git://github.com/openstack/nova',
-}
-
-GIT_DEFAULT_BRANCHES = {
-    'liberty': 'stable/liberty',
-    'mitaka': 'stable/mitaka',
-    'master': 'master',
-}
-
 DEFAULT_LOOPBACK_SIZE = '5G'
+
+
+class CompareOpenStackReleases(BasicStringComparator):
+    """Provide comparisons of OpenStack releases.
+
+    Use in the form of
+
+    if CompareOpenStackReleases(release) > 'mitaka':
+        # do something with mitaka
+    """
+    _list = OPENSTACK_RELEASES
 
 
 def error_out(msg):
@@ -255,8 +310,10 @@ def get_os_codename_install_source(src):
         return ca_rel
 
     # Best guess match based on deb string provided
-    if src.startswith('deb') or src.startswith('ppa'):
-        for k, v in six.iteritems(OPENSTACK_CODENAMES):
+    if (src.startswith('deb') or
+            src.startswith('ppa') or
+            src.startswith('snap')):
+        for v in OPENSTACK_CODENAMES.values():
             if v in src:
                 return v
 
@@ -306,6 +363,8 @@ def get_swift_codename(version):
             releases = UBUNTU_OPENSTACK_RELEASE
             release = [k for k, v in six.iteritems(releases) if codename in v]
             ret = subprocess.check_output(['apt-cache', 'policy', 'swift'])
+            if six.PY3:
+                ret = ret.decode('UTF-8')
             if codename in ret or release[0] in ret:
                 return codename
     elif len(codenames) == 1:
@@ -325,13 +384,28 @@ def get_swift_codename(version):
 
 def get_os_codename_package(package, fatal=True):
     '''Derive OpenStack release codename from an installed package.'''
+
+    if snap_install_requested():
+        cmd = ['snap', 'list', package]
+        try:
+            out = subprocess.check_output(cmd)
+            if six.PY3:
+                out = out.decode('UTF-8')
+        except subprocess.CalledProcessError as e:
+            return None
+        lines = out.split('\n')
+        for line in lines:
+            if package in line:
+                # Second item in list is Version
+                return line.split()[1]
+
     import apt_pkg as apt
 
     cache = apt_cache()
 
     try:
         pkg = cache[package]
-    except:
+    except Exception:
         if not fatal:
             return None
         # the package is unknown to the current apt cache.
@@ -400,149 +474,100 @@ def get_os_version_package(pkg, fatal=True):
     # error_out(e)
 
 
-os_rel = None
+# Module local cache variable for the os_release.
+_os_rel = None
 
 
-def os_release(package, base='essex'):
+def reset_os_release():
+    '''Unset the cached os_release version'''
+    global _os_rel
+    _os_rel = None
+
+
+def os_release(package, base='essex', reset_cache=False):
     '''
     Returns OpenStack release codename from a cached global.
+
+    If reset_cache then unset the cached os_release version and return the
+    freshly determined version.
+
     If the codename can not be determined from either an installed package or
     the installation source, the earliest release supported by the charm should
     be returned.
     '''
-    global os_rel
-    if os_rel:
-        return os_rel
-    os_rel = (git_os_codename_install_source(config('openstack-origin-git')) or
-              get_os_codename_package(package, fatal=False) or
-              get_os_codename_install_source(config('openstack-origin')) or
-              base)
-    return os_rel
+    global _os_rel
+    if reset_cache:
+        reset_os_release()
+    if _os_rel:
+        return _os_rel
+    _os_rel = (
+        get_os_codename_package(package, fatal=False) or
+        get_os_codename_install_source(config('openstack-origin')) or
+        base)
+    return _os_rel
 
 
+@deprecate("moved to charmhelpers.fetch.import_key()", "2017-07", log=juju_log)
 def import_key(keyid):
-    key = keyid.strip()
-    if (key.startswith('-----BEGIN PGP PUBLIC KEY BLOCK-----') and
-            key.endswith('-----END PGP PUBLIC KEY BLOCK-----')):
-        juju_log("PGP key found (looks like ASCII Armor format)", level=DEBUG)
-        juju_log("Importing ASCII Armor PGP key", level=DEBUG)
-        with tempfile.NamedTemporaryFile() as keyfile:
-            with open(keyfile.name, 'w') as fd:
-                fd.write(key)
-                fd.write("\n")
+    """Import a key, either ASCII armored, or a GPG key id.
 
-            cmd = ['apt-key', 'add', keyfile.name]
-            try:
-                subprocess.check_call(cmd)
-            except subprocess.CalledProcessError:
-                error_out("Error importing PGP key '%s'" % key)
-    else:
-        juju_log("PGP key found (looks like Radix64 format)", level=DEBUG)
-        juju_log("Importing PGP key from keyserver", level=DEBUG)
-        cmd = ['apt-key', 'adv', '--keyserver',
-               'hkp://keyserver.ubuntu.com:80', '--recv-keys', key]
-        try:
-            subprocess.check_call(cmd)
-        except subprocess.CalledProcessError:
-            error_out("Error importing PGP key '%s'" % key)
+    @param keyid: the key in ASCII armor format, or a GPG key id.
+    @raises SystemExit() via sys.exit() on failure.
+    """
+    try:
+        return fetch_import_key(keyid)
+    except GPGKeyError as e:
+        error_out("Could not import key: {}".format(str(e)))
 
 
-def get_source_and_pgp_key(input):
-    """Look for a pgp key ID or ascii-armor key in the given input."""
-    index = input.strip()
-    index = input.rfind('|')
-    if index < 0:
-        return input, None
+def get_source_and_pgp_key(source_and_key):
+    """Look for a pgp key ID or ascii-armor key in the given input.
 
-    key = input[index + 1:].strip('|')
-    source = input[:index]
-    return source, key
+    :param source_and_key: Sting, "source_spec|keyid" where '|keyid' is
+        optional.
+    :returns (source_spec, key_id OR None) as a tuple.  Returns None for key_id
+        if there was no '|' in the source_and_key string.
+    """
+    try:
+        source, key = source_and_key.split('|', 2)
+        return source, key or None
+    except ValueError:
+        return source_and_key, None
 
 
-def configure_installation_source(rel):
-    '''Configure apt installation source.'''
-    if rel == 'distro':
+@deprecate("use charmhelpers.fetch.add_source() instead.",
+           "2017-07", log=juju_log)
+def configure_installation_source(source_plus_key):
+    """Configure an installation source.
+
+    The functionality is provided by charmhelpers.fetch.add_source()
+    The difference between the two functions is that add_source() signature
+    requires the key to be passed directly, whereas this function passes an
+    optional key by appending '|<key>' to the end of the source specificiation
+    'source'.
+
+    Another difference from add_source() is that the function calls sys.exit(1)
+    if the configuration fails, whereas add_source() raises
+    SourceConfigurationError().  Another difference, is that add_source()
+    silently fails (with a juju_log command) if there is no matching source to
+    configure, whereas this function fails with a sys.exit(1)
+
+    :param source: String_plus_key -- see above for details.
+
+    Note that the behaviour on error is to log the error to the juju log and
+    then call sys.exit(1).
+    """
+    if source_plus_key.startswith('snap'):
+        # Do nothing for snap installs
         return
-    elif rel == 'distro-proposed':
-        ubuntu_rel = lsb_release()['DISTRIB_CODENAME']
-        with open('/etc/apt/sources.list.d/juju_deb.list', 'w') as f:
-            f.write(DISTRO_PROPOSED % ubuntu_rel)
-    elif rel[:4] == "ppa:":
-        src, key = get_source_and_pgp_key(rel)
-        if key:
-            import_key(key)
+    # extract the key if there is one, denoted by a '|' in the rel
+    source, key = get_source_and_pgp_key(source_plus_key)
 
-        subprocess.check_call(["add-apt-repository", "-y", src])
-    elif rel[:3] == "deb":
-        src, key = get_source_and_pgp_key(rel)
-        if key:
-            import_key(key)
-
-        with open('/etc/apt/sources.list.d/juju_deb.list', 'w') as f:
-            f.write(src)
-    elif rel[:6] == 'cloud:':
-        ubuntu_rel = lsb_release()['DISTRIB_CODENAME']
-        rel = rel.split(':')[1]
-        u_rel = rel.split('-')[0]
-        ca_rel = rel.split('-')[1]
-
-        if u_rel != ubuntu_rel:
-            e = 'Cannot install from Cloud Archive pocket %s on this Ubuntu '\
-                'version (%s)' % (ca_rel, ubuntu_rel)
-            error_out(e)
-
-        if 'staging' in ca_rel:
-            # staging is just a regular PPA.
-            os_rel = ca_rel.split('/')[0]
-            ppa = 'ppa:ubuntu-cloud-archive/%s-staging' % os_rel
-            cmd = 'add-apt-repository -y %s' % ppa
-            subprocess.check_call(cmd.split(' '))
-            return
-
-        # map charm config options to actual archive pockets.
-        pockets = {
-            'folsom': 'precise-updates/folsom',
-            'folsom/updates': 'precise-updates/folsom',
-            'folsom/proposed': 'precise-proposed/folsom',
-            'grizzly': 'precise-updates/grizzly',
-            'grizzly/updates': 'precise-updates/grizzly',
-            'grizzly/proposed': 'precise-proposed/grizzly',
-            'havana': 'precise-updates/havana',
-            'havana/updates': 'precise-updates/havana',
-            'havana/proposed': 'precise-proposed/havana',
-            'icehouse': 'precise-updates/icehouse',
-            'icehouse/updates': 'precise-updates/icehouse',
-            'icehouse/proposed': 'precise-proposed/icehouse',
-            'juno': 'trusty-updates/juno',
-            'juno/updates': 'trusty-updates/juno',
-            'juno/proposed': 'trusty-proposed/juno',
-            'kilo': 'trusty-updates/kilo',
-            'kilo/updates': 'trusty-updates/kilo',
-            'kilo/proposed': 'trusty-proposed/kilo',
-            'liberty': 'trusty-updates/liberty',
-            'liberty/updates': 'trusty-updates/liberty',
-            'liberty/proposed': 'trusty-proposed/liberty',
-            'mitaka': 'trusty-updates/mitaka',
-            'mitaka/updates': 'trusty-updates/mitaka',
-            'mitaka/proposed': 'trusty-proposed/mitaka',
-            'newton': 'xenial-updates/newton',
-            'newton/updates': 'xenial-updates/newton',
-            'newton/proposed': 'xenial-proposed/newton',
-        }
-
-        try:
-            pocket = pockets[ca_rel]
-        except KeyError:
-            e = 'Invalid Cloud Archive release specified: %s' % rel
-            error_out(e)
-
-        src = "deb %s %s main" % (CLOUD_ARCHIVE_URL, pocket)
-        apt_install('ubuntu-cloud-keyring', fatal=True)
-
-        with open('/etc/apt/sources.list.d/cloud-archive.list', 'w') as f:
-            f.write(src)
-    else:
-        error_out("Invalid openstack-release specified: %s" % rel)
+    # handle the ordinary sources via add_source
+    try:
+        fetch_add_source(source, key, fail_invalid=True)
+    except SourceConfigError as se:
+        error_out(str(se))
 
 
 def config_value_changed(option):
@@ -571,7 +596,7 @@ def save_script_rc(script_path="scripts/scriptrc", **env_vars):
     juju_rc_path = "%s/%s" % (charm_dir(), script_path)
     if not os.path.exists(os.path.dirname(juju_rc_path)):
         os.mkdir(os.path.dirname(juju_rc_path))
-    with open(juju_rc_path, 'wb') as rc_script:
+    with open(juju_rc_path, 'wt') as rc_script:
         rc_script.write(
             "#!/bin/bash\n")
         [rc_script.write('export %s=%s\n' % (u, p))
@@ -587,23 +612,20 @@ def openstack_upgrade_available(package):
 
     :returns: bool:    : Returns True if configured installation source offers
                          a newer version of package.
-
     """
 
     import apt_pkg as apt
     src = config('openstack-origin')
     cur_vers = get_os_version_package(package)
+    if not cur_vers:
+        # The package has not been installed yet do not attempt upgrade
+        return False
     if "swift" in package:
         codename = get_os_codename_install_source(src)
         avail_vers = get_os_version_codename_swift(codename)
     else:
         avail_vers = get_os_version_install_source(src)
     apt.init()
-    if "swift" in package:
-        major_cur_vers = cur_vers.split('.', 1)[0]
-        major_avail_vers = avail_vers.split('.', 1)[0]
-        major_diff = apt.version_compare(major_avail_vers, major_cur_vers)
-        return avail_vers > cur_vers and (major_diff == 1 or major_diff == 0)
     return apt.version_compare(avail_vers, cur_vers) == 1
 
 
@@ -661,6 +683,7 @@ def clean_storage(block_device):
     else:
         zap_disk(block_device)
 
+
 is_ip = ip.is_ip
 ns_query = ip.ns_query
 get_host_ip = ip.get_host_ip
@@ -711,387 +734,6 @@ def os_requires_version(ostack_release, pkg):
             f(*args)
         return wrapped_f
     return wrap
-
-
-def git_install_requested():
-    """
-    Returns true if openstack-origin-git is specified.
-    """
-    return config('openstack-origin-git') is not None
-
-
-def git_os_codename_install_source(projects_yaml):
-    """
-    Returns OpenStack codename of release being installed from source.
-    """
-    if git_install_requested():
-        projects = _git_yaml_load(projects_yaml)
-
-        if projects in GIT_DEFAULT_BRANCHES.keys():
-            if projects == 'master':
-                return 'newton'
-            return projects
-
-        if 'release' in projects:
-            if projects['release'] == 'master':
-                return 'newton'
-            return projects['release']
-
-    return None
-
-
-def git_default_repos(projects_yaml):
-    """
-    Returns default repos if a default openstack-origin-git value is specified.
-    """
-    service = service_name()
-    core_project = service
-
-    for default, branch in GIT_DEFAULT_BRANCHES.iteritems():
-        if projects_yaml == default:
-
-            # add the requirements repo first
-            repo = {
-                'name': 'requirements',
-                'repository': GIT_DEFAULT_REPOS['requirements'],
-                'branch': branch,
-            }
-            repos = [repo]
-
-            # neutron-* and nova-* charms require some additional repos
-            if service in ['neutron-api', 'neutron-gateway',
-                           'neutron-openvswitch']:
-                core_project = 'neutron'
-                if service == 'neutron-api':
-                    repo = {
-                        'name': 'networking-hyperv',
-                        'repository': GIT_DEFAULT_REPOS['networking-hyperv'],
-                        'branch': branch,
-                    }
-                    repos.append(repo)
-                for project in ['neutron-fwaas', 'neutron-lbaas',
-                                'neutron-vpnaas', 'nova']:
-                    repo = {
-                        'name': project,
-                        'repository': GIT_DEFAULT_REPOS[project],
-                        'branch': branch,
-                    }
-                    repos.append(repo)
-
-            elif service in ['nova-cloud-controller', 'nova-compute']:
-                core_project = 'nova'
-                repo = {
-                    'name': 'neutron',
-                    'repository': GIT_DEFAULT_REPOS['neutron'],
-                    'branch': branch,
-                }
-                repos.append(repo)
-            elif service == 'openstack-dashboard':
-                core_project = 'horizon'
-
-            # finally add the current service's core project repo
-            repo = {
-                'name': core_project,
-                'repository': GIT_DEFAULT_REPOS[core_project],
-                'branch': branch,
-            }
-            repos.append(repo)
-
-            return yaml.dump(dict(repositories=repos, release=default))
-
-    return projects_yaml
-
-
-def _git_yaml_load(projects_yaml):
-    """
-    Load the specified yaml into a dictionary.
-    """
-    if not projects_yaml:
-        return None
-
-    return yaml.load(projects_yaml)
-
-
-requirements_dir = None
-
-
-def git_clone_and_install(projects_yaml, core_project):
-    """
-    Clone/install all specified OpenStack repositories.
-
-    The expected format of projects_yaml is:
-
-        repositories:
-          - {name: keystone,
-             repository: 'git://git.openstack.org/openstack/keystone.git',
-             branch: 'stable/icehouse'}
-          - {name: requirements,
-             repository: 'git://git.openstack.org/openstack/requirements.git',
-             branch: 'stable/icehouse'}
-
-        directory: /mnt/openstack-git
-        http_proxy: squid-proxy-url
-        https_proxy: squid-proxy-url
-
-    The directory, http_proxy, and https_proxy keys are optional.
-
-    """
-    global requirements_dir
-    parent_dir = '/mnt/openstack-git'
-    http_proxy = None
-
-    projects = _git_yaml_load(projects_yaml)
-    _git_validate_projects_yaml(projects, core_project)
-
-    old_environ = dict(os.environ)
-
-    if 'http_proxy' in projects.keys():
-        http_proxy = projects['http_proxy']
-        os.environ['http_proxy'] = projects['http_proxy']
-    if 'https_proxy' in projects.keys():
-        os.environ['https_proxy'] = projects['https_proxy']
-
-    if 'directory' in projects.keys():
-        parent_dir = projects['directory']
-
-    pip_create_virtualenv(os.path.join(parent_dir, 'venv'))
-
-    # Upgrade setuptools and pip from default virtualenv versions. The default
-    # versions in trusty break master OpenStack branch deployments.
-    for p in ['pip', 'setuptools']:
-        pip_install(p, upgrade=True, proxy=http_proxy,
-                    venv=os.path.join(parent_dir, 'venv'))
-
-    constraints = None
-    for p in projects['repositories']:
-        repo = p['repository']
-        branch = p['branch']
-        depth = '1'
-        if 'depth' in p.keys():
-            depth = p['depth']
-        if p['name'] == 'requirements':
-            repo_dir = _git_clone_and_install_single(repo, branch, depth,
-                                                     parent_dir, http_proxy,
-                                                     update_requirements=False)
-            requirements_dir = repo_dir
-            constraints = os.path.join(repo_dir, "upper-constraints.txt")
-            # upper-constraints didn't exist until after icehouse
-            if not os.path.isfile(constraints):
-                constraints = None
-            # use constraints unless project yaml sets use_constraints to false
-            if 'use_constraints' in projects.keys():
-                if not projects['use_constraints']:
-                    constraints = None
-        else:
-            repo_dir = _git_clone_and_install_single(repo, branch, depth,
-                                                     parent_dir, http_proxy,
-                                                     update_requirements=True,
-                                                     constraints=constraints)
-
-    os.environ = old_environ
-
-
-def _git_validate_projects_yaml(projects, core_project):
-    """
-    Validate the projects yaml.
-    """
-    _git_ensure_key_exists('repositories', projects)
-
-    for project in projects['repositories']:
-        _git_ensure_key_exists('name', project.keys())
-        _git_ensure_key_exists('repository', project.keys())
-        _git_ensure_key_exists('branch', project.keys())
-
-    if projects['repositories'][0]['name'] != 'requirements':
-        error_out('{} git repo must be specified first'.format('requirements'))
-
-    if projects['repositories'][-1]['name'] != core_project:
-        error_out('{} git repo must be specified last'.format(core_project))
-
-    _git_ensure_key_exists('release', projects)
-
-
-def _git_ensure_key_exists(key, keys):
-    """
-    Ensure that key exists in keys.
-    """
-    if key not in keys:
-        error_out('openstack-origin-git key \'{}\' is missing'.format(key))
-
-
-def _git_clone_and_install_single(repo, branch, depth, parent_dir, http_proxy,
-                                  update_requirements, constraints=None):
-    """
-    Clone and install a single git repository.
-    """
-    if not os.path.exists(parent_dir):
-        juju_log('Directory already exists at {}. '
-                 'No need to create directory.'.format(parent_dir))
-        os.mkdir(parent_dir)
-
-    juju_log('Cloning git repo: {}, branch: {}'.format(repo, branch))
-    repo_dir = install_remote(
-        repo, dest=parent_dir, branch=branch, depth=depth)
-
-    venv = os.path.join(parent_dir, 'venv')
-
-    if update_requirements:
-        if not requirements_dir:
-            error_out('requirements repo must be cloned before '
-                      'updating from global requirements.')
-        _git_update_requirements(venv, repo_dir, requirements_dir)
-
-    juju_log('Installing git repo from dir: {}'.format(repo_dir))
-    if http_proxy:
-        pip_install(repo_dir, proxy=http_proxy, venv=venv,
-                    constraints=constraints)
-    else:
-        pip_install(repo_dir, venv=venv, constraints=constraints)
-
-    return repo_dir
-
-
-def _git_update_requirements(venv, package_dir, reqs_dir):
-    """
-    Update from global requirements.
-
-    Update an OpenStack git directory's requirements.txt and
-    test-requirements.txt from global-requirements.txt.
-    """
-    orig_dir = os.getcwd()
-    os.chdir(reqs_dir)
-    python = os.path.join(venv, 'bin/python')
-    cmd = [python, 'update.py', package_dir]
-    try:
-        subprocess.check_call(cmd)
-    except subprocess.CalledProcessError:
-        package = os.path.basename(package_dir)
-        error_out("Error updating {} from "
-                  "global-requirements.txt".format(package))
-    os.chdir(orig_dir)
-
-
-def git_pip_venv_dir(projects_yaml):
-    """
-    Return the pip virtualenv path.
-    """
-    parent_dir = '/mnt/openstack-git'
-
-    projects = _git_yaml_load(projects_yaml)
-
-    if 'directory' in projects.keys():
-        parent_dir = projects['directory']
-
-    return os.path.join(parent_dir, 'venv')
-
-
-def git_src_dir(projects_yaml, project):
-    """
-    Return the directory where the specified project's source is located.
-    """
-    parent_dir = '/mnt/openstack-git'
-
-    projects = _git_yaml_load(projects_yaml)
-
-    if 'directory' in projects.keys():
-        parent_dir = projects['directory']
-
-    for p in projects['repositories']:
-        if p['name'] == project:
-            return os.path.join(parent_dir, os.path.basename(p['repository']))
-
-    return None
-
-
-def git_yaml_value(projects_yaml, key):
-    """
-    Return the value in projects_yaml for the specified key.
-    """
-    projects = _git_yaml_load(projects_yaml)
-
-    if key in projects.keys():
-        return projects[key]
-
-    return None
-
-
-def git_generate_systemd_init_files(templates_dir):
-    """
-    Generate systemd init files.
-
-    Generates and installs systemd init units and script files based on the
-    *.init.in files contained in the templates_dir directory.
-
-    This code is based on the openstack-pkg-tools package and its init
-    script generation, which is used by the OpenStack packages.
-    """
-    for f in os.listdir(templates_dir):
-        # Create the init script and systemd unit file from the template
-        if f.endswith(".init.in"):
-            init_in_file = f
-            init_file = f[:-8]
-            service_file = "{}.service".format(init_file)
-
-            init_in_source = os.path.join(templates_dir, init_in_file)
-            init_source = os.path.join(templates_dir, init_file)
-            service_source = os.path.join(templates_dir, service_file)
-
-            init_dest = os.path.join('/etc/init.d', init_file)
-            service_dest = os.path.join('/lib/systemd/system', service_file)
-
-            shutil.copyfile(init_in_source, init_source)
-            with open(init_source, 'a') as outfile:
-                template = '/usr/share/openstack-pkg-tools/init-script-template'
-                with open(template) as infile:
-                    outfile.write('\n\n{}'.format(infile.read()))
-
-            cmd = ['pkgos-gen-systemd-unit', init_in_source]
-            subprocess.check_call(cmd)
-
-            if os.path.exists(init_dest):
-                os.remove(init_dest)
-            if os.path.exists(service_dest):
-                os.remove(service_dest)
-            shutil.copyfile(init_source, init_dest)
-            shutil.copyfile(service_source, service_dest)
-            os.chmod(init_dest, 0o755)
-
-    for f in os.listdir(templates_dir):
-        # If there's a service.in file, use it instead of the generated one
-        if f.endswith(".service.in"):
-            service_in_file = f
-            service_file = f[:-3]
-
-            service_in_source = os.path.join(templates_dir, service_in_file)
-            service_source = os.path.join(templates_dir, service_file)
-            service_dest = os.path.join('/lib/systemd/system', service_file)
-
-            shutil.copyfile(service_in_source, service_source)
-
-            if os.path.exists(service_dest):
-                os.remove(service_dest)
-            shutil.copyfile(service_source, service_dest)
-
-    for f in os.listdir(templates_dir):
-        # Generate the systemd unit if there's no existing .service.in
-        if f.endswith(".init.in"):
-            init_in_file = f
-            init_file = f[:-8]
-            service_in_file = "{}.service.in".format(init_file)
-            service_file = "{}.service".format(init_file)
-
-            init_in_source = os.path.join(templates_dir, init_in_file)
-            service_in_source = os.path.join(templates_dir, service_in_file)
-            service_source = os.path.join(templates_dir, service_file)
-            service_dest = os.path.join('/lib/systemd/system', service_file)
-
-            if not os.path.exists(service_in_source):
-                cmd = ['pkgos-gen-systemd-unit', init_in_source]
-                subprocess.check_call(cmd)
-
-                if os.path.exists(service_dest):
-                    os.remove(service_dest)
-                shutil.copyfile(service_source, service_dest)
 
 
 def os_workload_status(configs, required_interfaces, charm_func=None):
@@ -1527,27 +1169,24 @@ def do_action_openstack_upgrade(package, upgrade_callback, configs):
     """
     ret = False
 
-    if git_install_requested():
-        action_set({'outcome': 'installed from source, skipped upgrade.'})
-    else:
-        if openstack_upgrade_available(package):
-            if config('action-managed-upgrade'):
-                juju_log('Upgrading OpenStack release')
+    if openstack_upgrade_available(package):
+        if config('action-managed-upgrade'):
+            juju_log('Upgrading OpenStack release')
 
-                try:
-                    upgrade_callback(configs=configs)
-                    action_set({'outcome': 'success, upgrade completed.'})
-                    ret = True
-                except:
-                    action_set({'outcome': 'upgrade failed, see traceback.'})
-                    action_set({'traceback': traceback.format_exc()})
-                    action_fail('do_openstack_upgrade resulted in an '
-                                'unexpected error')
-            else:
-                action_set({'outcome': 'action-managed-upgrade config is '
-                                       'False, skipped upgrade.'})
+            try:
+                upgrade_callback(configs=configs)
+                action_set({'outcome': 'success, upgrade completed.'})
+                ret = True
+            except Exception:
+                action_set({'outcome': 'upgrade failed, see traceback.'})
+                action_set({'traceback': traceback.format_exc()})
+                action_fail('do_openstack_upgrade resulted in an '
+                            'unexpected error')
         else:
-            action_set({'outcome': 'no upgrade available.'})
+            action_set({'outcome': 'action-managed-upgrade config is '
+                                   'False, skipped upgrade.'})
+    else:
+        action_set({'outcome': 'no upgrade available.'})
 
     return ret
 
@@ -1643,7 +1282,7 @@ def is_unit_paused_set():
             kv = t[0]
             # transform something truth-y into a Boolean.
             return not(not(kv.get('unit-paused')))
-    except:
+    except Exception:
         return False
 
 
@@ -1812,6 +1451,30 @@ def pausable_restart_on_change(restart_map, stopstart=False,
     return wrap
 
 
+def ordered(orderme):
+    """Converts the provided dictionary into a collections.OrderedDict.
+
+    The items in the returned OrderedDict will be inserted based on the
+    natural sort order of the keys. Nested dictionaries will also be sorted
+    in order to ensure fully predictable ordering.
+
+    :param orderme: the dict to order
+    :return: collections.OrderedDict
+    :raises: ValueError: if `orderme` isn't a dict instance.
+    """
+    if not isinstance(orderme, dict):
+        raise ValueError('argument must be a dict type')
+
+    result = OrderedDict()
+    for k, v in sorted(six.iteritems(orderme), key=lambda x: x[0]):
+        if isinstance(v, dict):
+            result[k] = ordered(v)
+        else:
+            result[k] = v
+
+    return result
+
+
 def config_flags_parser(config_flags):
     """Parses config flags string into dict.
 
@@ -1823,15 +1486,13 @@ def config_flags_parser(config_flags):
          example, a string in the format of 'key1=value1, key2=value2' will
          return a dict of:
 
-             {'key1': 'value1',
-              'key2': 'value2'}.
+             {'key1': 'value1', 'key2': 'value2'}.
 
       2. A string in the above format, but supporting a comma-delimited list
          of values for the same key. For example, a string in the format of
          'key1=value1, key2=value3,value4,value5' will return a dict of:
 
-             {'key1', 'value1',
-              'key2', 'value2,value3,value4'}
+             {'key1': 'value1', 'key2': 'value2,value3,value4'}
 
       3. A string containing a colon character (:) prior to an equal
          character (=) will be treated as yaml and parsed as such. This can be
@@ -1851,7 +1512,7 @@ def config_flags_parser(config_flags):
     equals = config_flags.find('=')
     if colon > 0:
         if colon < equals or equals < 0:
-            return yaml.safe_load(config_flags)
+            return ordered(yaml.safe_load(config_flags))
 
     if config_flags.find('==') >= 0:
         juju_log("config_flags is not in expected format (key=value)",
@@ -1864,7 +1525,7 @@ def config_flags_parser(config_flags):
     # split on '='.
     split = config_flags.strip(' =').split('=')
     limit = len(split)
-    flags = {}
+    flags = OrderedDict()
     for i in range(0, limit - 1):
         current = split[i]
         next = split[i + 1]
@@ -1889,3 +1550,138 @@ def config_flags_parser(config_flags):
         flags[key.strip(post_strippers)] = value.rstrip(post_strippers)
 
     return flags
+
+
+def os_application_version_set(package):
+    '''Set version of application for Juju 2.0 and later'''
+    application_version = get_upstream_version(package)
+    # NOTE(jamespage) if not able to figure out package version, fallback to
+    #                 openstack codename version detection.
+    if not application_version:
+        application_version_set(os_release(package))
+    else:
+        application_version_set(application_version)
+
+
+def enable_memcache(source=None, release=None, package=None):
+    """Determine if memcache should be enabled on the local unit
+
+    @param release: release of OpenStack currently deployed
+    @param package: package to derive OpenStack version deployed
+    @returns boolean Whether memcache should be enabled
+    """
+    _release = None
+    if release:
+        _release = release
+    else:
+        _release = os_release(package, base='icehouse')
+    if not _release:
+        _release = get_os_codename_install_source(source)
+
+    return CompareOpenStackReleases(_release) >= 'mitaka'
+
+
+def token_cache_pkgs(source=None, release=None):
+    """Determine additional packages needed for token caching
+
+    @param source: source string for charm
+    @param release: release of OpenStack currently deployed
+    @returns List of package to enable token caching
+    """
+    packages = []
+    if enable_memcache(source=source, release=release):
+        packages.extend(['memcached', 'python-memcache'])
+    return packages
+
+
+def update_json_file(filename, items):
+    """Updates the json `filename` with a given dict.
+    :param filename: path to json file (e.g. /etc/glance/policy.json)
+    :param items: dict of items to update
+    """
+    if not items:
+        return
+
+    with open(filename) as fd:
+        policy = json.load(fd)
+
+    # Compare before and after and if nothing has changed don't write the file
+    # since that could cause unnecessary service restarts.
+    before = json.dumps(policy, indent=4, sort_keys=True)
+    policy.update(items)
+    after = json.dumps(policy, indent=4, sort_keys=True)
+    if before == after:
+        return
+
+    with open(filename, "w") as fd:
+        fd.write(after)
+
+
+@cached
+def snap_install_requested():
+    """ Determine if installing from snaps
+
+    If openstack-origin is of the form snap:track/channel[/branch]
+    and channel is in SNAPS_CHANNELS return True.
+    """
+    origin = config('openstack-origin') or ""
+    if not origin.startswith('snap:'):
+        return False
+
+    _src = origin[5:]
+    if '/' in _src:
+        channel = _src.split('/')[1]
+    else:
+        # Handle snap:track with no channel
+        channel = 'stable'
+    return valid_snap_channel(channel)
+
+
+def get_snaps_install_info_from_origin(snaps, src, mode='classic'):
+    """Generate a dictionary of snap install information from origin
+
+    @param snaps: List of snaps
+    @param src: String of openstack-origin or source of the form
+        snap:track/channel
+    @param mode: String classic, devmode or jailmode
+    @returns: Dictionary of snaps with channels and modes
+    """
+
+    if not src.startswith('snap:'):
+        juju_log("Snap source is not a snap origin", 'WARN')
+        return {}
+
+    _src = src[5:]
+    channel = '--channel={}'.format(_src)
+
+    return {snap: {'channel': channel, 'mode': mode}
+            for snap in snaps}
+
+
+def install_os_snaps(snaps, refresh=False):
+    """Install OpenStack snaps from channel and with mode
+
+    @param snaps: Dictionary of snaps with channels and modes of the form:
+        {'snap_name': {'channel': 'snap_channel',
+                       'mode': 'snap_mode'}}
+        Where channel is a snapstore channel and mode is --classic, --devmode
+        or --jailmode.
+    @param post_snap_install: Callback function to run after snaps have been
+    installed
+    """
+
+    def _ensure_flag(flag):
+        if flag.startswith('--'):
+            return flag
+        return '--{}'.format(flag)
+
+    if refresh:
+        for snap in snaps.keys():
+            snap_refresh(snap,
+                         _ensure_flag(snaps[snap]['channel']),
+                         _ensure_flag(snaps[snap]['mode']))
+    else:
+        for snap in snaps.keys():
+            snap_install(snap,
+                         _ensure_flag(snaps[snap]['channel']),
+                         _ensure_flag(snaps[snap]['mode']))

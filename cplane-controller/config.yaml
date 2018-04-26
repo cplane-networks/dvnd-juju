@@ -85,6 +85,10 @@ options:
     default: False
     type: boolean
     description: "Set y to use the default cluster else set n to use random cluster for each instance"
+  jboss-cluster-name:
+    default:
+    type: string
+    description: "Optional Jboss cluster name if the use-default-jboss-cluster is enable"
   enable-fip:
     default: False
     type: boolean
@@ -157,3 +161,70 @@ options:
     default: "y"
     type: string
     description: "Flag to indicate the production deployment"
+  # HA configuration settings
+  dns-ha:
+    type: boolean
+    default: False
+    description: |
+        Use DNS HA with MAAS 2.0. Note if this is set do not set vip
+        settings below.
+  vip:
+    type: string
+    default:
+    description: |
+      Virtual IP(s) to use to front API services in HA configuration.
+
+      If multiple networks are being used, a VIP should be provided for each
+      network, separated by spaces.
+  vip_iface:
+    type: string
+    default: eth0
+    description: |
+      Default network interface to use for HA vip when it cannot be
+      automatically determined.
+  vip_cidr:
+    type: int
+    default: 24
+    description: |
+      Default CIDR netmask to use for HA vip when it cannot be automatically
+      determined.
+  ha-bindiface:
+    type: string
+    default: eth0
+    description: |
+      Default network interface on which HA cluster will bind to communication
+      with the other members of the HA Cluster.
+  ha-mcastport:
+    type: int
+    default: 5434
+    description: |
+      Default multicast port number that will be used to communicate between
+      HA Cluster nodes.
+  haproxy-server-timeout:
+    type: int
+    default:
+    description: |
+      Server timeout configuration in ms for haproxy, used in HA
+      configurations. If not provided, default value of 90000ms is used.
+  haproxy-client-timeout:
+    type: int
+    default:
+    description: |
+      Client timeout configuration in ms for haproxy, used in HA
+      configurations. If not provided, default value of 90000ms is used.
+  haproxy-queue-timeout:
+    type: int
+    default:
+    description: |
+      Queue timeout configuration in ms for haproxy, used in HA
+      configurations. If not provided, default value of 9000ms is used.
+  haproxy-connect-timeout:
+    type: int
+    default:
+    description: |
+      Connect timeout configuration in ms for haproxy, used in HA
+      configurations. If not provided, default value of 9000ms is used.
+  jdk-version:
+    type: int
+    default: 0
+    description: "Java version to download from Cplane repo"

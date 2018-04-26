@@ -30,11 +30,15 @@ import re
 import json
 import socket
 import pickle
+import cplane_context
+
 from charmhelpers.contrib.openstack.utils import (
     make_assess_status_func,
 )
 
 import charmhelpers.core.hookenv as hookenv
+
+from charmhelpers.contrib.openstack import context, templating
 
 
 from cplane_package_manager import(
@@ -42,6 +46,7 @@ from cplane_package_manager import(
 )
 
 from xml.dom import minidom
+
 
 file_header = (
     '\n################################################\n',
@@ -51,7 +56,7 @@ file_header = (
 cplane_packages = OrderedDict([
     (config('oracle-version'), '0'),
     ('jboss', '0'),
-    ('jdk', '0'),
+    ('jdk', config('jdk-version')),
     ('oracle-client-basic', config('oracle-client-basic')),
     ('oracle-sqlplus', config('oracle-sqlplus')),
     (config('controller-app-mode'), '-1')
@@ -68,7 +73,8 @@ elif config('jboss-db-on-host'):
 PACKAGES = ['alien', 'libaio1', 'zlib1g-dev', 'libxml2-dev',
             'libxml-libxml-perl', 'unzip', 'python-pexpect',
             'libyaml-perl']
-
+if config('controller-app-mode') == 'msm':
+    PACKAGES.append('haproxy')
 
 CPLANE_URL = config('cp-package-url')
 
@@ -95,6 +101,7 @@ MSM_CONFIG = OrderedDict([
     ('jboss-db-on-host', 'JBOSS_DB_ON_HOST'),
 ])
 
+TEMPLATES = 'templates/'
 ORACLE_HOST = ''
 DB_SERVICE = ''
 DB_PASSWORD = ''
@@ -104,6 +111,7 @@ CHARM_LIB_DIR = os.environ.get('CHARM_DIR', '') + "/lib/"
 CPLANE_DIR = '/opt/cplane/bin'
 DB_DIR = os.environ.get('CHARM_DIR', '') + "/lib/" + 'PKG/pkg/db_init/'
 FILES_PATH = CHARM_LIB_DIR + '/filelink'
+HAPROXY_CONF = '/etc/haproxy/haproxy.cfg'
 CONTROLLER_CONFIG = ''
 if config('controller-app-mode') == 'dvnd':
     CONTROLLER_CONFIG = 'cplane-dvnd-config.yaml'
@@ -119,6 +127,25 @@ else:
     REQUIRED_INTERFACES = {}
 
 SERVICES = []
+API_PORTS = {
+    'msm': 8090,
+}
+
+
+def register_configs(release=None):
+    resources = OrderedDict([
+        (HAPROXY_CONF, {
+            'services': ['haproxy'],
+            'contexts': [context.HAProxyContext(singlenode_mode=True),
+                         cplane_context.HAProxyContext()],
+        })
+    ])
+    release = config('openstack-version')
+    configs = templating.OSConfigRenderer(templates_dir=TEMPLATES,
+                                          openstack_release=release)
+    for cfg, rscs in resources.iteritems():
+        configs.register(cfg, rscs['contexts'])
+    return configs
 
 
 def determine_packages():
@@ -420,12 +447,21 @@ def load_config():
             cluster_name = 'cplane' + '-' + hostname
             set_config('JBOSS_CLUSTER_NAME', cluster_name,
                        CONTROLLER_CONFIG)
+        elif config('jboss-cluster-name') is not None:
+            cluster_name = config('jboss-cluster-name')
+            set_config('JBOSS_CLUSTER_NAME', cluster_name,
+                       CONTROLLER_CONFIG)
+
     elif config('controller-app-mode') == 'msm':
         for key, value in MSM_CONFIG.items():
             set_config(value, config(key), CONTROLLER_CONFIG)
         if config('use-default-jboss-cluster') is False:
             hostname = socket.gethostname()
             cluster_name = 'cplane' + '-' + hostname
+            set_config('JBOSS_CLUSTER_NAME', cluster_name,
+                       CONTROLLER_CONFIG)
+        elif config('jboss-cluster-name') is not None:
+            cluster_name = config('jboss-cluster-name')
             set_config('JBOSS_CLUSTER_NAME', cluster_name,
                        CONTROLLER_CONFIG)
 
@@ -783,7 +819,7 @@ def is_oracle_relation_joined():
             oracle_host = relation_get(attribute='oracle-\
 host', unit=unit, rid=rid)
 
-    if oracle_host:
+    if oracle_host or config('jboss-db-on-host'):
         return True
     else:
         return False
@@ -799,3 +835,7 @@ deploy/cplane-OracleDB-ds.xml".format(DB_SERVICE, DB_SERVICE)
         cmd = "sed -i 's/:{}/\/{}/g' /opt/jboss/jboss-6.1.0.Final/server/all/\
 conf/quartz.properties".format(DB_SERVICE, DB_SERVICE)
         os.system(cmd)
+
+
+def api_port(service):
+    return API_PORTS[service]

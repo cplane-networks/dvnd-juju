@@ -8,6 +8,7 @@ include:
     - contrib.network.ip 
     - contrib.storage.linux
     - contrib.python.packages
+    - contrib.charmsupport
     - payload.archive
     - osplatform
 

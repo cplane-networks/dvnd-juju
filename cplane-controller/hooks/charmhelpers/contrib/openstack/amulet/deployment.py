@@ -13,12 +13,16 @@
 # limitations under the License.
 
 import logging
+import os
 import re
 import sys
 import six
 from collections import OrderedDict
 from charmhelpers.contrib.amulet.deployment import (
     AmuletDeployment
+)
+from charmhelpers.contrib.openstack.amulet.utils import (
+    OPENSTACK_RELEASES_PAIRS
 )
 
 DEBUG = logging.DEBUG
@@ -69,9 +73,9 @@ class OpenStackAmuletDeployment(AmuletDeployment):
 
         # Charms outside the ~openstack-charmers
         base_charms = {
-            'mysql': ['precise', 'trusty'],
-            'mongodb': ['precise', 'trusty'],
-            'nrpe': ['precise', 'trusty', 'wily', 'xenial'],
+            'mysql': ['trusty'],
+            'mongodb': ['trusty'],
+            'nrpe': ['trusty', 'xenial'],
         }
 
         for svc in other_services:
@@ -98,8 +102,47 @@ class OpenStackAmuletDeployment(AmuletDeployment):
 
         return other_services
 
-    def _add_services(self, this_service, other_services):
-        """Add services to the deployment and set openstack-origin/source."""
+    def _add_services(self, this_service, other_services, use_source=None,
+                      no_origin=None):
+        """Add services to the deployment and optionally set
+        openstack-origin/source.
+
+        :param this_service dict: Service dictionary describing the service
+                                  whose amulet tests are being run
+        :param other_services dict: List of service dictionaries describing
+                                    the services needed to support the target
+                                    service
+        :param use_source list: List of services which use the 'source' config
+                                option rather than 'openstack-origin'
+        :param no_origin list: List of services which do not support setting
+                               the Cloud Archive.
+        Service Dict:
+            {
+                'name': str charm-name,
+                'units': int number of units,
+                'constraints': dict of juju constraints,
+                'location': str location of charm,
+            }
+        eg
+        this_service = {
+            'name': 'openvswitch-odl',
+            'constraints': {'mem': '8G'},
+        }
+        other_services = [
+            {
+                'name': 'nova-compute',
+                'units': 2,
+                'constraints': {'mem': '4G'},
+                'location': cs:~bob/xenial/nova-compute
+            },
+            {
+                'name': 'mysql',
+                'constraints': {'mem': '2G'},
+            },
+            {'neutron-api-odl'}]
+        use_source = ['mysql']
+        no_origin = ['neutron-api-odl']
+        """
         self.log.info('OpenStackAmuletDeployment:  adding services')
 
         other_services = self._determine_branch_locations(other_services)
@@ -110,16 +153,22 @@ class OpenStackAmuletDeployment(AmuletDeployment):
         services = other_services
         services.append(this_service)
 
+        use_source = use_source or []
+        no_origin = no_origin or []
+
         # Charms which should use the source config option
-        use_source = ['mysql', 'mongodb', 'rabbitmq-server', 'ceph',
-                      'ceph-osd', 'ceph-radosgw', 'ceph-mon', 'ceph-proxy']
+        use_source = list(set(
+            use_source + ['mysql', 'mongodb', 'rabbitmq-server', 'ceph',
+                          'ceph-osd', 'ceph-radosgw', 'ceph-mon',
+                          'ceph-proxy', 'percona-cluster', 'lxd']))
 
         # Charms which can not use openstack-origin, ie. many subordinates
-        no_origin = ['cinder-ceph', 'hacluster', 'neutron-openvswitch', 'nrpe',
-                     'openvswitch-odl', 'neutron-api-odl', 'odl-controller',
-                     'cinder-backup', 'nexentaedge-data',
-                     'nexentaedge-iscsi-gw', 'nexentaedge-swift-gw',
-                     'cinder-nexentaedge', 'nexentaedge-mgmt']
+        no_origin = list(set(
+            no_origin + ['cinder-ceph', 'hacluster', 'neutron-openvswitch',
+                         'nrpe', 'openvswitch-odl', 'neutron-api-odl',
+                         'odl-controller', 'cinder-backup', 'nexentaedge-data',
+                         'nexentaedge-iscsi-gw', 'nexentaedge-swift-gw',
+                         'cinder-nexentaedge', 'nexentaedge-mgmt']))
 
         if self.openstack:
             for svc in services:
@@ -140,7 +189,7 @@ class OpenStackAmuletDeployment(AmuletDeployment):
             self.d.configure(service, config)
 
     def _auto_wait_for_status(self, message=None, exclude_services=None,
-                              include_only=None, timeout=1800):
+                              include_only=None, timeout=None):
         """Wait for all units to have a specific extended status, except
         for any defined as excluded.  Unless specified via message, any
         status containing any case of 'ready' will be considered a match.
@@ -170,7 +219,10 @@ class OpenStackAmuletDeployment(AmuletDeployment):
         :param timeout: Maximum time in seconds to wait for status match
         :returns: None.  Raises if timeout is hit.
         """
-        self.log.info('Waiting for extended status on units...')
+        if not timeout:
+            timeout = int(os.environ.get('AMULET_SETUP_TIMEOUT', 1800))
+        self.log.info('Waiting for extended status on units for {}s...'
+                      ''.format(timeout))
 
         all_services = self.d.services.keys()
 
@@ -205,7 +257,14 @@ class OpenStackAmuletDeployment(AmuletDeployment):
         self.log.debug('Waiting up to {}s for extended status on services: '
                        '{}'.format(timeout, services))
         service_messages = {service: message for service in services}
+
+        # Check for idleness
+        self.d.sentry.wait(timeout=timeout)
+        # Check for error states and bail early
+        self.d.sentry.wait_for_status(self.d.juju_env, services, timeout=timeout)
+        # Check for ready messages
         self.d.sentry.wait_for_messages(service_messages, timeout=timeout)
+
         self.log.info('OK')
 
     def _get_openstack_release(self):
@@ -215,28 +274,24 @@ class OpenStackAmuletDeployment(AmuletDeployment):
            release.
            """
         # Must be ordered by OpenStack release (not by Ubuntu release):
-        (self.precise_essex, self.precise_folsom, self.precise_grizzly,
-         self.precise_havana, self.precise_icehouse,
-         self.trusty_icehouse, self.trusty_juno, self.utopic_juno,
-         self.trusty_kilo, self.vivid_kilo, self.trusty_liberty,
-         self.wily_liberty, self.trusty_mitaka,
-         self.xenial_mitaka) = range(14)
+        for i, os_pair in enumerate(OPENSTACK_RELEASES_PAIRS):
+            setattr(self, os_pair, i)
 
         releases = {
-            ('precise', None): self.precise_essex,
-            ('precise', 'cloud:precise-folsom'): self.precise_folsom,
-            ('precise', 'cloud:precise-grizzly'): self.precise_grizzly,
-            ('precise', 'cloud:precise-havana'): self.precise_havana,
-            ('precise', 'cloud:precise-icehouse'): self.precise_icehouse,
             ('trusty', None): self.trusty_icehouse,
-            ('trusty', 'cloud:trusty-juno'): self.trusty_juno,
             ('trusty', 'cloud:trusty-kilo'): self.trusty_kilo,
             ('trusty', 'cloud:trusty-liberty'): self.trusty_liberty,
             ('trusty', 'cloud:trusty-mitaka'): self.trusty_mitaka,
-            ('utopic', None): self.utopic_juno,
-            ('vivid', None): self.vivid_kilo,
-            ('wily', None): self.wily_liberty,
-            ('xenial', None): self.xenial_mitaka}
+            ('xenial', None): self.xenial_mitaka,
+            ('xenial', 'cloud:xenial-newton'): self.xenial_newton,
+            ('xenial', 'cloud:xenial-ocata'): self.xenial_ocata,
+            ('xenial', 'cloud:xenial-pike'): self.xenial_pike,
+            ('xenial', 'cloud:xenial-queens'): self.xenial_queens,
+            ('yakkety', None): self.yakkety_newton,
+            ('zesty', None): self.zesty_ocata,
+            ('artful', None): self.artful_pike,
+            ('bionic', None): self.bionic_queens,
+        }
         return releases[(self.series, self.openstack)]
 
     def _get_openstack_release_string(self):
@@ -245,15 +300,12 @@ class OpenStackAmuletDeployment(AmuletDeployment):
            Return a string representing the openstack release.
            """
         releases = OrderedDict([
-            ('precise', 'essex'),
-            ('quantal', 'folsom'),
-            ('raring', 'grizzly'),
-            ('saucy', 'havana'),
             ('trusty', 'icehouse'),
-            ('utopic', 'juno'),
-            ('vivid', 'kilo'),
-            ('wily', 'liberty'),
             ('xenial', 'mitaka'),
+            ('yakkety', 'newton'),
+            ('zesty', 'ocata'),
+            ('artful', 'pike'),
+            ('bionic', 'queens'),
         ])
         if self.openstack:
             os_origin = self.openstack.split(':')[1]
@@ -266,20 +318,27 @@ class OpenStackAmuletDeployment(AmuletDeployment):
         test scenario, based on OpenStack release and whether ceph radosgw
         is flagged as present or not."""
 
-        if self._get_openstack_release() >= self.trusty_kilo:
-            # Kilo or later
-            pools = [
-                'rbd',
-                'cinder',
-                'glance'
-            ]
-        else:
-            # Juno or earlier
+        if self._get_openstack_release() == self.trusty_icehouse:
+            # Icehouse
             pools = [
                 'data',
                 'metadata',
                 'rbd',
-                'cinder',
+                'cinder-ceph',
+                'glance'
+            ]
+        elif (self.trusty_kilo <= self._get_openstack_release() <=
+              self.zesty_ocata):
+            # Kilo through Ocata
+            pools = [
+                'rbd',
+                'cinder-ceph',
+                'glance'
+            ]
+        else:
+            # Pike and later
+            pools = [
+                'cinder-ceph',
                 'glance'
             ]
 

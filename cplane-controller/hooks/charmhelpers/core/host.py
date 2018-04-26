@@ -34,7 +34,7 @@ import six
 
 from contextlib import contextmanager
 from collections import OrderedDict
-from .hookenv import log
+from .hookenv import log, DEBUG, local_unit
 from .fstab import Fstab
 from charmhelpers.osplatform import get_platform
 
@@ -45,6 +45,7 @@ if __platform__ == "ubuntu":
         add_new_group,
         lsb_release,
         cmp_pkgrevno,
+        CompareHostReleases,
     )  # flake8: noqa -- ignore F401 for this import
 elif __platform__ == "centos":
     from charmhelpers.core.host_factory.centos import (
@@ -52,44 +53,146 @@ elif __platform__ == "centos":
         add_new_group,
         lsb_release,
         cmp_pkgrevno,
+        CompareHostReleases,
     )  # flake8: noqa -- ignore F401 for this import
 
+UPDATEDB_PATH = '/etc/updatedb.conf'
 
-def service_start(service_name):
-    """Start a system service"""
-    return service('start', service_name)
+def service_start(service_name, **kwargs):
+    """Start a system service.
+
+    The specified service name is managed via the system level init system.
+    Some init systems (e.g. upstart) require that additional arguments be
+    provided in order to directly control service instances whereas other init
+    systems allow for addressing instances of a service directly by name (e.g.
+    systemd).
+
+    The kwargs allow for the additional parameters to be passed to underlying
+    init systems for those systems which require/allow for them. For example,
+    the ceph-osd upstart script requires the id parameter to be passed along
+    in order to identify which running daemon should be reloaded. The follow-
+    ing example stops the ceph-osd service for instance id=4:
+
+    service_stop('ceph-osd', id=4)
+
+    :param service_name: the name of the service to stop
+    :param **kwargs: additional parameters to pass to the init system when
+                     managing services. These will be passed as key=value
+                     parameters to the init system's commandline. kwargs
+                     are ignored for systemd enabled systems.
+    """
+    return service('start', service_name, **kwargs)
 
 
-def service_stop(service_name):
-    """Stop a system service"""
-    return service('stop', service_name)
+def service_stop(service_name, **kwargs):
+    """Stop a system service.
+
+    The specified service name is managed via the system level init system.
+    Some init systems (e.g. upstart) require that additional arguments be
+    provided in order to directly control service instances whereas other init
+    systems allow for addressing instances of a service directly by name (e.g.
+    systemd).
+
+    The kwargs allow for the additional parameters to be passed to underlying
+    init systems for those systems which require/allow for them. For example,
+    the ceph-osd upstart script requires the id parameter to be passed along
+    in order to identify which running daemon should be reloaded. The follow-
+    ing example stops the ceph-osd service for instance id=4:
+
+    service_stop('ceph-osd', id=4)
+
+    :param service_name: the name of the service to stop
+    :param **kwargs: additional parameters to pass to the init system when
+                     managing services. These will be passed as key=value
+                     parameters to the init system's commandline. kwargs
+                     are ignored for systemd enabled systems.
+    """
+    return service('stop', service_name, **kwargs)
 
 
-def service_restart(service_name):
-    """Restart a system service"""
+def service_restart(service_name, **kwargs):
+    """Restart a system service.
+
+    The specified service name is managed via the system level init system.
+    Some init systems (e.g. upstart) require that additional arguments be
+    provided in order to directly control service instances whereas other init
+    systems allow for addressing instances of a service directly by name (e.g.
+    systemd).
+
+    The kwargs allow for the additional parameters to be passed to underlying
+    init systems for those systems which require/allow for them. For example,
+    the ceph-osd upstart script requires the id parameter to be passed along
+    in order to identify which running daemon should be restarted. The follow-
+    ing example restarts the ceph-osd service for instance id=4:
+
+    service_restart('ceph-osd', id=4)
+
+    :param service_name: the name of the service to restart
+    :param **kwargs: additional parameters to pass to the init system when
+                     managing services. These will be passed as key=value
+                     parameters to the  init system's commandline. kwargs
+                     are ignored for init systems not allowing additional
+                     parameters via the commandline (systemd).
+    """
     return service('restart', service_name)
 
 
-def service_reload(service_name, restart_on_failure=False):
+def service_reload(service_name, restart_on_failure=False, **kwargs):
     """Reload a system service, optionally falling back to restart if
-    reload fails"""
-    service_result = service('reload', service_name)
+    reload fails.
+
+    The specified service name is managed via the system level init system.
+    Some init systems (e.g. upstart) require that additional arguments be
+    provided in order to directly control service instances whereas other init
+    systems allow for addressing instances of a service directly by name (e.g.
+    systemd).
+
+    The kwargs allow for the additional parameters to be passed to underlying
+    init systems for those systems which require/allow for them. For example,
+    the ceph-osd upstart script requires the id parameter to be passed along
+    in order to identify which running daemon should be reloaded. The follow-
+    ing example restarts the ceph-osd service for instance id=4:
+
+    service_reload('ceph-osd', id=4)
+
+    :param service_name: the name of the service to reload
+    :param restart_on_failure: boolean indicating whether to fallback to a
+                               restart if the reload fails.
+    :param **kwargs: additional parameters to pass to the init system when
+                     managing services. These will be passed as key=value
+                     parameters to the  init system's commandline. kwargs
+                     are ignored for init systems not allowing additional
+                     parameters via the commandline (systemd).
+    """
+    service_result = service('reload', service_name, **kwargs)
     if not service_result and restart_on_failure:
-        service_result = service('restart', service_name)
+        service_result = service('restart', service_name, **kwargs)
     return service_result
 
 
-def service_pause(service_name, init_dir="/etc/init", initd_dir="/etc/init.d"):
+def service_pause(service_name, init_dir="/etc/init", initd_dir="/etc/init.d",
+                  **kwargs):
     """Pause a system service.
 
-    Stop it, and prevent it from starting again at boot."""
+    Stop it, and prevent it from starting again at boot.
+
+    :param service_name: the name of the service to pause
+    :param init_dir: path to the upstart init directory
+    :param initd_dir: path to the sysv init directory
+    :param **kwargs: additional parameters to pass to the init system when
+                     managing services. These will be passed as key=value
+                     parameters to the init system's commandline. kwargs
+                     are ignored for init systems which do not support
+                     key=value arguments via the commandline.
+    """
     stopped = True
-    if service_running(service_name):
-        stopped = service_stop(service_name)
+    if service_running(service_name, **kwargs):
+        stopped = service_stop(service_name, **kwargs)
     upstart_file = os.path.join(init_dir, "{}.conf".format(service_name))
     sysv_file = os.path.join(initd_dir, service_name)
     if init_is_systemd():
         service('disable', service_name)
+        service('mask', service_name)
     elif os.path.exists(upstart_file):
         override_path = os.path.join(
             init_dir, '{}.override'.format(service_name))
@@ -106,13 +209,23 @@ def service_pause(service_name, init_dir="/etc/init", initd_dir="/etc/init.d"):
 
 
 def service_resume(service_name, init_dir="/etc/init",
-                   initd_dir="/etc/init.d"):
+                   initd_dir="/etc/init.d", **kwargs):
     """Resume a system service.
 
-    Reenable starting again at boot. Start the service"""
+    Reenable starting again at boot. Start the service.
+
+    :param service_name: the name of the service to resume
+    :param init_dir: the path to the init dir
+    :param initd dir: the path to the initd dir
+    :param **kwargs: additional parameters to pass to the init system when
+                     managing services. These will be passed as key=value
+                     parameters to the init system's commandline. kwargs
+                     are ignored for systemd enabled systems.
+    """
     upstart_file = os.path.join(init_dir, "{}.conf".format(service_name))
     sysv_file = os.path.join(initd_dir, service_name)
     if init_is_systemd():
+        service('unmask', service_name)
         service('enable', service_name)
     elif os.path.exists(upstart_file):
         override_path = os.path.join(
@@ -126,19 +239,28 @@ def service_resume(service_name, init_dir="/etc/init",
             "Unable to detect {0} as SystemD, Upstart {1} or"
             " SysV {2}".format(
                 service_name, upstart_file, sysv_file))
+    started = service_running(service_name, **kwargs)
 
-    started = service_running(service_name)
     if not started:
-        started = service_start(service_name)
+        started = service_start(service_name, **kwargs)
     return started
 
 
-def service(action, service_name):
-    """Control a system service"""
+def service(action, service_name, **kwargs):
+    """Control a system service.
+
+    :param action: the action to take on the service
+    :param service_name: the name of the service to perform th action on
+    :param **kwargs: additional params to be passed to the service command in
+                    the form of key=value.
+    """
     if init_is_systemd():
         cmd = ['systemctl', action, service_name]
     else:
         cmd = ['service', service_name, action]
+        for key, value in six.iteritems(kwargs):
+            parameter = '%s=%s' % (key, value)
+            cmd.append(parameter)
     return subprocess.call(cmd) == 0
 
 
@@ -146,15 +268,26 @@ _UPSTART_CONF = "/etc/init/{}.conf"
 _INIT_D_CONF = "/etc/init.d/{}"
 
 
-def service_running(service_name):
-    """Determine whether a system service is running"""
+def service_running(service_name, **kwargs):
+    """Determine whether a system service is running.
+
+    :param service_name: the name of the service
+    :param **kwargs: additional args to pass to the service command. This is
+                     used to pass additional key=value arguments to the
+                     service command line for managing specific instance
+                     units (e.g. service ceph-osd status id=2). The kwargs
+                     are ignored in systemd services.
+    """
     if init_is_systemd():
         return service('is-active', service_name)
     else:
         if os.path.exists(_UPSTART_CONF.format(service_name)):
             try:
-                output = subprocess.check_output(
-                    ['status', service_name],
+                cmd = ['status', service_name]
+                for key, value in six.iteritems(kwargs):
+                    parameter = '%s=%s' % (key, value)
+                    cmd.append(parameter)
+                output = subprocess.check_output(cmd,
                     stderr=subprocess.STDOUT).decode('UTF-8')
             except subprocess.CalledProcessError:
                 return False
@@ -177,6 +310,8 @@ SYSTEMD_SYSTEM = '/run/systemd/system'
 
 def init_is_systemd():
     """Return True if the host system uses systemd, False otherwise."""
+    if lsb_release()['DISTRIB_CODENAME'] == 'trusty':
+        return False
     return os.path.isdir(SYSTEMD_SYSTEM)
 
 
@@ -306,15 +441,60 @@ def add_user_to_group(username, group):
     subprocess.check_call(cmd)
 
 
-def rsync(from_path, to_path, flags='-r', options=None):
+def chage(username, lastday=None, expiredate=None, inactive=None,
+           mindays=None, maxdays=None, root=None, warndays=None):
+    """Change user password expiry information
+
+    :param str username: User to update
+    :param str lastday: Set when password was changed in YYYY-MM-DD format
+    :param str expiredate: Set when user's account will no longer be
+                           accessible in YYYY-MM-DD format.
+                           -1 will remove an account expiration date.
+    :param str inactive: Set the number of days of inactivity after a password
+                         has expired before the account is locked.
+                         -1 will remove an account's inactivity.
+    :param str mindays: Set the minimum number of days between password
+                        changes to MIN_DAYS.
+                        0 indicates the password can be changed anytime.
+    :param str maxdays: Set the maximum number of days during which a
+                        password is valid.
+                        -1 as MAX_DAYS will remove checking maxdays
+    :param str root: Apply changes in the CHROOT_DIR directory
+    :param str warndays: Set the number of days of warning before a password
+                         change is required
+    :raises subprocess.CalledProcessError: if call to chage fails
+    """
+    cmd = ['chage']
+    if root:
+        cmd.extend(['--root', root])
+    if lastday:
+        cmd.extend(['--lastday', lastday])
+    if expiredate:
+        cmd.extend(['--expiredate', expiredate])
+    if inactive:
+        cmd.extend(['--inactive', inactive])
+    if mindays:
+        cmd.extend(['--mindays', mindays])
+    if maxdays:
+        cmd.extend(['--maxdays', maxdays])
+    if warndays:
+        cmd.extend(['--warndays', warndays])
+    cmd.append(username)
+    subprocess.check_call(cmd)
+
+remove_password_expiry = functools.partial(chage, expiredate='-1', inactive='-1', mindays='0', maxdays='-1')
+
+def rsync(from_path, to_path, flags='-r', options=None, timeout=None):
     """Replicate the contents of a path"""
     options = options or ['--delete', '--executability']
     cmd = ['/usr/bin/rsync', flags]
+    if timeout:
+        cmd = ['timeout', str(timeout)] + cmd
     cmd.extend(options)
     cmd.append(from_path)
     cmd.append(to_path)
     log(" ".join(cmd))
-    return subprocess.check_output(cmd).decode('UTF-8').strip()
+    return subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode('UTF-8').strip()
 
 
 def symlink(source, destination):
@@ -350,13 +530,39 @@ def mkdir(path, owner='root', group='root', perms=0o555, force=False):
 
 def write_file(path, content, owner='root', group='root', perms=0o444):
     """Create or overwrite a file with the contents of a byte string."""
-    log("Writing file {} {}:{} {:o}".format(path, owner, group, perms))
     uid = pwd.getpwnam(owner).pw_uid
     gid = grp.getgrnam(group).gr_gid
-    with open(path, 'wb') as target:
-        os.fchown(target.fileno(), uid, gid)
-        os.fchmod(target.fileno(), perms)
-        target.write(content)
+    # lets see if we can grab the file and compare the context, to avoid doing
+    # a write.
+    existing_content = None
+    existing_uid, existing_gid = None, None
+    try:
+        with open(path, 'rb') as target:
+            existing_content = target.read()
+        stat = os.stat(path)
+        existing_uid, existing_gid = stat.st_uid, stat.st_gid
+    except:
+        pass
+    if content != existing_content:
+        log("Writing file {} {}:{} {:o}".format(path, owner, group, perms),
+            level=DEBUG)
+        with open(path, 'wb') as target:
+            os.fchown(target.fileno(), uid, gid)
+            os.fchmod(target.fileno(), perms)
+            if six.PY3 and isinstance(content, six.string_types):
+                content = content.encode('UTF-8')
+            target.write(content)
+        return
+    # the contents were the same, but we might still need to change the
+    # ownership.
+    if existing_uid != uid:
+        log("Changing uid on already existing content: {} -> {}"
+            .format(existing_uid, uid), level=DEBUG)
+        os.chown(path, uid, -1)
+    if existing_gid != gid:
+        log("Changing gid on already existing content: {} -> {}"
+            .format(existing_gid, gid), level=DEBUG)
+        os.chown(path, -1, gid)
 
 
 def fstab_remove(mp):
@@ -684,7 +890,7 @@ def chownr(path, owner, group, follow_links=True, chowntopdir=False):
     :param str path: The string path to start changing ownership.
     :param str owner: The owner string to use when looking up the uid.
     :param str group: The group string to use when looking up the gid.
-    :param bool follow_links: Also Chown links if True
+    :param bool follow_links: Also follow and chown links if True
     :param bool chowntopdir: Also chown path itself if True
     """
     uid = pwd.getpwnam(owner).pw_uid
@@ -698,7 +904,7 @@ def chownr(path, owner, group, follow_links=True, chowntopdir=False):
         broken_symlink = os.path.lexists(path) and not os.path.exists(path)
         if not broken_symlink:
             chown(path, uid, gid)
-    for root, dirs, files in os.walk(path):
+    for root, dirs, files in os.walk(path, followlinks=follow_links):
         for name in dirs + files:
             full = os.path.join(root, name)
             broken_symlink = os.path.lexists(full) and not os.path.exists(full)
@@ -718,6 +924,20 @@ def lchownr(path, owner, group):
     chownr(path, owner, group, follow_links=False)
 
 
+def owner(path):
+    """Returns a tuple containing the username & groupname owning the path.
+
+    :param str path: the string path to retrieve the ownership
+    :return tuple(str, str): A (username, groupname) tuple containing the
+                             name of the user and group owning the path.
+    :raises OSError: if the specified path does not exist
+    """
+    stat = os.stat(path)
+    username = pwd.getpwuid(stat.st_uid)[0]
+    groupname = grp.getgrgid(stat.st_gid)[0]
+    return username, groupname
+
+
 def get_total_ram():
     """The total amount of system RAM in bytes.
 
@@ -732,3 +952,77 @@ def get_total_ram():
                     assert unit == 'kB', 'Unknown unit'
                     return int(value) * 1024  # Classic, not KiB.
         raise NotImplementedError()
+
+
+UPSTART_CONTAINER_TYPE = '/run/container_type'
+
+
+def is_container():
+    """Determine whether unit is running in a container
+
+    @return: boolean indicating if unit is in a container
+    """
+    if init_is_systemd():
+        # Detect using systemd-detect-virt
+        return subprocess.call(['systemd-detect-virt',
+                                '--container']) == 0
+    else:
+        # Detect using upstart container file marker
+        return os.path.exists(UPSTART_CONTAINER_TYPE)
+
+
+def add_to_updatedb_prunepath(path, updatedb_path=UPDATEDB_PATH):
+    with open(updatedb_path, 'r+') as f_id:
+        updatedb_text = f_id.read()
+        output = updatedb(updatedb_text, path)
+        f_id.seek(0)
+        f_id.write(output)
+        f_id.truncate()
+
+
+def updatedb(updatedb_text, new_path):
+    lines = [line for line in updatedb_text.split("\n")]
+    for i, line in enumerate(lines):
+        if line.startswith("PRUNEPATHS="):
+            paths_line = line.split("=")[1].replace('"', '')
+            paths = paths_line.split(" ")
+            if new_path not in paths:
+                paths.append(new_path)
+                lines[i] = 'PRUNEPATHS="{}"'.format(' '.join(paths))
+    output = "\n".join(lines)
+    return output
+
+
+def modulo_distribution(modulo=3, wait=30, non_zero_wait=False):
+    """ Modulo distribution
+
+    This helper uses the unit number, a modulo value and a constant wait time
+    to produce a calculated wait time distribution. This is useful in large
+    scale deployments to distribute load during an expensive operation such as
+    service restarts.
+
+    If you have 1000 nodes that need to restart 100 at a time 1 minute at a
+    time:
+
+      time.wait(modulo_distribution(modulo=100, wait=60))
+      restart()
+
+    If you need restarts to happen serially set modulo to the exact number of
+    nodes and set a high constant wait time:
+
+      time.wait(modulo_distribution(modulo=10, wait=120))
+      restart()
+
+    @param modulo: int The modulo number creates the group distribution
+    @param wait: int The constant time wait value
+    @param non_zero_wait: boolean Override unit % modulo == 0,
+                          return modulo * wait. Used to avoid collisions with
+                          leader nodes which are often given priority.
+    @return: int Calculated time to wait for unit operation
+    """
+    unit_number = int(local_unit().split('/')[1])
+    calculated_wait_time = (unit_number % modulo) * wait
+    if non_zero_wait and calculated_wait_time == 0:
+        return modulo * wait
+    else:
+        return calculated_wait_time
