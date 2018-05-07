@@ -89,7 +89,8 @@ DVND_CONFIG = OrderedDict([
     ('oracle-host', 'DB_HOSTNAME'),
     ('jboss-db-on-host', 'JBOSS_DB_ON_HOST'),
     ('enable-fip', 'GatewayBridgeFipExt'),
-    ('production', 'PRODUCTION')
+    ('production', 'PRODUCTION'),
+    ('dvnd-cluster-port', 'JBOSS_HORNETQ_CLUSTER_PORT')
 ])
 
 MSM_CONFIG = OrderedDict([
@@ -99,6 +100,8 @@ MSM_CONFIG = OrderedDict([
     ('intall-reboot-scripts', 'JBOSS_INSTALL_REBOOT'),
     ('oracle-host', 'DB_HOSTNAME'),
     ('jboss-db-on-host', 'JBOSS_DB_ON_HOST'),
+    ('production', 'PRODUCTION'),
+    ('msm-cluster-port', 'JBOSS_HORNETQ_CLUSTER_PORT')
 ])
 
 TEMPLATES = 'templates/'

@@ -228,3 +228,11 @@ options:
     type: int
     default: 0
     description: "Java version to download from Cplane repo"
+  dvnd-cluster-port:
+    type: int
+    default: 9876
+    description: "Jboss hornetq cluster port for DVND"
+  msm-cluster-port:
+    type: int
+    default: 9877
+    description: "Jboss hornetq cluster port for MSM"
