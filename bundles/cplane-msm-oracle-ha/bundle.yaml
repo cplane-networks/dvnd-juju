@@ -1,0 +1,59 @@
+cplane-repo: &cplane_repo http://repohost.local/cplane_metadata.json
+openstack-version: &openstack_version mitaka
+msm-vip: &msm-vip 0.0.0.0
+series: trusty
+machines:
+  '0':
+    constraints: arch=amd64
+    series: trusty
+  '1':
+    constraints: arch=amd64
+    series: trusty
+  '2':
+    constraints: arch=amd64
+    series: trusty
+
+relations:
+- - oracle:oracle
+  - cplane-msm:oracle
+- - cplane-msm:ha
+  - hacluster-msm:ha
+
+series: trusty
+services:
+  hacluster-msm:
+    charm: cs:xenial/hacluster-40
+    options:
+      cluster_count: 2
+  cplane-msm:
+    annotations:
+      gui-x: '700'
+      gui-y: '0'
+    charm: cs:~cplane-team/trusty/cplane-controller
+    num_units: 1
+    options:
+      cp-package-url: *cplane_repo
+      controller-app-mode: msm
+      msm-version: 262
+      cplane-version: 1.3.8
+      openstack-version: *openstack_version
+      jboss-db-on-host: False
+      use-default-jboss-cluster: true
+      production: 'y'
+      jboss-cluster-name: 'cplane'
+      vip: *msm-vip
+    to:
+    - '0'
+    - '1'
+  oracle:
+    annotations:
+      gui-x: '700'
+      gui-y: '0'
+    charm: cs:~cplane-team/trusty/oracle
+    num_units: 1
+    options:
+      cp-package-url: *cplane_repo
+      cplane-version: 1.3.8
+      openstack-version: *openstack_version
+    to:
+    - '2'
