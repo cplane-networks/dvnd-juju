@@ -1,6 +1,7 @@
 cplane-repo: &cplane_repo http://repohost.local/cplane_metadata.json
 openstack-version: &openstack_version mitaka
 num-of-slave-units: &slave_units 0
+msm-vip: &msm-vip 0.0.0.0
 series: trusty
 machines:
   '0':
@@ -10,6 +11,8 @@ machines:
 relations:
 - - rac-master:oracle
   - cplane-msm:oracle
+- - cplane-msm:ha
+  - hacluster-msm:ha
 
 series: trusty
 services:
@@ -27,6 +30,9 @@ services:
       openstack-version: *openstack_version
       jboss-db-on-host: False
       use-default-jboss-cluster: true
+      production: 'y'
+      jboss-cluster-name: 'cplane'
+      vip: *msm-vip
 #      intf-mtu: "eth1.10=1500"
 #      tso-flag: "eth1.10=off"
 #      gso-flag: "eth1.10=off"

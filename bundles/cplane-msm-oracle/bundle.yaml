@@ -1,6 +1,7 @@
 cplane-repo: &cplane_repo http://repohost.local/cplane_metadata.json
 openstack-version: &openstack_version mitaka
 series: trusty
+msm-vip: &msm-vip 0.0.0.0
 machines:
   '0':
     constraints: arch=amd64
@@ -12,6 +13,8 @@ machines:
 relations:
 - - oracle:oracle
   - cplane-msm:oracle
+- - cplane-msm:ha
+  - hacluster-msm:ha
 
 series: trusty
 services:
@@ -29,6 +32,9 @@ services:
       openstack-version: *openstack_version
       jboss-db-on-host: False 
       use-default-jboss-cluster: true
+      production: 'y'
+      jboss-cluster-name: 'cplane'
+      vip: *msm-vip
     to:
     - '0'
   oracle:
