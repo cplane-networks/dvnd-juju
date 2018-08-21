@@ -87,7 +87,9 @@ class CplaneUtilsTest(CharmTestCase):
 
         self.relation_ids.assert_called_with('cplane-controller')
         self.related_units.assert_called_with('random_rid')
-        self.relation_get.assert_called_with('private-address')
+        self.relation_get.assert_called_with(attribute='private-address',
+                                             rid='random_rid',
+                                             unit='random_unit')
         self.assertEqual(m_check_call.call_args,
                          call(['cp-agentd', 'set-config',
                               'vm-mtu=random_interface']))
@@ -99,7 +101,9 @@ class CplaneUtilsTest(CharmTestCase):
 
         self.relation_ids.assert_called_with('cplane-controller')
         self.related_units.assert_called_with('random_rid')
-        self.relation_get.assert_called_with('private-address')
+        self.relation_get.assert_called_with(attribute='private-address',
+                                             rid='random_rid',
+                                             unit='random_unit')
         self.assertEqual(m_check_call.call_args,
                          call(['cp-agentd', 'set-config',
                                'vm-mtu=random_interface']))

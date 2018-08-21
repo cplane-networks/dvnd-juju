@@ -32,6 +32,7 @@ from cplane_utils import (
     disable_bridge_fw,
     fake_register_configs,
     ML2_CONFIG,
+    disable_port_security,
 )
 
 from cplane_network import (
@@ -183,6 +184,9 @@ def install():
     # disable_neutron_agent()
     pkgs = determine_packages()
     apt_install(pkgs, fatal=True)
+    if config('openstack-version') == 'ocata' or \
+       config('openstack-version') == 'pike':
+        disable_port_security()
     disable_bridge_fw()
 
 

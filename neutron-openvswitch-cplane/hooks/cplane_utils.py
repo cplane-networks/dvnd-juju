@@ -173,7 +173,8 @@ def set_cp_agent():
             mport = relation_get(attribute='mport', unit=unit, rid=rid)
             uport = relation_get(attribute='uport', unit=unit, rid=rid)
             unicast_mode = config('enable-unicast')
-            cplane_controller = relation_get('private-address')
+            cplane_controller = relation_get(attribute='private-address',
+                                             unit=unit, rid=rid)
             if mport:
                 key = 'mcast-port=' + mport
                 cmd = ['cp-agentd', 'set-config', key]

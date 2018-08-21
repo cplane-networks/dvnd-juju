@@ -213,3 +213,15 @@ def add_controller_ip():
 hosts = {}/g' /etc/neutron/plugins/ml2/ml2_conf.ini".format(cplane_controller)
                 os.system(cmd)
                 restart_service()
+
+
+def add_aggr_name():
+    aggr_name = ''
+    for rid in relation_ids('ogr-compute-cplane'):
+        for unit in related_units(rid):
+            aggr_name = relation_get(attribute='aggr-name', unit=unit, rid=rid)
+            if aggr_name is not '':
+                cmd = "sed -ie 's/ogr_aggregation_zone =.*/ogr_aggregation_zone = \
+{}/g' /etc/neutron/plugins/ml2/ml2_conf.ini".format(aggr_name)
+                os.system(cmd)
+                restart_service()

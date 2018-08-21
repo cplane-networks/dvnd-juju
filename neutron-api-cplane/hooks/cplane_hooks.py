@@ -32,6 +32,7 @@ from cplane_utils import (
     assess_status,
     fake_register_configs,
     add_controller_ip,
+    add_aggr_name,
 )
 
 from cplane_network import (
@@ -141,6 +142,11 @@ def cplane_controller_relation_changed():
     mport = relation_get('mport')
     if mport:
         add_controller_ip()
+
+
+@hooks.hook('ogr-compute-cplane-relation-changed')
+def ogr_compute_relation_changed():
+    add_aggr_name()
 
 
 @hooks.hook('shared-db-relation-changed')

@@ -9,6 +9,10 @@ from charmhelpers.core.hookenv import (
     action_fail,
     action_get,
     action_set,
+    relation_set,
+    config,
+    relation_ids,
+    related_units,
 )
 
 from cplane_utils import download_ogr_image
@@ -39,11 +43,23 @@ def create_ogr_zone(args):
     cmd = "su - ubuntu -c 'source nova.rc && nova aggregate-add-host {} {}'"\
           .format(aggr_name, ogr_compute)
     commands.getoutput(cmd)
-
-    cmd = "su - ubuntu -c 'source nova.rc && nova aggregate-details {}'"\
-          .format(aggr_name)
+    if config("openstack-version") == "liberty" or \
+       config("openstack-version") == "mitaka":
+        cmd = "su - ubuntu -c 'source nova.rc && nova aggregate-details {}'"\
+              .format(aggr_name)
+    else:
+        cmd = "su - ubuntu -c 'source nova.rc && nova aggregate-show {}'"\
+              .format(aggr_name)
     res = commands.getoutput(cmd)
     action_set({'result-map.message': res})
+    relation_info = {
+        'aggr-name': aggr_name
+    }
+    if config("openstack-version") == "pike" or \
+       config("openstack-version") == "ocata":
+        for rid in relation_ids('neutron-api-cplane'):
+            for unit in related_units(rid):
+                relation_set(relation_id=rid, relation_settings=relation_info)
 
 
 def delete_ogr_zone(args):
