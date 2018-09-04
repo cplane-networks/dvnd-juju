@@ -49,8 +49,8 @@ class CplaneUtilsTest(CharmTestCase):
     def test_prepare_env(self, m_check_call):
         cplane_utils.JBOSS_DIR = '.'
         cplane_utils.prepare_env()
-        m_check_call.assert_called_with(['sysctl', '-p', '/etc/sysctl.d/\
-10-network-security.conf'])
+        m_check_call.assert_called_with(['ln', '-sf', '/etc/init.d',
+                                         '/etc/rc.d/init.d'])
 
     @patch.object(cplane_utils.os.path, "exists")
     @patch("subprocess.check_call")
