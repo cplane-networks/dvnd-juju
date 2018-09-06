@@ -12,8 +12,8 @@ TO_PATCH = [
     'relation_get',
     'juju_log',
     'config',
-    'add_bridge',
     'check_interface',
+    'create_br_fip',
     'open'
 ]
 
@@ -62,7 +62,7 @@ class CplaneUtilsTest(CharmTestCase):
                                              rid='random_rid')
         self.config.assert_called_with('fip-interface')
         self.check_interface.assert_called_with('random_interface')
-        self.add_bridge.assert_called_with('br-fip', 'random_interface')
+        self.create_br_fip.assert_called_with('random_interface')
 
         # Check for incorrect fip interface
         self.check_interface.return_value = False

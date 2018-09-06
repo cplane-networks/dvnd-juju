@@ -124,6 +124,7 @@ def config_changed():
         subprocess.check_call(cmd)
     cmd = ['sysctl', '-p']
     subprocess.check_call(cmd)
+    manage_fip()
     CONFIGS.write_all()
     restart_services()
 

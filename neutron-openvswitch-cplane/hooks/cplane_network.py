@@ -13,41 +13,27 @@ class InterfaceConfigurationException(Exception):
     pass
 
 
-def create_br_ext(interface):
-    data = get_int_config(interface)
-    netmask = data[0]['netmask']
-    addr = data[0]['addr']
-    gateway = ni.gateways()
-    gw = gateway['default'][ni.AF_INET][0]
-
-    cmd = ['ovs-vsctl', 'add-br', 'br-ext']
-    subprocess.check_call(cmd)
-    cmd = ['ovs-vsctl', 'add-port', 'br-ext', interface]
-    subprocess.check_call(cmd)
-    cmd = ['ifconfig', interface, '0.0.0.0']
-    subprocess.check_call(cmd)
-    cmd = ['ifconfig', 'br-ext', addr, 'netmask', netmask, 'up']
-    subprocess.check_call(cmd)
-    cmd = ['route', 'add', 'default', 'gw', gw]
-    subprocess.check_call(cmd)
+def create_br_fip(interface):
+    if check_interface('br-fip'):
+        cmd = ['ifconfig', 'br-fip', 'up']
+        subprocess.check_call(cmd)
+    elif interface is not None:
+        cmd = ['ovs-vsctl', 'add-br', 'br-fip']
+        subprocess.check_call(cmd)
+        cmd = ['ovs-vsctl', 'add-port', 'br-fip', interface]
+        subprocess.check_call(cmd)
+        cmd = ['ifconfig', 'br-fip', 'up']
+        subprocess.check_call(cmd)
 
 
-def delete_br_ext(interface):
-    data = get_int_config('br-ext')
-    netmask = data[0]['netmask']
-    addr = data[0]['addr']
-    gateway = ni.gateways()
-    gw = gateway['default'][ni.AF_INET][0]
-
-    cmd = ['ovs-vsctl', 'del-port', 'br-ext', interface]
+def delete_br_fip(interface):
+    cmd = ['ifconfig', 'br-fip', 'down']
     subprocess.check_call(cmd)
 
-    cmd = ['ovs-vsctl', 'del-br', 'br-ext']
+    cmd = ['ovs-vsctl', 'del-port', 'br-fip', interface]
     subprocess.check_call(cmd)
 
-    cmd = ['ifconfig', interface, addr, 'netmask', netmask, 'up']
-    subprocess.check_call(cmd)
-    cmd = ['route', 'add', 'default', 'gw', gw]
+    cmd = ['ovs-vsctl', 'del-br', 'br-fip']
     subprocess.check_call(cmd)
 
 

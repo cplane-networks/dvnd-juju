@@ -32,8 +32,8 @@ from cplane_package_manager import(
 )
 
 from cplane_network import (
-    add_bridge,
     check_interface,
+    create_br_fip,
 )
 
 TEMPLATES = 'templates/'
@@ -159,7 +159,7 @@ def manage_fip():
             fip_mode = relation_get(attribute='fip-mode', unit=unit, rid=rid)
             if fip_mode == 'True':
                 if check_interface(config('fip-interface')):
-                    add_bridge('br-fip', config('fip-interface'))
+                    create_br_fip(config('fip-interface'))
                 else:
                     juju_log('Fip interface doesnt exist, and \
                     will be used by default by Cplane controller')
