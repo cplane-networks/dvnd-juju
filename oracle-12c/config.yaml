@@ -58,9 +58,13 @@ options:
     type: string
     description: "Password to access the database"
   private-interface:
-    default: "eth0"
+    default: "eth1"
     type: string
     description: "Private interface of the Oracle node"
+  public-interface:
+    default: "eth0"
+    type: string
+    description: "Public interface of the Oracle node"
   openstack-version:
     default: "liberty"
     type: string

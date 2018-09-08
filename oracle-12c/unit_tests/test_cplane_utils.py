@@ -25,7 +25,6 @@ TO_PATCH = [
     'log',
     'open',
     'unit_get',
-    'unit_private_ip',
     'local_unit',
     'get_ip',
 ]
@@ -48,7 +47,6 @@ class CplaneUtilsTest(CharmTestCase):
         super(CplaneUtilsTest, self).setUp(cplane_utils, TO_PATCH)
         self.config.side_effect = self.test_config.get
         self.unit_get.return_value = '127.0.0.1'
-        self.unit_private_ip.return_value = '127.0.0.1'
         self.local_unit.return_value = 'test/0'
         self.get_ip.return_value = '127.0.0.1'
         data = OrderedDict()
