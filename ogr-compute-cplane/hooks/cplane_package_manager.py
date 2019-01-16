@@ -52,8 +52,16 @@ class CPlanePackageManager:
     def _get_pkg_json(self):
         url = self.package_url
         response = None
+        proxies = {}
+        if config('http-proxy'):
+            proxies['http'] = config('http-proxy')
+        if config('https-proxy'):
+            proxies['https'] = config('https-proxy')
         try:
-            response = urllib.urlopen(url)
+            if not proxies:
+                response = urllib.urlopen(url)
+            else:
+                response = urllib.urlopen(url, proxies=proxies)
         except IOError:
             msg = "Invalid URL: URL metioned for Cplane binaries is not valid"
             status_set('blocked', msg)

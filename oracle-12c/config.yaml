@@ -89,3 +89,11 @@ options:
     default: 1248
     type: int
     description: "Max sessions for oracle RAC DB"
+  http-proxy:
+    default:
+    type: string
+    description: "Http proxy to download cplane binaries from dropbox"
+  https-proxy:
+    default:
+    type: string
+    description: "Https proxy to download cplane binaries from dropbox"
