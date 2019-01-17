@@ -2,6 +2,7 @@ import os
 import logging
 from optparse import OptionParser
 import urllib
+import urllib2
 import json
 import hashlib
 import urlparse
@@ -60,7 +61,10 @@ class CPlanePackageManager:
             if not proxies:
                 response = urllib.urlopen(url)
             else:
-                response = urllib.urlopen(url, proxies=proxies)
+                proxy = urllib2.ProxyHandler(proxies)
+                opener = urllib2.build_opener(proxy)
+                urllib2.install_opener(opener)
+                response = urllib2.urlopen(url)
         except IOError:
             msg = "Invalid URL: URL metioned for Cplane binaries is not valid"
             status_set('blocked', msg)
@@ -151,7 +155,20 @@ package {}".format(version, package_name)
         filename = urlparse.urlsplit(package_dwnld_link).path
         dwnld_package_name = os.path.join(CHARM_LIB_DIR,
                                           os.path.basename(filename))
-        urllib.urlretrieve(package_dwnld_link, dwnld_package_name)
+        proxies = {}
+        if config('http-proxy'):
+            proxies['http'] = config('http-proxy')
+        if config('https-proxy'):
+            proxies['https'] = config('https-proxy')
+        if not proxies:
+            urllib.urlretrieve(package_dwnld_link, dwnld_package_name)
+        else:
+            proxy = urllib2.ProxyHandler(proxies)
+            opener = urllib2.build_opener(proxy)
+            urllib2.install_opener(opener)
+            dwnldfile = urllib2.urlopen(package_dwnld_link)
+            with open(dwnld_package_name, 'wb') as output:
+                output.write(dwnldfile.read())
 
         if self.verify_file_checksum(dwnld_package_name, file_checksum):
             juju_log("Package %s downloaded successfully"
