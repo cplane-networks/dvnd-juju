@@ -169,7 +169,7 @@ def configure_host():
     hostname = socket.gethostname()
     hostname = hostname.split('.maas')[0]
     cmd = ("echo {} {} >> '/etc/hosts'".format(unit_get('private-address'),
-                                              hostname))
+                                               hostname))
     os.system(cmd)
 
 
