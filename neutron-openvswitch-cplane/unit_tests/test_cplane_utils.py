@@ -36,7 +36,8 @@ class CplaneUtilsTest(CharmTestCase):
         m_get_os_release.return_value = '14.04'
         self.assertEqual(cplane_utils.determine_packages(),
                          ['neutron-metadata-agent', 'neutron-plugin-ml2',
-                          'crudini', 'dkms', 'iputils-arping', 'dnsmasq'])
+                          'crudini', 'dkms', 'iputils-arping', 'dnsmasq',
+                          'libnuma-dev'])
 
     @patch("subprocess.check_call")
     def test_crudini_set(self, m_check_call):

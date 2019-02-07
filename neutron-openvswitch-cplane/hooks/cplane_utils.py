@@ -57,7 +57,7 @@ if config('enable-dpdk'):
     del cplane_packages['openvswitch-common']
     del cplane_packages['openvswitch-datapath-dkms']
     del cplane_packages['openvswitch-switch']
-  
+
 neutron_config = {
     'rabbit_userid': config('rabbit-user'),
     'rabbit_virtual_host': config('rabbit-vhost'),
@@ -155,26 +155,28 @@ def install_cplane_packages():
     for key, value in cplane_packages.items():
         filename = cp_package.download_package(key, value)
         if key == 'dpdk':
-            cmd = ['tar', '-xvzf', filename, '-C', '/usr/src'] 
+            cmd = ['tar', '-xvzf', filename, '-C', '/usr/src']
             dpdk_dir = subprocess.check_output(cmd).split('\n')[0]
             with open('/etc/profile.d/dpdk_env.sh', 'a') as dpdk_env:
-                dpdk_env.write('export DPDK_DIR=/usr/src/{}\n'.format(dpdk_dir))
-                dpdk_env.write('export DPDK_TARGET={}-native-linuxapp-gcc\n'.format(get_arch()))   
+                dpdk_env.write('export DPDK_DIR=/usr/src/{}\n'.
+                               format(dpdk_dir))
+                dpdk_env.write('export DPDK_TARGET={}-native-linuxapp-gcc\n'.
+                               format(get_arch()))
                 dpdk_env.write('export DPDK_BUILD=$DPDK_DIR$DPDK_TARGET\n')
         elif key == 'ovs':
             cmd = ['tar', '-xvzf', filename, '-C', '/usr/src']
             ovs_dir = subprocess.check_output(cmd).split('\n')[0]
             with open('/etc/profile.d/dpdk_env.sh', 'a') as dpdk_env:
-                dpdk_env.write('export OVS_DIR=/usr/src/{}\n'.format(ovs_dir))   
+                dpdk_env.write('export OVS_DIR=/usr/src/{}\n'.format(ovs_dir))
         else:
-        cmd = ['dpkg', '-i', filename]
-        subprocess.check_call(cmd)
+            cmd = ['dpkg', '-i', filename]
+            subprocess.check_call(cmd)
         options = "--fix-broken"
         apt_install(options, fatal=True)
     if config('enable-dpdk'):
         set_dpdk_env()
         install_dpdk()
-        install_ovs()  
+        install_ovs()
 
 
 def manage_fip():
@@ -360,4 +362,3 @@ def install_ovs():
 def create_vfio_file():
     with open("/etc/modprobe.d/vfio_iommu_type1.conf", 'w') as config_file:
         config_file.write("options vfio_iommu_type1 allow_unsafe_interrupts=1")
-
