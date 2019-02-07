@@ -1,5 +1,6 @@
 import subprocess
 import commands
+import socket
 
 
 from collections import OrderedDict
@@ -8,7 +9,7 @@ from charmhelpers.core.hookenv import (
     log,
     relation_ids,
     related_units,
-
+    unit_get,
 )
 
 from charmhelpers.fetch import (
@@ -161,6 +162,14 @@ def configure_oracle():
 
 def install_reboot_scripts():
     cmd = 'update-rc.d {} defaults 20 '.format(config('oracle-version'))
+    os.system(cmd)
+
+
+def configure_host():
+    hostname = socket.gethostname()
+    hostname = hostname.split('.maas')[0]
+    cmd = ("echo {} {} >> '/etc/hosts'".format(unit_get('private-address'),
+                                              hostname))
     os.system(cmd)
 
 

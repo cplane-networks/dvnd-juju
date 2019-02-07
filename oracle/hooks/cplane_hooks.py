@@ -18,6 +18,7 @@ from cplane_utils import (
     download_cplane_packages,
     install_oracle,
     configure_oracle,
+    configure_host,
     install_reboot_scripts,
     assess_status,
     fake_register_configs,
@@ -42,6 +43,7 @@ def oracle_relation_joined():
 def install():
     pkgs = determine_packages()
     apt_install(pkgs, fatal=True)
+    configure_host()
     download_cplane_packages()
     install_oracle()
     configure_oracle()
