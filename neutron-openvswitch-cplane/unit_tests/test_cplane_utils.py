@@ -12,8 +12,8 @@ TO_PATCH = [
     'relation_get',
     'juju_log',
     'config',
-    'add_bridge',
     'check_interface',
+    'create_br_fip',
     'open'
 ]
 
@@ -62,7 +62,7 @@ class CplaneUtilsTest(CharmTestCase):
                                              rid='random_rid')
         self.config.assert_called_with('fip-interface')
         self.check_interface.assert_called_with('random_interface')
-        self.add_bridge.assert_called_with('br-fip', 'random_interface')
+        self.create_br_fip.assert_called_with('random_interface')
 
         # Check for incorrect fip interface
         self.check_interface.return_value = False
@@ -87,7 +87,9 @@ class CplaneUtilsTest(CharmTestCase):
 
         self.relation_ids.assert_called_with('cplane-controller')
         self.related_units.assert_called_with('random_rid')
-        self.relation_get.assert_called_with('private-address')
+        self.relation_get.assert_called_with(attribute='private-address',
+                                             rid='random_rid',
+                                             unit='random_unit')
         self.assertEqual(m_check_call.call_args,
                          call(['cp-agentd', 'set-config',
                               'vm-mtu=random_interface']))
@@ -99,7 +101,9 @@ class CplaneUtilsTest(CharmTestCase):
 
         self.relation_ids.assert_called_with('cplane-controller')
         self.related_units.assert_called_with('random_rid')
-        self.relation_get.assert_called_with('private-address')
+        self.relation_get.assert_called_with(attribute='private-address',
+                                             rid='random_rid',
+                                             unit='random_unit')
         self.assertEqual(m_check_call.call_args,
                          call(['cp-agentd', 'set-config',
                                'vm-mtu=random_interface']))

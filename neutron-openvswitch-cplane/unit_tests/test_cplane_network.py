@@ -34,13 +34,11 @@ class CplaneNetworkTest(CharmTestCase):
         call(["rm", "-f", "/tmp/cplane.ini"])
 
     @patch("subprocess.check_call")
-    def test_create_br_ext(self, m_check_call):
+    def test_create_br_fip(self, m_check_call):
 
-        gateway = ni.gateways()
-        gw = gateway['default'][ni.AF_INET][0]
-        cplane_network.create_br_ext('lo')
+        cplane_network.create_br_fip('lo')
         self.assertEqual(m_check_call.call_args,
-                         call(['route', 'add', 'default', 'gw', gw]))
+                         call(['ifconfig', 'br-fip', 'up']))
 
     @patch("subprocess.check_call")
     def test_restart_network_service(self, m_check_call):

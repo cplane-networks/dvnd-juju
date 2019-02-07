@@ -19,7 +19,6 @@ from charmhelpers.core.hookenv import (
     relation_get,
     related_units,
     relation_set,
-    unit_private_ip,
     log as juju_log,
     log,
     local_unit,
@@ -201,7 +200,7 @@ def generate_host_string(address_type):
         host_string = private_address + '\t' + hostname + "-priv." + \
             domain_name + '\t' + hostname + "-priv"
     elif address_type == 'public':
-        public_address = unit_private_ip()
+        public_address = get_ip(config('public-interface'))
         host_string = public_address + '\t' + hostname + "." + \
             domain_name + '\t' + hostname
     elif address_type == 'vip':

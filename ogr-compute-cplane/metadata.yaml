@@ -17,6 +17,8 @@ provides:
   neutron-plugin:
     interface: neutron-plugin
     scope: container
+  neutron-api-cplane:
+    interface: ogr-compute-cplane
 requires:
   container:
     interface: juju-info

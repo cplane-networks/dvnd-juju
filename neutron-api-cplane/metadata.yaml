@@ -30,3 +30,5 @@ requires:
     interface: rabbitmq
   cplane-controller:
     interface: cplane-controller
+  ogr-compute-cplane:
+    interface: ogr-compute-cplane

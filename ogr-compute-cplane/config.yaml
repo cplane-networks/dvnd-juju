@@ -165,4 +165,12 @@ options:
     type: string
     default:
     description: "Metadata shared secret"
+  http-proxy:
+    default:
+    type: string
+    description: "Http proxy to download cplane binaries from dropbox"
+  https-proxy:
+    default:
+    type: string
+    description: "Https proxy to download cplane binaries from dropbox"
 

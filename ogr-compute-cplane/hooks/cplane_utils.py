@@ -1,4 +1,5 @@
 import subprocess
+import os
 
 from copy import deepcopy
 from collections import OrderedDict
@@ -24,7 +25,6 @@ from cplane_package_manager import(
 import cplane_context
 
 TEMPLATES = 'templates/'
-release = os_release('nova-common')
 PACKAGES = ['sysfsutils', 'neutron-metadata-agent', 'python-neutronclient',
             'crudini', 'conntrack', 'neutron-plugin-ml2',
             'neutron-plugin-linuxbridge-agent']
@@ -33,8 +33,9 @@ METADATA_AGENT_INI = '/etc/neutron/metadata_agent.ini'
 NEUTRON_CONF_DIR = "/etc/neutron"
 NEUTRON_CONF = '%s/neutron.conf' % NEUTRON_CONF_DIR
 
-ML2_CONFIG = '/etc/neutron/plugins/ml2/ml2_conf.ini'
-if release >= 'mitaka':
+if config('openstack-version') == 'liberty':
+    ML2_CONFIG = '/etc/neutron/plugins/ml2/ml2_conf.ini'
+else:
     ML2_CONFIG = '/etc/neutron/plugins/ml2/linuxbridge_agent.ini'
 
 BASE_RESOURCE_MAP = OrderedDict([
@@ -185,3 +186,12 @@ def disable_bridge_fw():
     subprocess.check_call(cmd)
     cmd = ['service', 'ebtables', 'stop']
     subprocess.check_call(cmd)
+
+
+def disable_port_security():
+    arp_protect_file = "/usr/lib/python2.7/dist-packages/neutron/plugins/ml2/\
+drivers/linuxbridge/agent/arp_protect.py"
+    cmd = ('sed -i "/def setup_arp_spoofing_protection(vif, port_details)/a\ \
+\ \ \ port_details['"'port_security_enabled'"'] = False" {}'
+           .format(arp_protect_file))
+    os.system(cmd)

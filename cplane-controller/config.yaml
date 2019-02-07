@@ -236,3 +236,12 @@ options:
     type: int
     default: 9877
     description: "Jboss hornetq cluster port for MSM"
+  http-proxy:
+    default:
+    type: string
+    description: "Http proxy to download cplane binaries from dropbox"
+  https-proxy:
+    default:
+    type: string
+    description: "Https proxy to download cplane binaries from dropbox"
+

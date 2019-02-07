@@ -38,7 +38,7 @@ class UbuntuIntfMgmt(object):
         """ extract the configuration for a specific interface
         """
         src_file = "/etc/network/interfaces.d/50-cloud-init.cfg"
-        if not os.path.exists(src_file):
+        if check_default_interface_file():
             src_file = "/etc/network/interfaces"
         back_file = "/tmp/cp_interfaces_file.{dt}".format(
             dt=datetime.now().strftime("%m%d%Y%H%M%S"))
@@ -124,7 +124,7 @@ class UbuntuIntfMgmt(object):
             op_file = kwargs['intf_file']
         else:
             op_file = "/etc/network/interfaces.d/50-cloud-init.cfg"
-            if not os.path.exists(op_file):
+            if check_default_interface_file():
                 op_file = "/etc/network/interfaces"
         with open(op_file, "a+") as fp_o:
             fp_o.write("\n")
@@ -163,7 +163,7 @@ class UbuntuIntfMgmt(object):
             raise ValueError("{name} interface needs bridge_name".
                              format(name=ifname))
         op_file = "/etc/network/interfaces.d/50-cloud-init.cfg"
-        if not os.path.exists(op_file):
+        if check_default_interface_file():
             op_file = "/etc/network/interfaces"
 
         with open(op_file, "a+") as fp_o:
@@ -217,7 +217,7 @@ class UbuntuIntfMgmt(object):
             op_file = kwargs['intf_file']
         else:
             op_file = "/etc/network/interfaces.d/50-cloud-init.cfg"
-            if not os.path.exists(op_file):
+            if check_default_interface_file():
                 op_file = "/etc/network/interfaces"
         with open(op_file, "a+") as fp_o:
             fp_o.write("\n")
@@ -259,7 +259,7 @@ class UbuntuIntfMgmt(object):
             op_file = kwargs['intf_file']
         else:
             op_file = "/etc/network/interfaces.d/50-cloud-init.cfg"
-            if not os.path.exists(op_file):
+            if check_default_interface_file():
                 op_file = "/etc/network/interfaces"
         with open(op_file, "a+") as fp_o:
             fp_o.write("\n")
@@ -289,7 +289,7 @@ class UbuntuIntfMgmt(object):
         """ Change the MTU of the interface
         """
         src_file = "/etc/network/interfaces.d/50-cloud-init.cfg"
-        if not os.path.exists(src_file):
+        if check_default_interface_file():
             src_file = "/etc/network/interfaces"
         back_file = "/tmp/cp_interfaces_file.{dt}".format(
             dt=datetime.now().strftime("%m%d%Y%H%M%S"))
@@ -434,3 +434,11 @@ class UbuntuIntfMgmt(object):
         fp_read.close()
         fp_bak.close()
         shutil.move(back_file, src_file)
+
+
+def check_default_interface_file():
+    with open('/etc/network/interfaces', 'r') as file:
+        if "source /etc/network/interfaces.d" in file.read():
+            return False
+        else:
+            return True
