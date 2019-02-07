@@ -1,0 +1,22 @@
+name: authenticate-cplane
+summary: Cplane authenticate for docker controller 
+maintainer: amarendra <info@cplanenetworks.com>
+description: |
+      CPlane authenticate module for docker controller.
+
+tags:
+  - identity
+  - misc
+extra-bindings:
+  public:
+  admin:
+  internal:
+provides:
+  auth:
+    interface: auth
+requires:
+  container:
+    interface: juju-info
+    scope: container
+  oracle:
+    interface: oracle

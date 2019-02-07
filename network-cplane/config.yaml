@@ -1,0 +1,109 @@
+options:
+  cp-package-url:
+    default: "http://repohost/cplane_metadata.json"
+    type: string
+    description: |
+      URL for cplane packages
+      if from local repo then "http://xx.xx.xx.xx/cplane_metadata.json" 
+  cplane-version:
+    default: "1.3.8"
+    type: string
+    description: "Cplane softwares version"
+  openstack-version:
+    default: "liberty"
+    type: string
+    description: "Openstack version eg. liberty, mitaka, ocata"
+  database-user:
+    default: "neutron"
+    type: string
+    description: "Database user name to connect to the oracle"
+  database-password:
+    default: "password"
+    type: string
+    description: "Database password to connect to the oracle"
+  database-type:
+    default: "oracle"
+    type: string
+    description: "Database type to connect to the oracle"
+  database-port:
+    default: 1521
+    type: int
+    description: "Database port to connect to the oracle"
+  db-on-host:
+    default: False
+    type: boolean
+    description: "Whether DB is on the same host where JBOSS is installed"
+  oracle-client-basic:
+    default: "12"
+    type: string
+    description: "The oracle instant client basic version"
+  oracle-sqlplus:
+    default: "12"
+    type: string
+    description: "The oracle instant client sqlplus version"
+  intf-mtu:
+    default:
+    type: string
+    description: "MTU for node interface. Eg. br-ext=9000,eth0=9000"
+  tso-flag:
+    default:
+    type: string
+    description: "Flag to trun off the TSO for an interface. Eg. eth1.10=off,br-ext=off"
+  gso-flag:
+    default:
+    type: string
+    description: "Flag to trun off the GSO for an interface. Eg. eth1.10=off,br-ext=off"
+  rx-flag:
+    default:
+    type: string
+    description: "Flag to trun off the RX for an interface. Eg. eth1.10=off,br-ext=off"
+  tx-flag:
+    default:
+    type: string
+    description: "Flag to trun off the TX for an interface. Eg. eth1.10=off,br-ext=off"
+  sg-flag:
+    default:
+    type: string
+    description: "Flag to trun off the SG for an interface. Eg. eth1.10=off,br-ext=off"
+  ufo-flag:
+    default:
+    type: string
+    description: "Flag to trun off the UFO for an interface. Eg. eth1.10=off,br-ext=off"
+  gro-flag:
+    default:
+    type: string
+    description: "Flag to trun off the GRO for an interface. Eg. eth1.10=off,br-ext=off"
+  lro-flag:
+    default:
+    type: string
+    description: "Flag to trun off the LRO for an interface. Eg. eth1.10=off,br-ext=off"
+  overlay-network-type:
+    default: gre vxlan
+    type: string
+    description: |
+      Overlay network types to use, valid options include:
+        gre
+        vxlan
+      Multiple types can be provided - field is space delimited.
+  security-groups:
+    default: True
+    type: boolean
+    description: Enable cplane  managed security groups.
+  cplane-controller_ip:
+    type: string
+    default: "192.168.4.154"
+    description: "IP of the Cplane controller"
+  cplane-controller_port:
+    type: int
+    default: 8080
+    description: "Cplane controller port"
+  vlan-ranges:
+    type: string
+    default: "physnet1:1000:2000"
+    description: |
+      Space-delimited list of Neutron network-provider & vlan-id-ranges using
+      the following format "<provider>:<start>:<end> ...".
+  topology-name:
+    default: "default"
+    type: string
+    description: "Name of the topology"

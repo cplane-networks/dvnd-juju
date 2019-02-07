@@ -1,0 +1,18 @@
+name: docker-compute-cplane
+summary: Cplane docker compute 
+maintainer: amarendra <info@cplanenetworks.com>
+description: |
+      The cplane-agent is a daemon that resides on compute nodes and other remotely managed endpoints. Cplane-agent is part of CPLANE NETWORKS’ Distributed Control 
+      Software-Defined Networking infrastructure orchestration and management platform.  
+
+tags:
+  - openstack
+  - networking
+extra-bindings:
+  public:
+  admin:
+  internal:
+requires:
+  cplane-controller:
+    interface: cplane-controller
+

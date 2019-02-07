@@ -1,0 +1,24 @@
+name: network-cplane
+summary: Cplane network for docker controller 
+maintainer: amarendra <info@cplanenetworks.com>
+description: |
+      CPlane network module for docker controller.
+
+tags:
+  - network
+  - misc
+extra-bindings:
+  public:
+  admin:
+  internal:
+requires:
+  container:
+    interface: juju-info
+    scope: container
+  oracle:
+    interface: oracle
+  auth:
+    interface: auth
+  cplane-controller:
+    interface: cplane-controller
+
