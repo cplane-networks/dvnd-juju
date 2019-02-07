@@ -37,6 +37,8 @@ from cplane_utils import (
     assess_status,
     fake_register_configs,
     get_os_release,
+    create_vfio_file,
+    set_dpdk_env,
 )
 
 
@@ -117,6 +119,7 @@ def cplane_ovs_relation_changed():
 
 @hooks.hook('config-changed')
 def config_changed():
+    set_dpdk_env()
     set_cp_agent()
     cplane_config(system_config, SYSTEM_CONF, '')
     if get_os_release() == '16.04':
@@ -217,6 +220,7 @@ def install():
 #    disable_neutron_agent()
     pkgs = determine_packages()
     apt_install(pkgs, fatal=True)
+    create_vfio_file()
     install_cplane_packages()
     add_bridge('br-ext',
                interface=config('data-interface'),

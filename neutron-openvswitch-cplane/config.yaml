@@ -129,4 +129,7 @@ options:
     default:
     type: string
     description: "Https proxy to download cplane binaries from dropbox"
-
+  enable-dpdk:
+    default: False
+    type: boolean
+    description: Flag to enable DPDK

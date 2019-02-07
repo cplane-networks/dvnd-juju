@@ -51,6 +51,13 @@ if config('cplane-version') == "1.3.5":
     cplane_packages['cplane-neutron-plugin'] = 439
     del cplane_packages['cplane-notification-driver']
 
+if config('enable-dpdk'):
+    cplane_packages['dpdk'] = -1
+    cplane_packages['ovs'] = -1
+    del cplane_packages['openvswitch-common']
+    del cplane_packages['openvswitch-datapath-dkms']
+    del cplane_packages['openvswitch-switch']
+  
 neutron_config = {
     'rabbit_userid': config('rabbit-user'),
     'rabbit_virtual_host': config('rabbit-vhost'),
@@ -61,7 +68,7 @@ neutron_config = {
 NEUTRON_CONF = '/etc/neutron/neutron.conf'
 
 PACKAGES = ['neutron-metadata-agent', 'neutron-plugin-ml2', 'crudini',
-            'dkms', 'iputils-arping', 'dnsmasq']
+            'dkms', 'iputils-arping', 'dnsmasq', 'libnuma-dev']
 
 
 REQUIRED_INTERFACES = {
@@ -147,10 +154,27 @@ def install_cplane_packages():
     cp_package = CPlanePackageManager(CPLANE_URL)
     for key, value in cplane_packages.items():
         filename = cp_package.download_package(key, value)
+        if key == 'dpdk':
+            cmd = ['tar', '-xvzf', filename, '-C', '/usr/src'] 
+            dpdk_dir = subprocess.check_output(cmd).split('\n')[0]
+            with open('/etc/profile.d/dpdk_env.sh', 'a') as dpdk_env:
+                dpdk_env.write('export DPDK_DIR=/usr/src/{}\n'.format(dpdk_dir))
+                dpdk_env.write('export DPDK_TARGET={}-native-linuxapp-gcc\n'.format(get_arch()))   
+                dpdk_env.write('export DPDK_BUILD=$DPDK_DIR$DPDK_TARGET\n')
+        elif key == 'ovs':
+            cmd = ['tar', '-xvzf', filename, '-C', '/usr/src']
+            ovs_dir = subprocess.check_output(cmd).split('\n')[0]
+            with open('/etc/profile.d/dpdk_env.sh', 'a') as dpdk_env:
+                dpdk_env.write('export OVS_DIR=/usr/src/{}\n'.format(ovs_dir))   
+        else:
         cmd = ['dpkg', '-i', filename]
         subprocess.check_call(cmd)
         options = "--fix-broken"
         apt_install(options, fatal=True)
+    if config('enable-dpdk'):
+        set_dpdk_env()
+        install_dpdk()
+        install_ovs()  
 
 
 def manage_fip():
@@ -282,3 +306,58 @@ def fake_register_configs():
 def get_os_release():
     ubuntu_release = commands.getoutput('lsb_release -r')
     return ubuntu_release.split()[1]
+
+
+def get_arch():
+    cmd = ['uname', '-m']
+    return subprocess.check_output(cmd).split()[0]
+
+
+def set_dpdk_env():
+    newenv = None
+    pipe = subprocess.Popen(". /etc/profile.d/dpdk_env.sh; python -c 'import os; \
+                            print \"newenv = %r\" % os.environ'",
+                            stdout=subprocess.PIPE, shell=True)
+    exec(pipe.communicate()[0])
+    os.environ.update(newenv)
+
+    cmd = 'modprobe vfio-pci'
+    os.system(cmd)
+    cmd = 'chmod a+x /dev/vfio'
+    os.system(cmd)
+    cmd = 'chmod 0666 /dev/vfio/*'
+    os.system(cmd)
+
+    if not os.path.exists("/mnt/huge"):
+        cmd = 'mkdir /mnt/huge'
+        os.system(cmd)
+    cmd = 'mount -t hugetlbfs -o pagesize=1G none /mnt/huge'
+    os.system(cmd)
+
+
+def install_dpdk():
+    dpdk_dir = os.environ.get('DPDK_DIR', '')
+    saved_path = os.getcwd()
+    os.chdir(dpdk_dir)
+    cmd = 'make install T=$DPDK_TARGET DESTDIR=/'
+    os.system(cmd)
+    os.chdir(saved_path)
+
+
+def install_ovs():
+    ovs_dir = os.environ.get('OVS_DIR', '')
+    saved_path = os.getcwd()
+    os.chdir(ovs_dir)
+    cmd = './configure --with-dpdk=$DPDK_BUILD'
+    os.system(cmd)
+    cmd = 'make'
+    os.system(cmd)
+    cmd = 'make install'
+    os.system(cmd)
+    os.chdir(saved_path)
+
+
+def create_vfio_file():
+    with open("/etc/modprobe.d/vfio_iommu_type1.conf", 'w') as config_file:
+        config_file.write("options vfio_iommu_type1 allow_unsafe_interrupts=1")
+
