@@ -1,0 +1,144 @@
+cplane_repo: &cplane_repo http://192.168.0.103/cplane_metadata_pike.json
+openstack_version: &openstack_version pike
+cplane_version: &cplane_version    "1.3.9"
+
+series: trusty
+machines:
+  '0':
+    constraints: tags=compute1
+    series: xenial 
+  '1':
+    constraints: tags=ogr
+    series: xenial
+  '2':
+    constraints: tags=compute2
+    series: xenial
+  '3':
+    constraints: tags=oracle-rac
+    series: xenial
+  '4':
+    constraints: tags=cpcontroller
+    series: xenial
+  '5':
+    constraints: tags=oscontroller
+    series: xenial
+
+
+relations:
+- - cplane-controller:cplane-controller
+  - network-cplane:cplane-controller
+- - authenticate-cplane:oracle
+  - oracle:oracle 
+- - oracle:oracle
+  - network-cplane:oracle
+- - authenticate-cplane:auth
+  - network-cplane:auth
+- - cplane-controller:cplane-controller
+  - docker-compute-cplane:cplane-controller
+- - docker-controller:cplane-controller
+  - docker-compute-cplane:docker-controller
+- - authenticate-cplane:auth
+  - docker-controller:auth
+
+series: xenial
+services:
+  authenticate-cplane:
+    annotations:
+      gui-x: '1000'
+      gui-y: '0'
+    charm: ../authenticate-cplane/
+    num_units: 1
+    options:
+      cp-package-url: *cplane_repo
+      cplane-version: *cplane_version
+      openstack-version: *openstack_version
+    to:
+    - '0'
+  network-cplane:
+    annotations:
+      gui-x: '1000'
+      gui-y: '0'
+    charm: ../network-cplane
+    num_units: 1
+    options:
+      cp-package-url: *cplane_repo
+      cplane-version: *cplane_version
+      openstack-version: *openstack_version
+      vlan-ranges: "physnet1:12:12, physnet2:11:11, physnet3:210:220"
+    to:
+    - '1'
+  docker-compute-cplane:
+    annotations:
+      gui-x: '700'
+      gui-y: '0'
+    charm: ../docker-compute-cplane
+    num_units: 1
+    options:
+      cp-package-url: *cplane_repo
+      cplane-version: *cplane_version
+      openstack-version: *openstack_version
+      mgmt-int: eth2.12
+      cp-controller-mport: 1901
+      cp-controller-uport: 1902
+      data-interface: eth1.15
+      data-gateway: 192.168.231.1
+    to:
+    - '2'
+  oracle:
+    annotations:
+      gui-x: '700'
+      gui-y: '0'
+    charm: cs:~cplane-team/xenial/oracle 
+    num_units: 1
+    options:
+      cp-package-url: *cplane_repo
+      cplane-version: *cplane_version
+      openstack-version: *openstack_version
+    to:
+    - '3'
+  cplane-controller:
+    annotations:
+      gui-x: '700'
+      gui-y: '0'
+    charm: cs:~cplane-team/xenial/cplane-controller
+    num_units: 1
+    options:
+      cp-package-url: https://www.dropbox.com/s/pzlb2c2x3newsg6/cplane_public_metadata.json
+      cplane-version: *cplane_version
+      openstack-version: *openstack_version
+      jboss-db-on-host: True 
+      multicast-intf: eth2.12
+      multicast-port: 1910
+      unicast-port: 1911
+      use-default-jboss-cluster: false
+      jboss-cluster-name: dockercontroller
+      production: 'n'
+      jdk-version: 8
+      dvnd-cluster-port: 9876
+    to:
+    - '4'
+  docker-controller:
+    annotations:
+      gui-x: '700'
+      gui-y: '0'
+    charm: ../cplane-controller
+    num_units: 1
+    options:
+      controller-app-mode: doctl
+      cp-package-url: *cplane_repo
+      cplane-version: *cplane_version
+      openstack-version: *openstack_version
+      jboss-db-on-host: True
+      multicast-intf: eth2.12
+      multicast-port: 1901
+      unicast-port: 1902
+      use-default-jboss-cluster: false
+      jboss-cluster-name: dockercontrollerproxy
+      production: 'n'
+      jdk-version: 8
+      dvnd-cluster-port: 9878
+      doctl-version: 271     
+    to:
+    - '5'
+
+

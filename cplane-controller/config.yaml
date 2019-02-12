@@ -11,6 +11,10 @@ options:
     default: 262
     type: int
     description: "Msm version to download"
+  doctl-version:
+    default: 271
+    type: int
+    description: "Doctl version to download"
   oracle-client-basic:
     default: "12"
     type: string
@@ -236,6 +240,10 @@ options:
     type: int
     default: 9877
     description: "Jboss hornetq cluster port for MSM"
+  doctl-cluster-port:
+    type: int
+    default: 9878
+    description: "Jboss hornetq cluster port for Docker-controller"
   http-proxy:
     default:
     type: string

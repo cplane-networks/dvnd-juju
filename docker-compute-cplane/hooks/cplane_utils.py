@@ -158,7 +158,7 @@ def set_cp_agent():
     key = 'mgmt-iface=' + config('mgmt-int')
     cmd = ['cp-agentd', 'set-config', key]
     subprocess.check_call(cmd)
-    key = 'ucast-ip=' + config('cplane-controller-ip')
+    key = 'ucast-ip=' + str(config('cplane-controller-ip'))
     cmd = ['cp-agentd', 'set-config', key]
     subprocess.check_call(cmd)
     key = 'ucast-port=' + str(config('cp-controller-uport'))
@@ -171,6 +171,53 @@ def set_cp_agent():
         cmd = ['cp-agentd', 'set-config', key]
         subprocess.check_call(cmd)
     key = 'vm-mtu=' + str(config('cp-vm-mtu'))
+    cmd = ['cp-agentd', 'set-config', key]
+    subprocess.check_call(cmd)
+
+
+def set_cp_agent_dc():
+    juju_log('Settig cp-agentd configuration for {} hook for docker'.format(hook_name()))
+    
+    key = 'model=cplane_docker'
+    cmd = ['cp-agentd', 'set-config', key]
+    subprocess.check_call(cmd)
+
+    key = 'mcast-ip-docker=' + config('docker-controller-mcast-ip')
+    cmd = ['cp-agentd', 'set-config', key]
+    subprocess.check_call(cmd)
+    mport = 0
+    for rid in relation_ids('docker-controller'):
+        for unit in related_units(rid):
+            mport = relation_get(attribute='mport', unit=unit, rid=rid)
+            uport = relation_get(attribute='uport', unit=unit, rid=rid)
+            unicast_mode = config('enable-unicast')
+            cplane_controller = relation_get('private-address')
+            if mport:
+                key = 'mcast-port-docker=' + mport
+                cmd = ['cp-agentd', 'set-config', key]
+                subprocess.check_call(cmd)
+                if unicast_mode is True:
+                    key = 'ucast-ip-docker=' + cplane_controller
+                    cmd = ['cp-agentd', 'set-config', key]
+                    subprocess.check_call(cmd)
+                else:
+                    cmd = "sed -i '/ucast-ip/d' /etc/cplane/cp-config.json"
+                    os.system(cmd)
+                key = 'ucast-port-docker=' + uport
+                cmd = ['cp-agentd', 'set-config', key]
+                subprocess.check_call(cmd)
+                key = 'log-level=' + str(config('cp-agent-log-level'))
+                with open('/etc/cplane/cp-config.json', 'r') as file:
+                    filedata = file.read()
+
+                return
+    key = 'mcast-port-docker=' + str(config('docker-controller-mport'))
+    cmd = ['cp-agentd', 'set-config', key]
+    subprocess.check_call(cmd)
+    key = 'ucast-ip-docker=' + str(config('docker-controller-ip'))
+    cmd = ['cp-agentd', 'set-config', key]
+    subprocess.check_call(cmd)
+    key = 'ucast-port-docker=' + str(config('docker-controller-uport'))
     cmd = ['cp-agentd', 'set-config', key]
     subprocess.check_call(cmd)
 

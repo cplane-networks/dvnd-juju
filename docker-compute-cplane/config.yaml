@@ -13,7 +13,7 @@ options:
     description: "Cplane controller unicast port"
   cplane-controller-ip:
     type: string
-    default: "192.168.4.154"
+    default: 
     description: "Cplane-Controller IP"
   region:
     type: string
@@ -93,3 +93,20 @@ options:
     default: "liberty"
     type: string
     description: "Openstack version eg. liberty, mitaka, ocata"
+  docker-controller-mport:
+    type: int
+    default: 1910
+    description: "Cplane controller multicast port"
+  docker-controller-uport:
+    type: int
+    default: 1911
+    description: "Cplane controller unicast port"
+  docker-controller-ip:
+    type: string
+    default: 
+    description: "Cplane-Controller IP"
+  docker-controller-mcast-ip:
+    type: string
+    default: "239.255.255.250"
+    description: "Docker-Controller mutlticast IP"
+

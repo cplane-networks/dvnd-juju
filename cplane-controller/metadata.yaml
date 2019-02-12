@@ -23,6 +23,8 @@ requires:
   oracle:
    interface: oracle
    scope: global
+  auth:
+    interface: auth
 peers:
   cluster:
     interface: cplane-msm-ha

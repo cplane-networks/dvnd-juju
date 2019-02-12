@@ -23,6 +23,7 @@ from cplane_utils import (
     install_cplane_packages,
     cplane_config,
     set_cp_agent,
+    set_cp_agent_dc,
     manage_fip,
     restart_services,
     system_config,
@@ -47,13 +48,20 @@ hooks = Hooks()
 @hooks.hook('cplane-controller-relation-changed')
 def cplane_controller_relation_changed():
     set_cp_agent()
+    set_cp_agent_dc()
     manage_fip()
+    restart_cp_agentd()
+
+@hooks.hook('docker-controller-relation-changed')
+def docker_controller_relation_changed():
+    set_cp_agent_dc()
     restart_cp_agentd()
 
 
 @hooks.hook('config-changed')
 def config_changed():
     set_cp_agent()
+    set_cp_agent_dc()
     cplane_config(system_config, SYSTEM_CONF, '')
     if get_os_release() == '16.04':
         cmd = ['modprobe', 'br_netfilter']

@@ -15,4 +15,7 @@ extra-bindings:
 requires:
   cplane-controller:
     interface: cplane-controller
+  docker-controller:
+    interface: cplane-controller
+
 

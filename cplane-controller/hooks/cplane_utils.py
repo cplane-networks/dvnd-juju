@@ -73,7 +73,7 @@ elif config('jboss-db-on-host'):
 PACKAGES = ['alien', 'libaio1', 'zlib1g-dev', 'libxml2-dev',
             'libxml-libxml-perl', 'unzip', 'python-pexpect',
             'libyaml-perl']
-if config('controller-app-mode') == 'msm':
+if config('controller-app-mode') == 'msm' or config('controller-app-mode') == 'doctl':
     PACKAGES.append('haproxy')
 
 CPLANE_URL = config('cp-package-url')
@@ -104,6 +104,18 @@ MSM_CONFIG = OrderedDict([
     ('msm-cluster-port', 'JBOSS_HORNETQ_CLUSTER_PORT')
 ])
 
+DOCTL_CONFIG = OrderedDict([
+    ('jboss-home', 'JBOSS_HOME'),
+    ('db-user', 'DB_USERNAME'),
+    ('db-password', 'DB_PASSWORD'),
+    ('intall-reboot-scripts', 'JBOSS_INSTALL_REBOOT'),
+    ('oracle-host', 'DB_HOSTNAME'),
+    ('jboss-db-on-host', 'JBOSS_DB_ON_HOST'),
+    ('production', 'PRODUCTION'),
+    ('doctl-cluster-port', 'JBOSS_HORNETQ_CLUSTER_PORT')
+])
+
+
 TEMPLATES = 'templates/'
 ORACLE_HOST = ''
 DB_SERVICE = ''
@@ -121,6 +133,9 @@ if config('controller-app-mode') == 'dvnd':
 elif config('controller-app-mode') == 'msm':
     CONTROLLER_CONFIG = 'cplane-msm-config.yaml'
     cplane_packages[config('controller-app-mode')] = config('msm-version')
+elif config('controller-app-mode') == 'doctl':
+    CONTROLLER_CONFIG = 'cplane-dcntr-config.yaml'
+    cplane_packages[config('controller-app-mode')] = config('doctl-version')
 
 if not config('jboss-db-on-host'):
     REQUIRED_INTERFACES = {
@@ -469,6 +484,20 @@ def load_config():
             set_config('JBOSS_CLUSTER_NAME', cluster_name,
                        CONTROLLER_CONFIG)
 
+    elif config('controller-app-mode') == 'doctl':
+        for key, value in DOCTL_CONFIG.items():
+            set_config(value, config(key), CONTROLLER_CONFIG)
+        if config('use-default-jboss-cluster') is False:
+            hostname = socket.gethostname()
+            cluster_name = 'cplane' + '-' + hostname
+            set_config('JBOSS_CLUSTER_NAME', cluster_name,
+                       CONTROLLER_CONFIG)
+        elif config('jboss-cluster-name') is not None:
+            cluster_name = config('jboss-cluster-name')
+            set_config('JBOSS_CLUSTER_NAME', cluster_name,
+                       CONTROLLER_CONFIG)
+
+
 
 def cplane_installer():
     filename = json.load(open(FILES_PATH))
@@ -767,8 +796,10 @@ def assess_status(configs):
     assess_status_func(configs)()
     if config('controller-app-mode') == 'dvnd':
         hookenv.application_version_set(config('cplane-version'))
-    else:
+    elif config('controller-app-mode') == 'msm':
         hookenv.application_version_set(str(config('msm-version')))
+    elif config('controller-app-mode') == 'doclt':
+        hookenv.application_version_set(str(config('doctl-version')))
 
 
 def assess_status_func(configs):
