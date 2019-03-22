@@ -105,6 +105,9 @@ MSM_CONFIG = OrderedDict([
 ])
 
 DOCTL_CONFIG = OrderedDict([
+    ('multicast-port', 'multicastPort'),
+    ('multicast-intf', 'multicastInterface'),
+    ('unicast-port', 'unicastPort'),
     ('jboss-home', 'JBOSS_HOME'),
     ('db-user', 'DB_USERNAME'),
     ('db-password', 'DB_PASSWORD'),

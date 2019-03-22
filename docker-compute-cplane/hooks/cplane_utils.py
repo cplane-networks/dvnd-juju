@@ -178,7 +178,7 @@ def set_cp_agent():
 def set_cp_agent_dc():
     juju_log('Settig cp-agentd configuration for {} hook for docker'.format(hook_name()))
     
-    key = 'model=cplane_docker'
+    key = 'model=Cplane_Docker'
     cmd = ['cp-agentd', 'set-config', key]
     subprocess.check_call(cmd)
 
