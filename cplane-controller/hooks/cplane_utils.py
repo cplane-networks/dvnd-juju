@@ -490,6 +490,8 @@ def load_config():
     elif config('controller-app-mode') == 'doctl':
         for key, value in DOCTL_CONFIG.items():
             set_config(value, config(key), CONTROLLER_CONFIG)
+        set_config('multicastServerInterface', config('multicast-intf'),
+                   CONTROLLER_CONFIG)
         if config('use-default-jboss-cluster') is False:
             hostname = socket.gethostname()
             cluster_name = 'cplane' + '-' + hostname
