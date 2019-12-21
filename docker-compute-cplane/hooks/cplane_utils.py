@@ -44,7 +44,7 @@ cplane_packages = OrderedDict([
 ])
 
 
-PACKAGES = ['crudini', 'dkms', 'iputils-arping', 'dnsmasq', 'libnuma-dev', 'apt-transport-https', 'ca-certificates', 'curl', 'software-properties-common']
+PACKAGES = ['crudini', 'dkms', 'iputils-arping', 'dnsmasq', 'libnuma-dev', 'apt-transport-https', 'ca-certificates', 'curl', 'software-properties-common', 'python-flask']
 
 
 REQUIRED_INTERFACES = {
