@@ -10,4 +10,5 @@ oslo.middleware>=3.27.0
 oslo.policy>=1.23.0
 oslo.serialization!=2.19.1,>=1.10.0
 oslo.utils>=3.20.0
-
+more-itertools==4.0.0
+cachetools==2.0.0
