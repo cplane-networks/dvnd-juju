@@ -286,12 +286,12 @@ $(readlink -f $(which javac))))")
     os.system('export JAVA_HOME={}'.format(java_dir))
 # The code below should be commented if we install from RPM package with Alien
     cmd = 'sudo update-alternatives --install  "/usr/bin/java" "java" \
-"{}/bin/java" 0'.format(java_dir) 11  \
+"{}/bin/java" 0'.format(java_dir) 130  \
 "--slave" "/usr/bin/keytool" "keytool" "{}/bin/keytool" 0'.format(java_dir) \
 "--slave" "/usr/bin/rmiregistry" "rmiregsitry" "{}/bin/rmiregristry" 0'.format(java_dir)
     os.system(cmd)
     cmd = 'sudo update-alternatives --install  "/usr/bin/javac" "javac" \
-"{}/bin/javac" 0'.format(java_dir) 11 \
+"{}/bin/javac" 0'.format(java_dir) 130 \
 "--slave" "/usr/bin/jar" "jar" "{}/bin/jar" 0'.format(java_dir) \
 "--slave" "/usr/bin/rmic" "rmic" "{}/bin/rmic" 0'.format(java_dir) 
     os.system(cmd)
