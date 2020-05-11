@@ -284,6 +284,19 @@ $(readlink -f $(which javac))))")
         f.write('export JAVA_HOME={}\n'.format(java_dir))
     f.close()
     os.system('export JAVA_HOME={}'.format(java_dir))
+# The code below should be commented if we install from RPM package with Alien
+    cmd = 'sudo update-alternatives --install  "/usr/bin/java" "java" \
+"{}/bin/java" 0'.format(java_dir)
+    os.system(cmd)
+    cmd = 'sudo update-alternatives --install  "/usr/bin/javac" "javac" \
+"{}/bin/javac" 0'.format(java_dir)
+    os.system(cmd)
+    cmd = 'sudo update-alternatives --set  java {}/bin/java'.\
+          format(java_dir)
+    os.system(cmd)
+    cmd = 'sudo update-alternatives --set  javac {}/bin/javac'.\
+          format(java_dir)
+    os.system(cmd)
 
 
 def install_jdk_from_tar(module):

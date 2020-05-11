@@ -141,7 +141,8 @@ jboss-6.1.0.Final')
         m_getoutput.assert_called_with('echo $(dirname $(dirname $(readlink\
  -f $(which javac))))')
         m_install_jdk_from_tar.assert_called_with('jdk')
-        m_system.assert_called_with('export JAVA_HOME=/opt/jdk')
+        m_system.assert_called_with('sudo update-alternatives\
+ --set  javac /opt/jdk/bin/javac')
 
     @patch("cplane_utils.deb_convert_install")
     def test_install_oracle(self, m_deb_convert_install):
