@@ -131,16 +131,16 @@ jboss-6.1.0.Final')
                                         '-i', 'test.txt'])
 
     @patch("subprocess.check_call")
-    @patch("cplane_utils.deb_convert_install")
+    @patch("cplane_utils.install_jdk_from_tar")
     @patch("os.system")
     @patch("commands.getoutput")
-    def test_install_jdk(self, m_getoutput, m_system, m_deb_convert_install,
+    def test_install_jdk(self, m_getoutput, m_system, m_install_jdk_from_tar,
                          m_check_call):
         m_getoutput.return_value = "/opt/jdk"
         cplane_utils.install_jdk()
         m_getoutput.assert_called_with('echo $(dirname $(dirname $(readlink\
  -f $(which javac))))')
-        m_deb_convert_install.assert_called_with('jdk')
+        m_install_jdk_from_tar.assert_called_with('jdk')
         m_system.assert_called_with('export JAVA_HOME=/opt/jdk')
 
     @patch("cplane_utils.deb_convert_install")

@@ -77,7 +77,8 @@ from cplane_network import (
 )
 
 hooks = Hooks()
-if config('controller-app-mode') == 'msm' or config('controller-app-mode') == 'doctl':
+if config('controller-app-mode') == 'msm' or config('controller-app-mode') == \
+   'doctl':
     configs = register_configs()
 
 
@@ -168,7 +169,8 @@ def oracle_relation_changed():
 
 @hooks.hook('config-changed')
 def config_changed():
-    if config('controller-app-mode') == 'msm' or config('controller-app-mode') == 'doctl':
+    if config('controller-app-mode') == 'msm' or \
+       config('controller-app-mode') == 'doctl':
         configs.write_all()
 
     upgrade_type = get_upgrade_type()
@@ -264,6 +266,7 @@ def config_changed():
                 .format(interface[0], interface[1]))
             change_iface_config(interface[0], 'lro', interface[1])
 
+
 @hooks.hook('auth-relation-changed')
 def auth_relation_changed():
     auth_ip = relation_get('private-address')
@@ -271,7 +274,6 @@ def auth_relation_changed():
 /etc/docker-proxy/doctl_config.ini".format(auth_ip)
     os.system(cmd)
 
-    
 
 @hooks.hook('leader-settings-changed')
 def leader_settings_changed():
@@ -286,7 +288,8 @@ def leader_settings_changed():
 
 @hooks.hook('ha-relation-joined')
 def ha_joined(relation_id=None):
-    if config('controller-app-mode') == 'msm' or config('controller-app-mode') == 'doctl':
+    if config('controller-app-mode') == 'msm' or \
+       config('controller-app-mode') == 'doctl':
         cluster_config = get_hacluster_config()
         resources = {
             'res_msm_haproxy': 'lsb:haproxy',
@@ -369,7 +372,8 @@ def ha_joined(relation_id=None):
 
 @hooks.hook('ha-relation-changed')
 def ha_changed():
-    if config('controller-app-mode') == 'msm' or config('controller-app-mode') == 'doctl':
+    if config('controller-app-mode') == 'msm' or \
+       config('controller-app-mode') == 'doctl':
         clustered = relation_get('clustered')
         if not clustered or clustered in [None, 'None', '']:
             log('ha_changed: hacluster subordinate'
@@ -381,7 +385,8 @@ def ha_changed():
 
 @hooks.hook('cluster-relation-joined')
 def cluster_joined(relation_id=None):
-    if config('controller-app-mode') == 'msm' or config('controller-app-mode') == 'doctl':
+    if config('controller-app-mode') == 'msm' or \
+       config('controller-app-mode') == 'doctl':
         private_addr = get_relation_ip('cluster')
         relation_set(relation_id=relation_id,
                      relation_settings={'private-address': private_addr})
@@ -390,7 +395,8 @@ def cluster_joined(relation_id=None):
 @hooks.hook('cluster-relation-departed',
             'cluster-relation-changed')
 def cluster_relation():
-    if config('controller-app-mode') == 'msm' or config('controller-app-mode') == 'doctl':
+    if config('controller-app-mode') == 'msm' or \
+       config('controller-app-mode') == 'doctl':
         configs.write(HAPROXY_CONF)
 
 

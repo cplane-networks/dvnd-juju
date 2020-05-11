@@ -73,7 +73,8 @@ elif config('jboss-db-on-host'):
 PACKAGES = ['alien', 'libaio1', 'zlib1g-dev', 'libxml2-dev',
             'libxml-libxml-perl', 'unzip', 'python-pexpect',
             'libyaml-perl']
-if config('controller-app-mode') == 'msm' or config('controller-app-mode') == 'doctl':
+if config('controller-app-mode') == 'msm' or \
+   config('controller-app-mode') == 'doctl':
     PACKAGES.append('haproxy')
 
 CPLANE_URL = config('cp-package-url')
@@ -125,6 +126,7 @@ DB_SERVICE = ''
 DB_PASSWORD = ''
 DB_PATH = ''
 JBOSS_DIR = '/opt/jboss'
+JAVA_DIR = '/opt/java'
 CHARM_LIB_DIR = os.environ.get('CHARM_DIR', '') + "/lib/"
 CPLANE_DIR = '/opt/cplane/bin'
 DB_DIR = os.environ.get('CHARM_DIR', '') + "/lib/" + 'PKG/pkg/db_init/'
@@ -225,6 +227,9 @@ def prepare_env():
     cmd = ['mkdir', JBOSS_DIR]
     if os.path.exists(JBOSS_DIR) == 0:
         subprocess.check_call(cmd)
+    cmd = ['mkdir', JAVA_DIR]
+    if os.path.exists(JAVA_DIR) == 0:
+        subprocess.check_call(cmd)
     cmd = ['mkdir', '/etc/rc.d']
     if os.path.exists('/etc/rc.d') == 0:
         subprocess.check_call(cmd)
@@ -270,7 +275,8 @@ def deb_convert_install(module):
 
 def install_jdk():
     log('Installing JDK')
-    deb_convert_install('jdk')
+#    deb_convert_install('jdk')
+    install_jdk_from_tar('jdk')
     java_dir = commands.getoutput("echo $(dirname $(dirname \
 $(readlink -f $(which javac))))")
     home_dir = pwd.getpwuid(os.getuid()).pw_dir
@@ -278,6 +284,23 @@ $(readlink -f $(which javac))))")
         f.write('export JAVA_HOME={}\n'.format(java_dir))
     f.close()
     os.system('export JAVA_HOME={}'.format(java_dir))
+
+
+def install_jdk_from_tar(module):
+    filename = json.load(open(FILES_PATH))
+    saved_path = os.getcwd()
+    os.chdir(JAVA_DIR)
+    cmd = ['tar', '-xvf', filename[module]]
+    res = list(subprocess.check_output(cmd).split())[0]
+    java_bin_path = JAVA_DIR + '/' + res + 'bin'
+    os.chdir(saved_path)
+    home_dir = pwd.getpwuid(os.getuid()).pw_dir
+
+    with open('{}/.bashrc'.format(home_dir), 'a') as f:
+        f.write('export PATH={}:$PATH\n'.format(java_bin_path))
+    f.close()
+    os.system('export PATH={}:$PATH'.format(java_bin_path))
+    os.environ['PATH'] = java_bin_path + ':' + os.environ['PATH']
 
 
 def install_oracle_client():
@@ -501,7 +524,6 @@ def load_config():
             cluster_name = config('jboss-cluster-name')
             set_config('JBOSS_CLUSTER_NAME', cluster_name,
                        CONTROLLER_CONFIG)
-
 
 
 def cplane_installer():
