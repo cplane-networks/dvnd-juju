@@ -285,15 +285,17 @@ $(readlink -f $(which javac))))")
     f.close()
     os.system('export JAVA_HOME={}'.format(java_dir))
 # The code below should be commented if we install from RPM package with Alien
-    cmd = 'sudo update-alternatives --install  "/usr/bin/java" "java" \
-"{}/bin/java" 0'.format(java_dir) 130  \
-"--slave" "/usr/bin/keytool" "keytool" "{}/bin/keytool" 0'.format(java_dir) \
-"--slave" "/usr/bin/rmiregistry" "rmiregsitry" "{}/bin/rmiregristry" 0'.format(java_dir)
+    cmd = 'sudo update-alternatives --install \
+"/usr/bin/java" "java" "{0}/bin/java" 0 \
+"--slave" "/usr/bin/keytool" "keytool" "{0}/bin/keytool" \
+"--slave" "/usr/bin/rmiregistry" "rmiregsitry" "{0}/bin/rmiregristry"  \
+'.format(java_dir) 
     os.system(cmd)
-    cmd = 'sudo update-alternatives --install  "/usr/bin/javac" "javac" \
-"{}/bin/javac" 0'.format(java_dir) 130 \
-"--slave" "/usr/bin/jar" "jar" "{}/bin/jar" 0'.format(java_dir) \
-"--slave" "/usr/bin/rmic" "rmic" "{}/bin/rmic" 0'.format(java_dir) 
+    cmd = 'sudo update-alternatives --install \
+"/usr/bin/javac" "javac" "{0}/bin/javac" 0 \
+"--slave" "/usr/bin/jar" "jar" "{0}/bin/jar" \
+"--slave" "/usr/bin/rmic" "rmic" "{0}/bin/rmic" \
+'.format(java_dir) 
     os.system(cmd)
     cmd = 'sudo update-alternatives --set  java {}/bin/java'.\
           format(java_dir)
