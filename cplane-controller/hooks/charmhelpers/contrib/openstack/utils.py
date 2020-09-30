@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Common python helper functions used for OpenStack charms.
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 from functools import wraps
 
 import subprocess
@@ -36,23 +36,35 @@ from charmhelpers.contrib.network import ip
 from charmhelpers.core import unitdata
 
 from charmhelpers.core.hookenv import (
+    WORKLOAD_STATES,
     action_fail,
     action_set,
     config,
+    expected_peer_units,
+    expected_related_units,
     log as juju_log,
     charm_dir,
     INFO,
     ERROR,
+    metadata,
     related_units,
+    relation_get,
+    relation_id,
     relation_ids,
     relation_set,
     status_set,
     hook_name,
     application_version_set,
     cached,
+    leader_set,
+    leader_get,
+    local_unit,
 )
 
-from charmhelpers.core.strutils import BasicStringComparator
+from charmhelpers.core.strutils import (
+    BasicStringComparator,
+    bool_from_string,
+)
 
 from charmhelpers.contrib.storage.linux.lvm import (
     deactivate_lvm_volume_group,
@@ -73,6 +85,8 @@ from charmhelpers.core.host import (
     service_running,
     service_pause,
     service_resume,
+    service_stop,
+    service_start,
     restart_on_change_helper,
 )
 from charmhelpers.fetch import (
@@ -81,7 +95,9 @@ from charmhelpers.fetch import (
     add_source as fetch_add_source,
     SourceConfigError,
     GPGKeyError,
-    get_upstream_version
+    get_upstream_version,
+    filter_missing_packages,
+    ubuntu_apt_pkg as apt,
 )
 
 from charmhelpers.fetch.snap import (
@@ -93,6 +109,14 @@ from charmhelpers.fetch.snap import (
 from charmhelpers.contrib.storage.linux.utils import is_block_device, zap_disk
 from charmhelpers.contrib.storage.linux.loopback import ensure_loopback_device
 from charmhelpers.contrib.openstack.exceptions import OSContextError
+from charmhelpers.contrib.openstack.policyd import (
+    policyd_status_message_prefix,
+    POLICYD_CONFIG_NAME,
+)
+
+from charmhelpers.contrib.openstack.ha.utils import (
+    expect_ha,
+)
 
 CLOUD_ARCHIVE_URL = "http://ubuntu-cloud.archive.canonical.com/ubuntu"
 CLOUD_ARCHIVE_KEY_ID = '5EDB1B62EC4926EA'
@@ -116,6 +140,10 @@ OPENSTACK_RELEASES = (
     'pike',
     'queens',
     'rocky',
+    'stein',
+    'train',
+    'ussuri',
+    'victoria',
 )
 
 UBUNTU_OPENSTACK_RELEASE = OrderedDict([
@@ -133,6 +161,11 @@ UBUNTU_OPENSTACK_RELEASE = OrderedDict([
     ('zesty', 'ocata'),
     ('artful', 'pike'),
     ('bionic', 'queens'),
+    ('cosmic', 'rocky'),
+    ('disco', 'stein'),
+    ('eoan', 'train'),
+    ('focal', 'ussuri'),
+    ('groovy', 'victoria'),
 ])
 
 
@@ -151,6 +184,11 @@ OPENSTACK_CODENAMES = OrderedDict([
     ('2017.1', 'ocata'),
     ('2017.2', 'pike'),
     ('2018.1', 'queens'),
+    ('2018.2', 'rocky'),
+    ('2019.1', 'stein'),
+    ('2019.2', 'train'),
+    ('2020.1', 'ussuri'),
+    ('2020.2', 'victoria'),
 ])
 
 # The ugly duckling - must list releases oldest to newest
@@ -183,6 +221,16 @@ SWIFT_CODENAMES = OrderedDict([
         ['2.13.0', '2.15.0']),
     ('queens',
         ['2.16.0', '2.17.0']),
+    ('rocky',
+        ['2.18.0', '2.19.0']),
+    ('stein',
+        ['2.20.0', '2.21.0']),
+    ('train',
+        ['2.22.0', '2.23.0']),
+    ('ussuri',
+        ['2.24.0', '2.25.0']),
+    ('victoria',
+        ['2.25.0']),
 ])
 
 # >= Liberty version->codename mapping
@@ -195,6 +243,10 @@ PACKAGE_CODENAMES = {
         ('16', 'pike'),
         ('17', 'queens'),
         ('18', 'rocky'),
+        ('19', 'stein'),
+        ('20', 'train'),
+        ('21', 'ussuri'),
+        ('22', 'victoria'),
     ]),
     'neutron-common': OrderedDict([
         ('7', 'liberty'),
@@ -204,6 +256,10 @@ PACKAGE_CODENAMES = {
         ('11', 'pike'),
         ('12', 'queens'),
         ('13', 'rocky'),
+        ('14', 'stein'),
+        ('15', 'train'),
+        ('16', 'ussuri'),
+        ('17', 'victoria'),
     ]),
     'cinder-common': OrderedDict([
         ('7', 'liberty'),
@@ -213,6 +269,10 @@ PACKAGE_CODENAMES = {
         ('11', 'pike'),
         ('12', 'queens'),
         ('13', 'rocky'),
+        ('14', 'stein'),
+        ('15', 'train'),
+        ('16', 'ussuri'),
+        ('17', 'victoria'),
     ]),
     'keystone': OrderedDict([
         ('8', 'liberty'),
@@ -222,6 +282,10 @@ PACKAGE_CODENAMES = {
         ('12', 'pike'),
         ('13', 'queens'),
         ('14', 'rocky'),
+        ('15', 'stein'),
+        ('16', 'train'),
+        ('17', 'ussuri'),
+        ('18', 'victoria'),
     ]),
     'horizon-common': OrderedDict([
         ('8', 'liberty'),
@@ -231,6 +295,10 @@ PACKAGE_CODENAMES = {
         ('12', 'pike'),
         ('13', 'queens'),
         ('14', 'rocky'),
+        ('15', 'stein'),
+        ('16', 'train'),
+        ('18', 'ussuri'),
+        ('19', 'victoria'),
     ]),
     'ceilometer-common': OrderedDict([
         ('5', 'liberty'),
@@ -240,6 +308,10 @@ PACKAGE_CODENAMES = {
         ('9', 'pike'),
         ('10', 'queens'),
         ('11', 'rocky'),
+        ('12', 'stein'),
+        ('13', 'train'),
+        ('14', 'ussuri'),
+        ('15', 'victoria'),
     ]),
     'heat-common': OrderedDict([
         ('5', 'liberty'),
@@ -249,6 +321,10 @@ PACKAGE_CODENAMES = {
         ('9', 'pike'),
         ('10', 'queens'),
         ('11', 'rocky'),
+        ('12', 'stein'),
+        ('13', 'train'),
+        ('14', 'ussuri'),
+        ('15', 'victoria'),
     ]),
     'glance-common': OrderedDict([
         ('11', 'liberty'),
@@ -258,6 +334,10 @@ PACKAGE_CODENAMES = {
         ('15', 'pike'),
         ('16', 'queens'),
         ('17', 'rocky'),
+        ('18', 'stein'),
+        ('19', 'train'),
+        ('20', 'ussuri'),
+        ('21', 'victoria'),
     ]),
     'openstack-dashboard': OrderedDict([
         ('8', 'liberty'),
@@ -267,10 +347,18 @@ PACKAGE_CODENAMES = {
         ('12', 'pike'),
         ('13', 'queens'),
         ('14', 'rocky'),
+        ('15', 'stein'),
+        ('16', 'train'),
+        ('18', 'ussuri'),
+        ('19', 'victoria'),
     ]),
 }
 
 DEFAULT_LOOPBACK_SIZE = '5G'
+
+DB_SERIES_UPGRADING_KEY = 'cluster-series-upgrading'
+
+DB_MAINTENANCE_KEYS = [DB_SERIES_UPGRADING_KEY]
 
 
 class CompareOpenStackReleases(BasicStringComparator):
@@ -289,13 +377,22 @@ def error_out(msg):
     sys.exit(1)
 
 
+def get_installed_semantic_versioned_packages():
+    '''Get a list of installed packages which have OpenStack semantic versioning
+
+    :returns List of installed packages
+    :rtype: [pkg1, pkg2, ...]
+    '''
+    return filter_missing_packages(PACKAGE_CODENAMES.keys())
+
+
 def get_os_codename_install_source(src):
     '''Derive OpenStack release codename from a given installation source.'''
     ubuntu_rel = lsb_release()['DISTRIB_CODENAME']
     rel = ''
     if src is None:
         return rel
-    if src in ['distro', 'distro-proposed']:
+    if src in ['distro', 'distro-proposed', 'proposed']:
         try:
             rel = UBUNTU_OPENSTACK_RELEASE[ubuntu_rel]
         except KeyError:
@@ -306,7 +403,7 @@ def get_os_codename_install_source(src):
 
     if src.startswith('cloud:'):
         ca_rel = src.split(':')[1]
-        ca_rel = ca_rel.split('%s-' % ubuntu_rel)[1].split('/')[0]
+        ca_rel = ca_rel.split('-')[1].split('/')[0]
         return ca_rel
 
     # Best guess match based on deb string provided
@@ -371,7 +468,7 @@ def get_swift_codename(version):
         return codenames[0]
 
     # NOTE: fallback - attempt to match with just major.minor version
-    match = re.match('^(\d+)\.(\d+)', version)
+    match = re.match(r'^(\d+)\.(\d+)', version)
     if match:
         major_minor_version = match.group(0)
         for codename, versions in six.iteritems(SWIFT_CODENAMES):
@@ -391,15 +488,13 @@ def get_os_codename_package(package, fatal=True):
             out = subprocess.check_output(cmd)
             if six.PY3:
                 out = out.decode('UTF-8')
-        except subprocess.CalledProcessError as e:
+        except subprocess.CalledProcessError:
             return None
         lines = out.split('\n')
         for line in lines:
             if package in line:
                 # Second item in list is Version
                 return line.split()[1]
-
-    import apt_pkg as apt
 
     cache = apt_cache()
 
@@ -423,11 +518,11 @@ def get_os_codename_package(package, fatal=True):
     vers = apt.upstream_version(pkg.current_ver.ver_str)
     if 'swift' in pkg.name:
         # Fully x.y.z match for swift versions
-        match = re.match('^(\d+)\.(\d+)\.(\d+)', vers)
+        match = re.match(r'^(\d+)\.(\d+)\.(\d+)', vers)
     else:
         # x.y match only for 20XX.X
         # and ignore patch level for other packages
-        match = re.match('^(\d+)\.(\d+)', vers)
+        match = re.match(r'^(\d+)\.(\d+)', vers)
 
     if match:
         vers = match.group(0)
@@ -484,9 +579,8 @@ def reset_os_release():
     _os_rel = None
 
 
-def os_release(package, base='essex', reset_cache=False):
-    '''
-    Returns OpenStack release codename from a cached global.
+def os_release(package, base=None, reset_cache=False, source_key=None):
+    """Returns OpenStack release codename from a cached global.
 
     If reset_cache then unset the cached os_release version and return the
     freshly determined version.
@@ -494,7 +588,22 @@ def os_release(package, base='essex', reset_cache=False):
     If the codename can not be determined from either an installed package or
     the installation source, the earliest release supported by the charm should
     be returned.
-    '''
+
+    :param package: Name of package to determine release from
+    :type package: str
+    :param base: Fallback codename if endavours to determine from package fail
+    :type base: Optional[str]
+    :param reset_cache: Reset any cached codename value
+    :type reset_cache: bool
+    :param source_key: Name of source configuration option
+                       (default: 'openstack-origin')
+    :type source_key: Optional[str]
+    :returns: OpenStack release codename
+    :rtype: str
+    """
+    source_key = source_key or 'openstack-origin'
+    if not base:
+        base = UBUNTU_OPENSTACK_RELEASE[lsb_release()['DISTRIB_CODENAME']]
     global _os_rel
     if reset_cache:
         reset_os_release()
@@ -502,7 +611,7 @@ def os_release(package, base='essex', reset_cache=False):
         return _os_rel
     _os_rel = (
         get_os_codename_package(package, fatal=False) or
-        get_os_codename_install_source(config('openstack-origin')) or
+        get_os_codename_install_source(config(source_key)) or
         base)
     return _os_rel
 
@@ -585,6 +694,93 @@ def config_value_changed(option):
         return current != saved
 
 
+def get_endpoint_key(service_name, relation_id, unit_name):
+    """Return the key used to refer to an ep changed notification from a unit.
+
+    :param service_name: Service name eg nova, neutron, placement etc
+    :type service_name: str
+    :param relation_id: The id of the relation the unit is on.
+    :type relation_id: str
+    :param unit_name: The name of the unit publishing the notification.
+    :type unit_name: str
+    :returns: The key used to refer to an ep changed notification from a unit
+    :rtype: str
+    """
+    return '{}-{}-{}'.format(
+        service_name,
+        relation_id.replace(':', '_'),
+        unit_name.replace('/', '_'))
+
+
+def get_endpoint_notifications(service_names, rel_name='identity-service'):
+    """Return all notifications for the given services.
+
+    :param service_names: List of service name.
+    :type service_name: List
+    :param rel_name: Name of the relation to query
+    :type rel_name: str
+    :returns: A dict containing the source of the notification and its nonce.
+    :rtype: Dict[str, str]
+    """
+    notifications = {}
+    for rid in relation_ids(rel_name):
+        for unit in related_units(relid=rid):
+            ep_changed_json = relation_get(
+                rid=rid,
+                unit=unit,
+                attribute='ep_changed')
+            if ep_changed_json:
+                ep_changed = json.loads(ep_changed_json)
+                for service in service_names:
+                    if ep_changed.get(service):
+                        key = get_endpoint_key(service, rid, unit)
+                        notifications[key] = ep_changed[service]
+    return notifications
+
+
+def endpoint_changed(service_name, rel_name='identity-service'):
+    """Whether a new notification has been recieved for an endpoint.
+
+    :param service_name: Service name eg nova, neutron, placement etc
+    :type service_name: str
+    :param rel_name: Name of the relation to query
+    :type rel_name: str
+    :returns: Whether endpoint has changed
+    :rtype: bool
+    """
+    changed = False
+    with unitdata.HookData()() as t:
+        db = t[0]
+        notifications = get_endpoint_notifications(
+            [service_name],
+            rel_name=rel_name)
+        for key, nonce in notifications.items():
+            if db.get(key) != nonce:
+                juju_log(('New endpoint change notification found: '
+                          '{}={}').format(key, nonce),
+                         'INFO')
+                changed = True
+                break
+    return changed
+
+
+def save_endpoint_changed_triggers(service_names, rel_name='identity-service'):
+    """Save the enpoint triggers in  db so it can be tracked if they changed.
+
+    :param service_names: List of service name.
+    :type service_name: List
+    :param rel_name: Name of the relation to query
+    :type rel_name: str
+    """
+    with unitdata.HookData()() as t:
+        db = t[0]
+        notifications = get_endpoint_notifications(
+            service_names,
+            rel_name=rel_name)
+        for key, nonce in notifications.items():
+            db.set(key, nonce)
+
+
 def save_script_rc(script_path="scripts/scriptrc", **env_vars):
     """
     Write an rc file in the charm-delivered directory containing
@@ -614,7 +810,6 @@ def openstack_upgrade_available(package):
                          a newer version of package.
     """
 
-    import apt_pkg as apt
     src = config('openstack-origin')
     cur_vers = get_os_version_package(package)
     if not cur_vers:
@@ -624,9 +819,12 @@ def openstack_upgrade_available(package):
         codename = get_os_codename_install_source(src)
         avail_vers = get_os_version_codename_swift(codename)
     else:
-        avail_vers = get_os_version_install_source(src)
+        try:
+            avail_vers = get_os_version_install_source(src)
+        except Exception:
+            avail_vers = cur_vers
     apt.init()
-    return apt.version_compare(avail_vers, cur_vers) == 1
+    return apt.version_compare(avail_vers, cur_vers) >= 1
 
 
 def ensure_block_device(block_device):
@@ -820,6 +1018,12 @@ def _determine_os_workload_status(
         message = "Unit is ready"
         juju_log(message, 'INFO')
 
+    try:
+        if config(POLICYD_CONFIG_NAME):
+            message = "{} {}".format(policyd_status_message_prefix(), message)
+    except Exception:
+        pass
+
     return state, message
 
 
@@ -827,12 +1031,25 @@ def _ows_check_if_paused(services=None, ports=None):
     """Check if the unit is supposed to be paused, and if so check that the
     services/ports (if passed) are actually stopped/not being listened to.
 
-    if the unit isn't supposed to be paused, just return None, None
+    If the unit isn't supposed to be paused, just return None, None
+
+    If the unit is performing a series upgrade, return a message indicating
+    this.
 
     @param services: OPTIONAL services spec or list of service names.
     @param ports: OPTIONAL list of port numbers.
     @returns state, message or None, None
     """
+    if is_unit_upgrading_set():
+        state, message = check_actually_paused(services=services,
+                                               ports=ports)
+        if state is None:
+            # we're paused okay, so set maintenance and return
+            state = "blocked"
+            message = ("Ready for do-release-upgrade and reboot. "
+                       "Set complete when finished.")
+        return state, message
+
     if is_unit_paused_set():
         state, message = check_actually_paused(services=services,
                                                ports=ports)
@@ -939,7 +1156,9 @@ def _ows_check_charm_func(state, message, charm_func_with_configs):
     """
     if charm_func_with_configs:
         charm_state, charm_message = charm_func_with_configs()
-        if charm_state != 'active' and charm_state != 'unknown':
+        if (charm_state != 'active' and
+                charm_state != 'unknown' and
+                charm_state is not None):
             state = workload_state_compare(state, charm_state)
             if message:
                 charm_message = charm_message.replace("Incomplete relations: ",
@@ -1208,7 +1427,7 @@ def remote_restart(rel_name, remote_service=None):
 
 
 def check_actually_paused(services=None, ports=None):
-    """Check that services listed in the services object and and ports
+    """Check that services listed in the services object and ports
     are actually closed (not listened to), to verify that the unit is
     properly paused.
 
@@ -1286,6 +1505,65 @@ def is_unit_paused_set():
         return False
 
 
+def manage_payload_services(action, services=None, charm_func=None):
+    """Run an action against all services.
+
+    An optional charm_func() can be called. It should raise an Exception to
+    indicate that the function failed. If it was succesfull it should return
+    None or an optional message.
+
+    The signature for charm_func is:
+    charm_func() -> message: str
+
+    charm_func() is executed after any services are stopped, if supplied.
+
+    The services object can either be:
+      - None : no services were passed (an empty dict is returned)
+      - a list of strings
+      - A dictionary (optionally OrderedDict) {service_name: {'service': ..}}
+      - An array of [{'service': service_name, ...}, ...]
+
+    :param action: Action to run: pause, resume, start or stop.
+    :type action: str
+    :param services: See above
+    :type services: See above
+    :param charm_func: function to run for custom charm pausing.
+    :type charm_func: f()
+    :returns: Status boolean and list of messages
+    :rtype: (bool, [])
+    :raises: RuntimeError
+    """
+    actions = {
+        'pause': service_pause,
+        'resume': service_resume,
+        'start': service_start,
+        'stop': service_stop}
+    action = action.lower()
+    if action not in actions.keys():
+        raise RuntimeError(
+            "action: {} must be one of: {}".format(action,
+                                                   ', '.join(actions.keys())))
+    services = _extract_services_list_helper(services)
+    messages = []
+    success = True
+    if services:
+        for service in services.keys():
+            rc = actions[action](service)
+            if not rc:
+                success = False
+                messages.append("{} didn't {} cleanly.".format(service,
+                                                               action))
+    if charm_func:
+        try:
+            message = charm_func()
+            if message:
+                messages.append(message)
+        except Exception as e:
+            success = False
+            messages.append(str(e))
+    return success, messages
+
+
 def pause_unit(assess_status_func, services=None, ports=None,
                charm_func=None):
     """Pause a unit by stopping the services and setting 'unit-paused'
@@ -1316,26 +1594,16 @@ def pause_unit(assess_status_func, services=None, ports=None,
     @returns None
     @raises Exception(message) on an error for action_fail().
     """
-    services = _extract_services_list_helper(services)
-    messages = []
-    if services:
-        for service in services.keys():
-            stopped = service_pause(service)
-            if not stopped:
-                messages.append("{} didn't stop cleanly.".format(service))
-    if charm_func:
-        try:
-            message = charm_func()
-            if message:
-                messages.append(message)
-        except Exception as e:
-            message.append(str(e))
+    _, messages = manage_payload_services(
+        'pause',
+        services=services,
+        charm_func=charm_func)
     set_unit_paused()
     if assess_status_func:
         message = assess_status_func()
         if message:
             messages.append(message)
-    if messages:
+    if messages and not is_unit_upgrading_set():
         raise Exception("Couldn't pause: {}".format("; ".join(messages)))
 
 
@@ -1368,20 +1636,10 @@ def resume_unit(assess_status_func, services=None, ports=None,
     @returns None
     @raises Exception(message) on an error for action_fail().
     """
-    services = _extract_services_list_helper(services)
-    messages = []
-    if services:
-        for service in services.keys():
-            started = service_resume(service)
-            if not started:
-                messages.append("{} didn't start cleanly.".format(service))
-    if charm_func:
-        try:
-            message = charm_func()
-            if message:
-                messages.append(message)
-        except Exception as e:
-            message.append(str(e))
+    _, messages = manage_payload_services(
+        'resume',
+        services=services,
+        charm_func=charm_func)
     clear_unit_paused()
     if assess_status_func:
         message = assess_status_func()
@@ -1433,20 +1691,33 @@ def pausable_restart_on_change(restart_map, stopstart=False,
 
     see core.utils.restart_on_change() for more details.
 
+    Note restart_map can be a callable, in which case, restart_map is only
+    evaluated at runtime.  This means that it is lazy and the underlying
+    function won't be called if the decorated function is never called.  Note,
+    retains backwards compatibility for passing a non-callable dictionary.
+
     @param f: the function to decorate
-    @param restart_map: the restart map {conf_file: [services]}
+    @param restart_map: (optionally callable, which then returns the
+        restart_map) the restart map {conf_file: [services]}
     @param stopstart: DEFAULT false; whether to stop, start or just restart
     @returns decorator to use a restart_on_change with pausability
     """
     def wrap(f):
+        # py27 compatible nonlocal variable.  When py3 only, replace with
+        # nonlocal keyword
+        __restart_map_cache = {'cache': None}
+
         @functools.wraps(f)
         def wrapped_f(*args, **kwargs):
             if is_unit_paused_set():
                 return f(*args, **kwargs)
+            if __restart_map_cache['cache'] is None:
+                __restart_map_cache['cache'] = restart_map() \
+                    if callable(restart_map) else restart_map
             # otherwise, normal restart_on_change functionality
             return restart_on_change_helper(
-                (lambda: f(*args, **kwargs)), restart_map, stopstart,
-                restart_functions)
+                (lambda: f(*args, **kwargs)), __restart_map_cache['cache'],
+                stopstart, restart_functions)
         return wrapped_f
     return wrap
 
@@ -1563,6 +1834,16 @@ def os_application_version_set(package):
         application_version_set(application_version)
 
 
+def os_application_status_set(check_function):
+    """Run the supplied function and set the application status accordingly.
+
+    :param check_function: Function to run to get app states and messages.
+    :type check_function: function
+    """
+    state, message = check_function()
+    status_set(state, message, application=True)
+
+
 def enable_memcache(source=None, release=None, package=None):
     """Determine if memcache should be enabled on the local unit
 
@@ -1574,7 +1855,7 @@ def enable_memcache(source=None, release=None, package=None):
     if release:
         _release = release
     else:
-        _release = os_release(package, base='icehouse')
+        _release = os_release(package)
     if not _release:
         _release = get_os_codename_install_source(source)
 
@@ -1685,3 +1966,408 @@ def install_os_snaps(snaps, refresh=False):
             snap_install(snap,
                          _ensure_flag(snaps[snap]['channel']),
                          _ensure_flag(snaps[snap]['mode']))
+
+
+def set_unit_upgrading():
+    """Set the unit to a upgrading state in the local kv() store.
+    """
+    with unitdata.HookData()() as t:
+        kv = t[0]
+        kv.set('unit-upgrading', True)
+
+
+def clear_unit_upgrading():
+    """Clear the unit from a upgrading state in the local kv() store
+    """
+    with unitdata.HookData()() as t:
+        kv = t[0]
+        kv.set('unit-upgrading', False)
+
+
+def is_unit_upgrading_set():
+    """Return the state of the kv().get('unit-upgrading').
+
+    To help with units that don't have HookData() (testing)
+    if it excepts, return False
+    """
+    try:
+        with unitdata.HookData()() as t:
+            kv = t[0]
+            # transform something truth-y into a Boolean.
+            return not(not(kv.get('unit-upgrading')))
+    except Exception:
+        return False
+
+
+def series_upgrade_prepare(pause_unit_helper=None, configs=None):
+    """ Run common series upgrade prepare tasks.
+
+    :param pause_unit_helper: function: Function to pause unit
+    :param configs: OSConfigRenderer object: Configurations
+    :returns None:
+    """
+    set_unit_upgrading()
+    if pause_unit_helper and configs:
+        if not is_unit_paused_set():
+            pause_unit_helper(configs)
+
+
+def series_upgrade_complete(resume_unit_helper=None, configs=None):
+    """ Run common series upgrade complete tasks.
+
+    :param resume_unit_helper: function: Function to resume unit
+    :param configs: OSConfigRenderer object: Configurations
+    :returns None:
+    """
+    clear_unit_paused()
+    clear_unit_upgrading()
+    if configs:
+        configs.write_all()
+        if resume_unit_helper:
+            resume_unit_helper(configs)
+
+
+def is_db_initialised():
+    """Check leader storage to see if database has been initialised.
+
+    :returns: Whether DB has been initialised
+    :rtype: bool
+    """
+    db_initialised = None
+    if leader_get('db-initialised') is None:
+        juju_log(
+            'db-initialised key missing, assuming db is not initialised',
+            'DEBUG')
+        db_initialised = False
+    else:
+        db_initialised = bool_from_string(leader_get('db-initialised'))
+    juju_log('Database initialised: {}'.format(db_initialised), 'DEBUG')
+    return db_initialised
+
+
+def set_db_initialised():
+    """Add flag to leader storage to indicate database has been initialised.
+    """
+    juju_log('Setting db-initialised to True', 'DEBUG')
+    leader_set({'db-initialised': True})
+
+
+def is_db_maintenance_mode(relid=None):
+    """Check relation data from notifications of db in maintenance mode.
+
+    :returns: Whether db has notified it is in maintenance mode.
+    :rtype: bool
+    """
+    juju_log('Checking for maintenance notifications', 'DEBUG')
+    if relid:
+        r_ids = [relid]
+    else:
+        r_ids = relation_ids('shared-db')
+    rids_units = [(r, u) for r in r_ids for u in related_units(r)]
+    notifications = []
+    for r_id, unit in rids_units:
+        settings = relation_get(unit=unit, rid=r_id)
+        for key, value in settings.items():
+            if value and key in DB_MAINTENANCE_KEYS:
+                juju_log(
+                    'Unit: {}, Key: {}, Value: {}'.format(unit, key, value),
+                    'DEBUG')
+                try:
+                    notifications.append(bool_from_string(value))
+                except ValueError:
+                    juju_log(
+                        'Could not discern bool from {}'.format(value),
+                        'WARN')
+                    pass
+    return True in notifications
+
+
+@cached
+def container_scoped_relations():
+    """Get all the container scoped relations
+
+    :returns: List of relation names
+    :rtype: List
+    """
+    md = metadata()
+    relations = []
+    for relation_type in ('provides', 'requires', 'peers'):
+        for relation in md.get(relation_type, []):
+            if md[relation_type][relation].get('scope') == 'container':
+                relations.append(relation)
+    return relations
+
+
+def is_db_ready(use_current_context=False, rel_name=None):
+    """Check remote database is ready to be used.
+
+    Database relations are expected to provide a list of 'allowed' units to
+    confirm that the database is ready for use by those units.
+
+    If db relation has provided this information and local unit is a member,
+    returns True otherwise False.
+
+    :param use_current_context: Whether to limit checks to current hook
+                                context.
+    :type use_current_context: bool
+    :param rel_name: Name of relation to check
+    :type rel_name: string
+    :returns: Whether remote db is ready.
+    :rtype: bool
+    :raises: Exception
+    """
+    key = 'allowed_units'
+
+    rel_name = rel_name or 'shared-db'
+    this_unit = local_unit()
+
+    if use_current_context:
+        if relation_id() in relation_ids(rel_name):
+            rids_units = [(None, None)]
+        else:
+            raise Exception("use_current_context=True but not in {} "
+                            "rel hook contexts (currently in {})."
+                            .format(rel_name, relation_id()))
+    else:
+        rids_units = [(r_id, u)
+                      for r_id in relation_ids(rel_name)
+                      for u in related_units(r_id)]
+
+    for rid, unit in rids_units:
+        allowed_units = relation_get(rid=rid, unit=unit, attribute=key)
+        if allowed_units and this_unit in allowed_units.split():
+            juju_log("This unit ({}) is in allowed unit list from {}".format(
+                this_unit,
+                unit), 'DEBUG')
+            return True
+
+    juju_log("This unit was not found in any allowed unit list")
+    return False
+
+
+def is_expected_scale(peer_relation_name='cluster'):
+    """Query juju goal-state to determine whether our peer- and dependency-
+    relations are at the expected scale.
+
+    Useful for deferring per unit per relation housekeeping work until we are
+    ready to complete it successfully and without unnecessary repetiton.
+
+    Always returns True if version of juju used does not support goal-state.
+
+    :param peer_relation_name: Name of peer relation
+    :type rel_name: string
+    :returns: True or False
+    :rtype: bool
+    """
+    def _get_relation_id(rel_type):
+        return next((rid for rid in relation_ids(reltype=rel_type)), None)
+
+    Relation = namedtuple('Relation', 'rel_type rel_id')
+    peer_rid = _get_relation_id(peer_relation_name)
+    # Units with no peers should still have a peer relation.
+    if not peer_rid:
+        juju_log('Not at expected scale, no peer relation found', 'DEBUG')
+        return False
+    expected_relations = [
+        Relation(rel_type='shared-db', rel_id=_get_relation_id('shared-db'))]
+    if expect_ha():
+        expected_relations.append(
+            Relation(
+                rel_type='ha',
+                rel_id=_get_relation_id('ha')))
+    juju_log(
+        'Checking scale of {} relations'.format(
+            ','.join([r.rel_type for r in expected_relations])),
+        'DEBUG')
+    try:
+        if (len(related_units(relid=peer_rid)) <
+                len(list(expected_peer_units()))):
+            return False
+        for rel in expected_relations:
+            if not rel.rel_id:
+                juju_log(
+                    'Expected to find {} relation, but it is missing'.format(
+                        rel.rel_type),
+                    'DEBUG')
+                return False
+            # Goal state returns every unit even for container scoped
+            # relations but the charm only ever has a relation with
+            # the local unit.
+            if rel.rel_type in container_scoped_relations():
+                expected_count = 1
+            else:
+                expected_count = len(
+                    list(expected_related_units(reltype=rel.rel_type)))
+            if len(related_units(relid=rel.rel_id)) < expected_count:
+                juju_log(
+                    ('Not at expected scale, not enough units on {} '
+                     'relation'.format(rel.rel_type)),
+                    'DEBUG')
+                return False
+    except NotImplementedError:
+        return True
+    juju_log('All checks have passed, unit is at expected scale', 'DEBUG')
+    return True
+
+
+def get_peer_key(unit_name):
+    """Get the peer key for this unit.
+
+    The peer key is the key a unit uses to publish its status down the peer
+    relation
+
+    :param unit_name: Name of unit
+    :type unit_name: string
+    :returns: Peer key for given unit
+    :rtype: string
+    """
+    return 'unit-state-{}'.format(unit_name.replace('/', '-'))
+
+
+UNIT_READY = 'READY'
+UNIT_NOTREADY = 'NOTREADY'
+UNIT_UNKNOWN = 'UNKNOWN'
+UNIT_STATES = [UNIT_READY, UNIT_NOTREADY, UNIT_UNKNOWN]
+
+
+def inform_peers_unit_state(state, relation_name='cluster'):
+    """Inform peers of the state of this unit.
+
+    :param state: State of unit to publish
+    :type state: string
+    :param relation_name: Name of relation to publish state on
+    :type relation_name: string
+    """
+    if state not in UNIT_STATES:
+        raise ValueError(
+            "Setting invalid state {} for unit".format(state))
+    this_unit = local_unit()
+    for r_id in relation_ids(relation_name):
+        juju_log('Telling peer behind relation {} that {} is {}'.format(
+            r_id, this_unit, state), 'DEBUG')
+        relation_set(relation_id=r_id,
+                     relation_settings={
+                         get_peer_key(this_unit): state})
+
+
+def get_peers_unit_state(relation_name='cluster'):
+    """Get the state of all peers.
+
+    :param relation_name: Name of relation to check peers on.
+    :type relation_name: string
+    :returns: Unit states keyed on unit name.
+    :rtype: dict
+    :raises: ValueError
+    """
+    r_ids = relation_ids(relation_name)
+    rids_units = [(r, u) for r in r_ids for u in related_units(r)]
+    unit_states = {}
+    for r_id, unit in rids_units:
+        settings = relation_get(unit=unit, rid=r_id)
+        unit_states[unit] = settings.get(get_peer_key(unit), UNIT_UNKNOWN)
+        if unit_states[unit] not in UNIT_STATES:
+            raise ValueError(
+                "Unit in unknown state {}".format(unit_states[unit]))
+    return unit_states
+
+
+def are_peers_ready(relation_name='cluster'):
+    """Check if all peers are ready.
+
+    :param relation_name: Name of relation to check peers on.
+    :type relation_name: string
+    :returns: Whether all units are ready.
+    :rtype: bool
+    """
+    unit_states = get_peers_unit_state(relation_name).values()
+    juju_log('{} peers are in the following states: {}'.format(
+        relation_name, unit_states), 'DEBUG')
+    return all(state == UNIT_READY for state in unit_states)
+
+
+def inform_peers_if_ready(check_unit_ready_func, relation_name='cluster'):
+    """Inform peers if this unit is ready.
+
+    The check function should return a tuple (state, message). A state
+    of 'READY' indicates the unit is READY.
+
+    :param check_unit_ready_func: Function to run to check readiness
+    :type check_unit_ready_func: function
+    :param relation_name: Name of relation to check peers on.
+    :type relation_name: string
+    """
+    unit_ready, msg = check_unit_ready_func()
+    if unit_ready:
+        state = UNIT_READY
+    else:
+        state = UNIT_NOTREADY
+    juju_log('Telling peers this unit is: {}'.format(state), 'DEBUG')
+    inform_peers_unit_state(state, relation_name)
+
+
+def check_api_unit_ready(check_db_ready=True):
+    """Check if this unit is ready.
+
+    :param check_db_ready: Include checks of database readiness.
+    :type check_db_ready: bool
+    :returns: Whether unit state is ready and status message
+    :rtype: (bool, str)
+    """
+    unit_state, msg = get_api_unit_status(check_db_ready=check_db_ready)
+    return unit_state == WORKLOAD_STATES.ACTIVE, msg
+
+
+def get_api_unit_status(check_db_ready=True):
+    """Return a workload status and message for this unit.
+
+    :param check_db_ready: Include checks of database readiness.
+    :type check_db_ready: bool
+    :returns: Workload state and message
+    :rtype: (bool, str)
+    """
+    unit_state = WORKLOAD_STATES.ACTIVE
+    msg = 'Unit is ready'
+    if is_db_maintenance_mode():
+        unit_state = WORKLOAD_STATES.MAINTENANCE
+        msg = 'Database in maintenance mode.'
+    elif is_unit_paused_set():
+        unit_state = WORKLOAD_STATES.BLOCKED
+        msg = 'Unit paused.'
+    elif check_db_ready and not is_db_ready():
+        unit_state = WORKLOAD_STATES.WAITING
+        msg = 'Allowed_units list provided but this unit not present'
+    elif not is_db_initialised():
+        unit_state = WORKLOAD_STATES.WAITING
+        msg = 'Database not initialised'
+    elif not is_expected_scale():
+        unit_state = WORKLOAD_STATES.WAITING
+        msg = 'Charm and its dependencies not yet at expected scale'
+    juju_log(msg, 'DEBUG')
+    return unit_state, msg
+
+
+def check_api_application_ready():
+    """Check if this application is ready.
+
+    :returns: Whether application state is ready and status message
+    :rtype: (bool, str)
+    """
+    app_state, msg = get_api_application_status()
+    return app_state == WORKLOAD_STATES.ACTIVE, msg
+
+
+def get_api_application_status():
+    """Return a workload status and message for this application.
+
+    :returns: Workload state and message
+    :rtype: (bool, str)
+    """
+    app_state, msg = get_api_unit_status()
+    if app_state == WORKLOAD_STATES.ACTIVE:
+        if are_peers_ready():
+            msg = 'Application Ready'
+        else:
+            app_state = WORKLOAD_STATES.WAITING
+            msg = 'Some units are not ready'
+    juju_log(msg, 'DEBUG')
+    return app_state, msg

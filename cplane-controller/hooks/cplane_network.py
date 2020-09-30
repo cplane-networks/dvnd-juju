@@ -1,4 +1,3 @@
-#!/usr/bin/python
 import netifaces as ni
 import subprocess
 from cplane_interface import UbuntuIntfMgmt

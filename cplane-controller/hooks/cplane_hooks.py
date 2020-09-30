@@ -1,4 +1,5 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
+
 from charmhelpers.core.hookenv import (
     Hooks,
     UnregisteredHookError,
@@ -13,7 +14,7 @@ from charmhelpers.core.hookenv import (
     WARNING,
 )
 import sys
-import commands
+import subprocess 
 import os
 import json
 
@@ -84,7 +85,7 @@ if config('controller-app-mode') == 'msm' or config('controller-app-mode') == \
 
 @hooks.hook('cplane-controller-relation-joined')
 def cplane_controller_relation_joined(rid=None):
-    tm = commands.getoutput("date")
+    tm = subprocess.getoutput("date")
     if config('controller-app-mode') == 'dvnd':
         if check_fip_mode() == 'true':
             fip_mode = True

@@ -25,6 +25,7 @@ Helpers for clustering and determining "cluster leadership" and other
 clustering-related helpers.
 """
 
+import functools
 import subprocess
 import os
 import time
@@ -223,6 +224,11 @@ def https():
         return True
     if config_get('ssl_cert') and config_get('ssl_key'):
         return True
+    for r_id in relation_ids('certificates'):
+        for unit in relation_list(r_id):
+            ca = relation_get('ca', rid=r_id, unit=unit)
+            if ca:
+                return True
     for r_id in relation_ids('identity-service'):
         for unit in relation_list(r_id):
             # TODO - needs fixing for new helper as ssl_cert/key suffixes with CN
@@ -274,6 +280,10 @@ def determine_apache_port(public_port, singlenode_mode=False):
     elif len(peer_units()) > 0 or is_clustered():
         i += 1
     return public_port - (i * 10)
+
+
+determine_apache_port_single = functools.partial(
+    determine_apache_port, singlenode_mode=True)
 
 
 def get_hacluster_config(exclude_keys=None):
@@ -399,3 +409,43 @@ def distributed_wait(modulo=None, wait=None, operation_name='operation'):
     log(msg, DEBUG)
     status_set('maintenance', msg)
     time.sleep(calculated_wait)
+
+
+def get_managed_services_and_ports(services, external_ports,
+                                   external_services=None,
+                                   port_conv_f=determine_apache_port_single):
+    """Get the services and ports managed by this charm.
+
+    Return only the services and corresponding ports that are managed by this
+    charm. This excludes haproxy when there is a relation with hacluster. This
+    is because this charm passes responsability for stopping and starting
+    haproxy to hacluster.
+
+    Similarly, if a relation with hacluster exists then the ports returned by
+    this method correspond to those managed by the apache server rather than
+    haproxy.
+
+    :param services: List of services.
+    :type services: List[str]
+    :param external_ports: List of ports managed by external services.
+    :type external_ports: List[int]
+    :param external_services: List of services to be removed if ha relation is
+                              present.
+    :type external_services: List[str]
+    :param port_conv_f: Function to apply to ports to calculate the ports
+                        managed by services controlled by this charm.
+    :type port_convert_func: f()
+    :returns: A tuple containing a list of services first followed by a list of
+              ports.
+    :rtype: Tuple[List[str], List[int]]
+    """
+    if external_services is None:
+        external_services = ['haproxy']
+    if relation_ids('ha'):
+        for svc in external_services:
+            try:
+                services.remove(svc)
+            except ValueError:
+                pass
+        external_ports = [port_conv_f(p) for p in external_ports]
+    return services, external_ports

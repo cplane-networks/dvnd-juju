@@ -24,7 +24,6 @@ from charmhelpers.fetch import (
 
 import os
 import pwd
-import commands
 import time
 import re
 import json
@@ -71,7 +70,7 @@ elif config('jboss-db-on-host'):
 
 
 PACKAGES = ['alien', 'libaio1', 'zlib1g-dev', 'libxml2-dev',
-            'libxml-libxml-perl', 'unzip', 'python-pexpect',
+            'libxml-libxml-perl', 'unzip', 'python3-pexpect',
             'libyaml-perl']
 if config('controller-app-mode') == 'msm' or \
    config('controller-app-mode') == 'doctl':
@@ -166,7 +165,7 @@ def register_configs(release=None):
     release = config('openstack-version')
     configs = templating.OSConfigRenderer(templates_dir=TEMPLATES,
                                           openstack_release=release)
-    for cfg, rscs in resources.iteritems():
+    for cfg, rscs in list(resources.items()):
         configs.register(cfg, rscs['contexts'])
     return configs
 
@@ -180,7 +179,7 @@ def determine_packages():
 def download_cplane_packages():
     filename = {}
     cp_package = CPlanePackageManager(CPLANE_URL)
-    for key, value in cplane_packages.items():
+    for key, value in list(cplane_packages.items()):
         filename[key] = cp_package.download_package(key, value)
         log('downloaded {} package'.format(filename[key]))
     json.dump(filename, open(FILES_PATH, 'w'))
@@ -189,7 +188,7 @@ def download_cplane_packages():
 def download_cplane_installer():
     filename = json.load(open(FILES_PATH))
     cp_package = CPlanePackageManager(CPLANE_URL)
-    for key, value in cplane_packages.items():
+    for key, value in list(cplane_packages.items()):
         if key == config('controller-app-mode'):
             filename[key] = cp_package.download_package(key, value)
             log('downloaded {} package'.format(filename[key]))
@@ -277,7 +276,7 @@ def install_jdk():
     log('Installing JDK')
 #    deb_convert_install('jdk')
     install_jdk_from_tar('jdk')
-    java_dir = commands.getoutput("echo $(dirname $(dirname \
+    java_dir = subprocess.getoutput("echo $(dirname $(dirname \
 $(readlink -f $(which javac))))")
     home_dir = pwd.getpwuid(os.getuid()).pw_dir
     with open('{}/.bashrc'.format(home_dir), 'a') as f:
@@ -311,7 +310,7 @@ def install_jdk_from_tar(module):
     os.chdir(JAVA_DIR)
     cmd = ['tar', '-xvf', filename[module]]
     res = list(subprocess.check_output(cmd).split())[0]
-    java_bin_path = JAVA_DIR + '/' + res + 'bin'
+    java_bin_path = JAVA_DIR + '/' + res.decode() + 'bin'
     os.chdir(saved_path)
     home_dir = pwd.getpwuid(os.getuid()).pw_dir
 
@@ -333,7 +332,7 @@ def configure_oracle_client():
     filename = json.load(open(FILES_PATH))
     cmd = 'ln -s /usr/bin/sqlplus64 /usr/bin/sqlplus'
     os.system(cmd)
-    oracle_version = re.findall(u'instantclient([0-9.]+)', filename['oracle\
+    oracle_version = re.findall('instantclient([0-9.]+)', filename['oracle\
 -client-basic'])[0]
     with open('/etc/ld.so.conf.d/oracle.conf',
               'w') as oracle_configuration_file:
@@ -368,12 +367,11 @@ def install_oracle():
 
 
 def set_oracle_env():
-    newenv = None
-    pipe = subprocess.Popen(". /etc/profile.d/oracle_env.sh; python -c 'import os; \
-                            print \"newenv = %r\" % os.environ'",
+    pipe = subprocess.Popen(". /etc/profile.d/oracle_env.sh; env", 
                             stdout=subprocess.PIPE, shell=True)
-    exec(pipe.communicate()[0])
-    os.environ.update(newenv)
+    output = pipe.communicate()[0].decode('utf-8')
+    env = dict((line.split("=", 1) for line in output.splitlines()))
+    os.environ.update(env)
 
 
 def configure_oracle():
@@ -430,7 +428,7 @@ def configure_oracle():
 def execute_sql_command(connect_string, sql_command):
     session = subprocess.Popen(['sqlplus', '-S', connect_string], stdin=PIPE,
                                stdout=PIPE, stderr=PIPE)
-    session.stdin.write(sql_command)
+    session.stdin.write(sql_command.encode())
     log('{}'.format(session.communicate()))
 
 
@@ -496,7 +494,7 @@ password'), host, DB_SERVICE)
 
 def load_config():
     if config('controller-app-mode') == 'dvnd':
-        for key, value in DVND_CONFIG.items():
+        for key, value in list(DVND_CONFIG.items()):
             if key == 'enable-fip':
                 if(config(key)):
                     set_config(value, 'true', CONTROLLER_CONFIG)
@@ -517,7 +515,7 @@ def load_config():
                        CONTROLLER_CONFIG)
 
     elif config('controller-app-mode') == 'msm':
-        for key, value in MSM_CONFIG.items():
+        for key, value in list(MSM_CONFIG.items()):
             set_config(value, config(key), CONTROLLER_CONFIG)
         if config('use-default-jboss-cluster') is False:
             hostname = socket.gethostname()
@@ -530,7 +528,7 @@ def load_config():
                        CONTROLLER_CONFIG)
 
     elif config('controller-app-mode') == 'doctl':
-        for key, value in DOCTL_CONFIG.items():
+        for key, value in list(DOCTL_CONFIG.items()):
             set_config(value, config(key), CONTROLLER_CONFIG)
         set_config('multicastServerInterface', config('multicast-intf'),
                    CONTROLLER_CONFIG)
@@ -576,7 +574,7 @@ def cplane_installer():
 def start_jboss_service():
     os.system('bash startJBossServer.sh')
     for num in range(0, 5):
-        status = commands.getoutput('bash checkJBossServer.sh')
+        status = subprocess.getoutput('bash checkJBossServer.sh')
         if status == "JBoss server is not running!":
             log("JBoss is not yet started... Retry checking it after 60 sec")
             time.sleep(60)
@@ -645,7 +643,7 @@ def check_fip_mode():
 
 
 def get_upgrade_type():
-    upgrade_type = commands.getoutput("cat $CHARM_DIR/config/upgrade-config | \
+    upgrade_type = subprocess.getoutput("cat $CHARM_DIR/config/upgrade-config | \
 awk '{ print $2}'")
     return upgrade_type
 
@@ -677,7 +675,7 @@ password'), host, DB_SERVICE)
 def check_jboss_service():
     saved_path = os.getcwd()
     os.chdir(CPLANE_DIR)
-    status = commands.getoutput('bash checkJBossServer.sh')
+    status = subprocess.getoutput('bash checkJBossServer.sh')
     ret_val = ''
     if status == "JBoss server is not running!":
         ret_val = False
@@ -687,7 +685,7 @@ def check_jboss_service():
 
     if ret_val is False:
         time.sleep(150)
-        status = commands.getoutput('bash checkJBossServer.sh')
+        status = subprocess.getoutput('bash checkJBossServer.sh')
         os.chdir(saved_path)
         if status == "JBoss server is not running!":
             return False
@@ -831,7 +829,7 @@ def config_host(host_string, address_type):
 
 
 def check_jboss_status():
-    status = commands.getoutput('bash /opt/cplane/bin/checkJBossServer.sh')
+    status = subprocess.getoutput('bash /opt/cplane/bin/checkJBossServer.sh')
     if status == "JBoss server is not running!":
         return False
     elif status == "JBoss server is running!":
@@ -858,7 +856,7 @@ def assess_status_func(configs):
 class FakeOSConfigRenderer(object):
     def complete_contexts(self):
         interfaces = []
-        for key, values in REQUIRED_INTERFACES.items():
+        for key, values in list(REQUIRED_INTERFACES.items()):
             for value in values:
                 for rid in relation_ids(value):
                     for unit in related_units(rid):
@@ -874,7 +872,7 @@ def fake_register_configs():
 
 
 def get_os_release():
-    ubuntu_release = commands.getoutput('lsb_release -r')
+    ubuntu_release = subprocess.getoutput('lsb_release -r')
     return ubuntu_release.split()[1]
 
 
