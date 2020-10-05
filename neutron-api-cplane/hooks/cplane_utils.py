@@ -59,7 +59,7 @@ if config('cplane-version') == "1.3.5":
 if config('cplane-version') == "1.3.7" or "1.3.8":
     del cplane_packages['neutronclient']
 
-PACKAGES = ['neutron-plugin-ml2', 'crudini', 'python-bitarray']
+PACKAGES = ['neutron-plugin-ml2', 'crudini', 'python3-bitarray']
 
 CPLANE_URL = config('cp-package-url')
 
@@ -86,7 +86,7 @@ def register_configs(release=None):
     release = os_release('neutron-common')
     configs = templating.OSConfigRenderer(templates_dir=TEMPLATES,
                                           openstack_release=release)
-    for cfg, rscs in resources.iteritems():
+    for cfg, rscs in list(resources.items()):
         configs.register(cfg, rscs['contexts'])
     return configs
 
@@ -119,7 +119,7 @@ def cplane_config(data, config_file):
 
 def install_cplane_packages():
     cp_package = CPlanePackageManager(CPLANE_URL)
-    for key, value in cplane_packages.items():
+    for key, value in list(cplane_packages.items()):
         filename = cp_package.download_package(key, value)
         if key == "neutronclient":
             cmd = ['tar', '-xvf', filename, '-C',
@@ -182,7 +182,7 @@ def assess_status_func(configs):
 class FakeOSConfigRenderer(object):
     def complete_contexts(self):
         interfaces = []
-        for key, values in REQUIRED_INTERFACES.items():
+        for key, values in list(REQUIRED_INTERFACES.items()):
             for value in values:
                 for rid in relation_ids(value):
                     for unit in related_units(rid):

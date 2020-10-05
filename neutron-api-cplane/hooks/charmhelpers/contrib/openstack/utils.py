@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Common python helper functions used for OpenStack charms.
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 from functools import wraps
 
 import subprocess
@@ -23,35 +23,47 @@ import sys
 import re
 import itertools
 import functools
-import shutil
 
 import six
-import tempfile
 import traceback
 import uuid
 import yaml
 
+from charmhelpers import deprecate
+
 from charmhelpers.contrib.network import ip
 
-from charmhelpers.core import (
-    unitdata,
-)
+from charmhelpers.core import unitdata
 
 from charmhelpers.core.hookenv import (
+    WORKLOAD_STATES,
     action_fail,
     action_set,
     config,
+    expected_peer_units,
+    expected_related_units,
     log as juju_log,
     charm_dir,
-    DEBUG,
     INFO,
     ERROR,
+    metadata,
     related_units,
+    relation_get,
+    relation_id,
     relation_ids,
     relation_set,
-    service_name,
     status_set,
-    hook_name
+    hook_name,
+    application_version_set,
+    cached,
+    leader_set,
+    leader_get,
+    local_unit,
+)
+
+from charmhelpers.core.strutils import (
+    BasicStringComparator,
+    bool_from_string,
 )
 
 from charmhelpers.contrib.storage.linux.lvm import (
@@ -66,11 +78,6 @@ from charmhelpers.contrib.network.ip import (
     port_has_listener,
 )
 
-from charmhelpers.contrib.python.packages import (
-    pip_create_virtualenv,
-    pip_install,
-)
-
 from charmhelpers.core.host import (
     lsb_release,
     mounts,
@@ -78,18 +85,66 @@ from charmhelpers.core.host import (
     service_running,
     service_pause,
     service_resume,
+    service_stop,
+    service_start,
     restart_on_change_helper,
 )
-from charmhelpers.fetch import apt_install, apt_cache, install_remote
+from charmhelpers.fetch import (
+    apt_cache,
+    import_key as fetch_import_key,
+    add_source as fetch_add_source,
+    SourceConfigError,
+    GPGKeyError,
+    get_upstream_version,
+    filter_missing_packages,
+    ubuntu_apt_pkg as apt,
+)
+
+from charmhelpers.fetch.snap import (
+    snap_install,
+    snap_refresh,
+    valid_snap_channel,
+)
+
 from charmhelpers.contrib.storage.linux.utils import is_block_device, zap_disk
 from charmhelpers.contrib.storage.linux.loopback import ensure_loopback_device
 from charmhelpers.contrib.openstack.exceptions import OSContextError
+from charmhelpers.contrib.openstack.policyd import (
+    policyd_status_message_prefix,
+    POLICYD_CONFIG_NAME,
+)
+
+from charmhelpers.contrib.openstack.ha.utils import (
+    expect_ha,
+)
 
 CLOUD_ARCHIVE_URL = "http://ubuntu-cloud.archive.canonical.com/ubuntu"
 CLOUD_ARCHIVE_KEY_ID = '5EDB1B62EC4926EA'
 
 DISTRO_PROPOSED = ('deb http://archive.ubuntu.com/ubuntu/ %s-proposed '
                    'restricted main multiverse universe')
+
+OPENSTACK_RELEASES = (
+    'diablo',
+    'essex',
+    'folsom',
+    'grizzly',
+    'havana',
+    'icehouse',
+    'juno',
+    'kilo',
+    'liberty',
+    'mitaka',
+    'newton',
+    'ocata',
+    'pike',
+    'queens',
+    'rocky',
+    'stein',
+    'train',
+    'ussuri',
+    'victoria',
+)
 
 UBUNTU_OPENSTACK_RELEASE = OrderedDict([
     ('oneiric', 'diablo'),
@@ -103,7 +158,14 @@ UBUNTU_OPENSTACK_RELEASE = OrderedDict([
     ('wily', 'liberty'),
     ('xenial', 'mitaka'),
     ('yakkety', 'newton'),
-    ('zebra', 'ocata'),  # TODO: upload with real Z name
+    ('zesty', 'ocata'),
+    ('artful', 'pike'),
+    ('bionic', 'queens'),
+    ('cosmic', 'rocky'),
+    ('disco', 'stein'),
+    ('eoan', 'train'),
+    ('focal', 'ussuri'),
+    ('groovy', 'victoria'),
 ])
 
 
@@ -120,6 +182,13 @@ OPENSTACK_CODENAMES = OrderedDict([
     ('2016.1', 'mitaka'),
     ('2016.2', 'newton'),
     ('2017.1', 'ocata'),
+    ('2017.2', 'pike'),
+    ('2018.1', 'queens'),
+    ('2018.2', 'rocky'),
+    ('2019.1', 'stein'),
+    ('2019.2', 'train'),
+    ('2020.1', 'ussuri'),
+    ('2020.2', 'victoria'),
 ])
 
 # The ugly duckling - must list releases oldest to newest
@@ -145,7 +214,23 @@ SWIFT_CODENAMES = OrderedDict([
     ('mitaka',
         ['2.5.0', '2.6.0', '2.7.0']),
     ('newton',
-        ['2.8.0', '2.9.0']),
+        ['2.8.0', '2.9.0', '2.10.0']),
+    ('ocata',
+        ['2.11.0', '2.12.0', '2.13.0']),
+    ('pike',
+        ['2.13.0', '2.15.0']),
+    ('queens',
+        ['2.16.0', '2.17.0']),
+    ('rocky',
+        ['2.18.0', '2.19.0']),
+    ('stein',
+        ['2.20.0', '2.21.0']),
+    ('train',
+        ['2.22.0', '2.23.0']),
+    ('ussuri',
+        ['2.24.0', '2.25.0']),
+    ('victoria',
+        ['2.25.0']),
 ])
 
 # >= Liberty version->codename mapping
@@ -155,83 +240,150 @@ PACKAGE_CODENAMES = {
         ('13', 'mitaka'),
         ('14', 'newton'),
         ('15', 'ocata'),
+        ('16', 'pike'),
+        ('17', 'queens'),
+        ('18', 'rocky'),
+        ('19', 'stein'),
+        ('20', 'train'),
+        ('21', 'ussuri'),
+        ('22', 'victoria'),
     ]),
     'neutron-common': OrderedDict([
         ('7', 'liberty'),
         ('8', 'mitaka'),
         ('9', 'newton'),
         ('10', 'ocata'),
+        ('11', 'pike'),
+        ('12', 'queens'),
+        ('13', 'rocky'),
+        ('14', 'stein'),
+        ('15', 'train'),
+        ('16', 'ussuri'),
+        ('17', 'victoria'),
     ]),
     'cinder-common': OrderedDict([
         ('7', 'liberty'),
         ('8', 'mitaka'),
         ('9', 'newton'),
         ('10', 'ocata'),
+        ('11', 'pike'),
+        ('12', 'queens'),
+        ('13', 'rocky'),
+        ('14', 'stein'),
+        ('15', 'train'),
+        ('16', 'ussuri'),
+        ('17', 'victoria'),
     ]),
     'keystone': OrderedDict([
         ('8', 'liberty'),
         ('9', 'mitaka'),
         ('10', 'newton'),
         ('11', 'ocata'),
+        ('12', 'pike'),
+        ('13', 'queens'),
+        ('14', 'rocky'),
+        ('15', 'stein'),
+        ('16', 'train'),
+        ('17', 'ussuri'),
+        ('18', 'victoria'),
     ]),
     'horizon-common': OrderedDict([
         ('8', 'liberty'),
         ('9', 'mitaka'),
         ('10', 'newton'),
         ('11', 'ocata'),
+        ('12', 'pike'),
+        ('13', 'queens'),
+        ('14', 'rocky'),
+        ('15', 'stein'),
+        ('16', 'train'),
+        ('18', 'ussuri'),
+        ('19', 'victoria'),
     ]),
     'ceilometer-common': OrderedDict([
         ('5', 'liberty'),
         ('6', 'mitaka'),
         ('7', 'newton'),
         ('8', 'ocata'),
+        ('9', 'pike'),
+        ('10', 'queens'),
+        ('11', 'rocky'),
+        ('12', 'stein'),
+        ('13', 'train'),
+        ('14', 'ussuri'),
+        ('15', 'victoria'),
     ]),
     'heat-common': OrderedDict([
         ('5', 'liberty'),
         ('6', 'mitaka'),
         ('7', 'newton'),
         ('8', 'ocata'),
+        ('9', 'pike'),
+        ('10', 'queens'),
+        ('11', 'rocky'),
+        ('12', 'stein'),
+        ('13', 'train'),
+        ('14', 'ussuri'),
+        ('15', 'victoria'),
     ]),
     'glance-common': OrderedDict([
         ('11', 'liberty'),
         ('12', 'mitaka'),
         ('13', 'newton'),
         ('14', 'ocata'),
+        ('15', 'pike'),
+        ('16', 'queens'),
+        ('17', 'rocky'),
+        ('18', 'stein'),
+        ('19', 'train'),
+        ('20', 'ussuri'),
+        ('21', 'victoria'),
     ]),
     'openstack-dashboard': OrderedDict([
         ('8', 'liberty'),
         ('9', 'mitaka'),
         ('10', 'newton'),
         ('11', 'ocata'),
+        ('12', 'pike'),
+        ('13', 'queens'),
+        ('14', 'rocky'),
+        ('15', 'stein'),
+        ('16', 'train'),
+        ('18', 'ussuri'),
+        ('19', 'victoria'),
     ]),
 }
 
-GIT_DEFAULT_REPOS = {
-    'requirements': 'git://github.com/openstack/requirements',
-    'cinder': 'git://github.com/openstack/cinder',
-    'glance': 'git://github.com/openstack/glance',
-    'horizon': 'git://github.com/openstack/horizon',
-    'keystone': 'git://github.com/openstack/keystone',
-    'networking-hyperv': 'git://github.com/openstack/networking-hyperv',
-    'neutron': 'git://github.com/openstack/neutron',
-    'neutron-fwaas': 'git://github.com/openstack/neutron-fwaas',
-    'neutron-lbaas': 'git://github.com/openstack/neutron-lbaas',
-    'neutron-vpnaas': 'git://github.com/openstack/neutron-vpnaas',
-    'nova': 'git://github.com/openstack/nova',
-}
-
-GIT_DEFAULT_BRANCHES = {
-    'liberty': 'stable/liberty',
-    'mitaka': 'stable/mitaka',
-    'master': 'master',
-}
-
 DEFAULT_LOOPBACK_SIZE = '5G'
+
+DB_SERIES_UPGRADING_KEY = 'cluster-series-upgrading'
+
+DB_MAINTENANCE_KEYS = [DB_SERIES_UPGRADING_KEY]
+
+
+class CompareOpenStackReleases(BasicStringComparator):
+    """Provide comparisons of OpenStack releases.
+
+    Use in the form of
+
+    if CompareOpenStackReleases(release) > 'mitaka':
+        # do something with mitaka
+    """
+    _list = OPENSTACK_RELEASES
 
 
 def error_out(msg):
     juju_log("FATAL ERROR: %s" % msg, level='ERROR')
     sys.exit(1)
+
+
+def get_installed_semantic_versioned_packages():
+    '''Get a list of installed packages which have OpenStack semantic versioning
+
+    :returns List of installed packages
+    :rtype: [pkg1, pkg2, ...]
+    '''
+    return filter_missing_packages(PACKAGE_CODENAMES.keys())
 
 
 def get_os_codename_install_source(src):
@@ -240,7 +392,7 @@ def get_os_codename_install_source(src):
     rel = ''
     if src is None:
         return rel
-    if src in ['distro', 'distro-proposed']:
+    if src in ['distro', 'distro-proposed', 'proposed']:
         try:
             rel = UBUNTU_OPENSTACK_RELEASE[ubuntu_rel]
         except KeyError:
@@ -251,12 +403,14 @@ def get_os_codename_install_source(src):
 
     if src.startswith('cloud:'):
         ca_rel = src.split(':')[1]
-        ca_rel = ca_rel.split('%s-' % ubuntu_rel)[1].split('/')[0]
+        ca_rel = ca_rel.split('-')[1].split('/')[0]
         return ca_rel
 
     # Best guess match based on deb string provided
-    if src.startswith('deb') or src.startswith('ppa'):
-        for k, v in six.iteritems(OPENSTACK_CODENAMES):
+    if (src.startswith('deb') or
+            src.startswith('ppa') or
+            src.startswith('snap')):
+        for v in OPENSTACK_CODENAMES.values():
             if v in src:
                 return v
 
@@ -306,13 +460,15 @@ def get_swift_codename(version):
             releases = UBUNTU_OPENSTACK_RELEASE
             release = [k for k, v in six.iteritems(releases) if codename in v]
             ret = subprocess.check_output(['apt-cache', 'policy', 'swift'])
+            if six.PY3:
+                ret = ret.decode('UTF-8')
             if codename in ret or release[0] in ret:
                 return codename
     elif len(codenames) == 1:
         return codenames[0]
 
     # NOTE: fallback - attempt to match with just major.minor version
-    match = re.match('^(\d+)\.(\d+)', version)
+    match = re.match(r'^(\d+)\.(\d+)', version)
     if match:
         major_minor_version = match.group(0)
         for codename, versions in six.iteritems(SWIFT_CODENAMES):
@@ -325,13 +481,26 @@ def get_swift_codename(version):
 
 def get_os_codename_package(package, fatal=True):
     '''Derive OpenStack release codename from an installed package.'''
-    import apt_pkg as apt
+
+    if snap_install_requested():
+        cmd = ['snap', 'list', package]
+        try:
+            out = subprocess.check_output(cmd)
+            if six.PY3:
+                out = out.decode('UTF-8')
+        except subprocess.CalledProcessError:
+            return None
+        lines = out.split('\n')
+        for line in lines:
+            if package in line:
+                # Second item in list is Version
+                return line.split()[1]
 
     cache = apt_cache()
 
     try:
         pkg = cache[package]
-    except:
+    except Exception:
         if not fatal:
             return None
         # the package is unknown to the current apt cache.
@@ -349,11 +518,11 @@ def get_os_codename_package(package, fatal=True):
     vers = apt.upstream_version(pkg.current_ver.ver_str)
     if 'swift' in pkg.name:
         # Fully x.y.z match for swift versions
-        match = re.match('^(\d+)\.(\d+)\.(\d+)', vers)
+        match = re.match(r'^(\d+)\.(\d+)\.(\d+)', vers)
     else:
         # x.y match only for 20XX.X
         # and ignore patch level for other packages
-        match = re.match('^(\d+)\.(\d+)', vers)
+        match = re.match(r'^(\d+)\.(\d+)', vers)
 
     if match:
         vers = match.group(0)
@@ -400,149 +569,114 @@ def get_os_version_package(pkg, fatal=True):
     # error_out(e)
 
 
-os_rel = None
+# Module local cache variable for the os_release.
+_os_rel = None
 
 
-def os_release(package, base='essex'):
-    '''
-    Returns OpenStack release codename from a cached global.
+def reset_os_release():
+    '''Unset the cached os_release version'''
+    global _os_rel
+    _os_rel = None
+
+
+def os_release(package, base=None, reset_cache=False, source_key=None):
+    """Returns OpenStack release codename from a cached global.
+
+    If reset_cache then unset the cached os_release version and return the
+    freshly determined version.
+
     If the codename can not be determined from either an installed package or
     the installation source, the earliest release supported by the charm should
     be returned.
-    '''
-    global os_rel
-    if os_rel:
-        return os_rel
-    os_rel = (git_os_codename_install_source(config('openstack-origin-git')) or
-              get_os_codename_package(package, fatal=False) or
-              get_os_codename_install_source(config('openstack-origin')) or
-              base)
-    return os_rel
+
+    :param package: Name of package to determine release from
+    :type package: str
+    :param base: Fallback codename if endavours to determine from package fail
+    :type base: Optional[str]
+    :param reset_cache: Reset any cached codename value
+    :type reset_cache: bool
+    :param source_key: Name of source configuration option
+                       (default: 'openstack-origin')
+    :type source_key: Optional[str]
+    :returns: OpenStack release codename
+    :rtype: str
+    """
+    source_key = source_key or 'openstack-origin'
+    if not base:
+        base = UBUNTU_OPENSTACK_RELEASE[lsb_release()['DISTRIB_CODENAME']]
+    global _os_rel
+    if reset_cache:
+        reset_os_release()
+    if _os_rel:
+        return _os_rel
+    _os_rel = (
+        get_os_codename_package(package, fatal=False) or
+        get_os_codename_install_source(config(source_key)) or
+        base)
+    return _os_rel
 
 
+@deprecate("moved to charmhelpers.fetch.import_key()", "2017-07", log=juju_log)
 def import_key(keyid):
-    key = keyid.strip()
-    if (key.startswith('-----BEGIN PGP PUBLIC KEY BLOCK-----') and
-            key.endswith('-----END PGP PUBLIC KEY BLOCK-----')):
-        juju_log("PGP key found (looks like ASCII Armor format)", level=DEBUG)
-        juju_log("Importing ASCII Armor PGP key", level=DEBUG)
-        with tempfile.NamedTemporaryFile() as keyfile:
-            with open(keyfile.name, 'w') as fd:
-                fd.write(key)
-                fd.write("\n")
+    """Import a key, either ASCII armored, or a GPG key id.
 
-            cmd = ['apt-key', 'add', keyfile.name]
-            try:
-                subprocess.check_call(cmd)
-            except subprocess.CalledProcessError:
-                error_out("Error importing PGP key '%s'" % key)
-    else:
-        juju_log("PGP key found (looks like Radix64 format)", level=DEBUG)
-        juju_log("Importing PGP key from keyserver", level=DEBUG)
-        cmd = ['apt-key', 'adv', '--keyserver',
-               'hkp://keyserver.ubuntu.com:80', '--recv-keys', key]
-        try:
-            subprocess.check_call(cmd)
-        except subprocess.CalledProcessError:
-            error_out("Error importing PGP key '%s'" % key)
+    @param keyid: the key in ASCII armor format, or a GPG key id.
+    @raises SystemExit() via sys.exit() on failure.
+    """
+    try:
+        return fetch_import_key(keyid)
+    except GPGKeyError as e:
+        error_out("Could not import key: {}".format(str(e)))
 
 
-def get_source_and_pgp_key(input):
-    """Look for a pgp key ID or ascii-armor key in the given input."""
-    index = input.strip()
-    index = input.rfind('|')
-    if index < 0:
-        return input, None
+def get_source_and_pgp_key(source_and_key):
+    """Look for a pgp key ID or ascii-armor key in the given input.
 
-    key = input[index + 1:].strip('|')
-    source = input[:index]
-    return source, key
+    :param source_and_key: Sting, "source_spec|keyid" where '|keyid' is
+        optional.
+    :returns (source_spec, key_id OR None) as a tuple.  Returns None for key_id
+        if there was no '|' in the source_and_key string.
+    """
+    try:
+        source, key = source_and_key.split('|', 2)
+        return source, key or None
+    except ValueError:
+        return source_and_key, None
 
 
-def configure_installation_source(rel):
-    '''Configure apt installation source.'''
-    if rel == 'distro':
+@deprecate("use charmhelpers.fetch.add_source() instead.",
+           "2017-07", log=juju_log)
+def configure_installation_source(source_plus_key):
+    """Configure an installation source.
+
+    The functionality is provided by charmhelpers.fetch.add_source()
+    The difference between the two functions is that add_source() signature
+    requires the key to be passed directly, whereas this function passes an
+    optional key by appending '|<key>' to the end of the source specificiation
+    'source'.
+
+    Another difference from add_source() is that the function calls sys.exit(1)
+    if the configuration fails, whereas add_source() raises
+    SourceConfigurationError().  Another difference, is that add_source()
+    silently fails (with a juju_log command) if there is no matching source to
+    configure, whereas this function fails with a sys.exit(1)
+
+    :param source: String_plus_key -- see above for details.
+
+    Note that the behaviour on error is to log the error to the juju log and
+    then call sys.exit(1).
+    """
+    if source_plus_key.startswith('snap'):
+        # Do nothing for snap installs
         return
-    elif rel == 'distro-proposed':
-        ubuntu_rel = lsb_release()['DISTRIB_CODENAME']
-        with open('/etc/apt/sources.list.d/juju_deb.list', 'w') as f:
-            f.write(DISTRO_PROPOSED % ubuntu_rel)
-    elif rel[:4] == "ppa:":
-        src, key = get_source_and_pgp_key(rel)
-        if key:
-            import_key(key)
+    # extract the key if there is one, denoted by a '|' in the rel
+    source, key = get_source_and_pgp_key(source_plus_key)
 
-        subprocess.check_call(["add-apt-repository", "-y", src])
-    elif rel[:3] == "deb":
-        src, key = get_source_and_pgp_key(rel)
-        if key:
-            import_key(key)
-
-        with open('/etc/apt/sources.list.d/juju_deb.list', 'w') as f:
-            f.write(src)
-    elif rel[:6] == 'cloud:':
-        ubuntu_rel = lsb_release()['DISTRIB_CODENAME']
-        rel = rel.split(':')[1]
-        u_rel = rel.split('-')[0]
-        ca_rel = rel.split('-')[1]
-
-        if u_rel != ubuntu_rel:
-            e = 'Cannot install from Cloud Archive pocket %s on this Ubuntu '\
-                'version (%s)' % (ca_rel, ubuntu_rel)
-            error_out(e)
-
-        if 'staging' in ca_rel:
-            # staging is just a regular PPA.
-            os_rel = ca_rel.split('/')[0]
-            ppa = 'ppa:ubuntu-cloud-archive/%s-staging' % os_rel
-            cmd = 'add-apt-repository -y %s' % ppa
-            subprocess.check_call(cmd.split(' '))
-            return
-
-        # map charm config options to actual archive pockets.
-        pockets = {
-            'folsom': 'precise-updates/folsom',
-            'folsom/updates': 'precise-updates/folsom',
-            'folsom/proposed': 'precise-proposed/folsom',
-            'grizzly': 'precise-updates/grizzly',
-            'grizzly/updates': 'precise-updates/grizzly',
-            'grizzly/proposed': 'precise-proposed/grizzly',
-            'havana': 'precise-updates/havana',
-            'havana/updates': 'precise-updates/havana',
-            'havana/proposed': 'precise-proposed/havana',
-            'icehouse': 'precise-updates/icehouse',
-            'icehouse/updates': 'precise-updates/icehouse',
-            'icehouse/proposed': 'precise-proposed/icehouse',
-            'juno': 'trusty-updates/juno',
-            'juno/updates': 'trusty-updates/juno',
-            'juno/proposed': 'trusty-proposed/juno',
-            'kilo': 'trusty-updates/kilo',
-            'kilo/updates': 'trusty-updates/kilo',
-            'kilo/proposed': 'trusty-proposed/kilo',
-            'liberty': 'trusty-updates/liberty',
-            'liberty/updates': 'trusty-updates/liberty',
-            'liberty/proposed': 'trusty-proposed/liberty',
-            'mitaka': 'trusty-updates/mitaka',
-            'mitaka/updates': 'trusty-updates/mitaka',
-            'mitaka/proposed': 'trusty-proposed/mitaka',
-            'newton': 'xenial-updates/newton',
-            'newton/updates': 'xenial-updates/newton',
-            'newton/proposed': 'xenial-proposed/newton',
-        }
-
-        try:
-            pocket = pockets[ca_rel]
-        except KeyError:
-            e = 'Invalid Cloud Archive release specified: %s' % rel
-            error_out(e)
-
-        src = "deb %s %s main" % (CLOUD_ARCHIVE_URL, pocket)
-        apt_install('ubuntu-cloud-keyring', fatal=True)
-
-        with open('/etc/apt/sources.list.d/cloud-archive.list', 'w') as f:
-            f.write(src)
-    else:
-        error_out("Invalid openstack-release specified: %s" % rel)
+    # handle the ordinary sources via add_source
+    try:
+        fetch_add_source(source, key, fail_invalid=True)
+    except SourceConfigError as se:
+        error_out(str(se))
 
 
 def config_value_changed(option):
@@ -560,6 +694,93 @@ def config_value_changed(option):
         return current != saved
 
 
+def get_endpoint_key(service_name, relation_id, unit_name):
+    """Return the key used to refer to an ep changed notification from a unit.
+
+    :param service_name: Service name eg nova, neutron, placement etc
+    :type service_name: str
+    :param relation_id: The id of the relation the unit is on.
+    :type relation_id: str
+    :param unit_name: The name of the unit publishing the notification.
+    :type unit_name: str
+    :returns: The key used to refer to an ep changed notification from a unit
+    :rtype: str
+    """
+    return '{}-{}-{}'.format(
+        service_name,
+        relation_id.replace(':', '_'),
+        unit_name.replace('/', '_'))
+
+
+def get_endpoint_notifications(service_names, rel_name='identity-service'):
+    """Return all notifications for the given services.
+
+    :param service_names: List of service name.
+    :type service_name: List
+    :param rel_name: Name of the relation to query
+    :type rel_name: str
+    :returns: A dict containing the source of the notification and its nonce.
+    :rtype: Dict[str, str]
+    """
+    notifications = {}
+    for rid in relation_ids(rel_name):
+        for unit in related_units(relid=rid):
+            ep_changed_json = relation_get(
+                rid=rid,
+                unit=unit,
+                attribute='ep_changed')
+            if ep_changed_json:
+                ep_changed = json.loads(ep_changed_json)
+                for service in service_names:
+                    if ep_changed.get(service):
+                        key = get_endpoint_key(service, rid, unit)
+                        notifications[key] = ep_changed[service]
+    return notifications
+
+
+def endpoint_changed(service_name, rel_name='identity-service'):
+    """Whether a new notification has been recieved for an endpoint.
+
+    :param service_name: Service name eg nova, neutron, placement etc
+    :type service_name: str
+    :param rel_name: Name of the relation to query
+    :type rel_name: str
+    :returns: Whether endpoint has changed
+    :rtype: bool
+    """
+    changed = False
+    with unitdata.HookData()() as t:
+        db = t[0]
+        notifications = get_endpoint_notifications(
+            [service_name],
+            rel_name=rel_name)
+        for key, nonce in notifications.items():
+            if db.get(key) != nonce:
+                juju_log(('New endpoint change notification found: '
+                          '{}={}').format(key, nonce),
+                         'INFO')
+                changed = True
+                break
+    return changed
+
+
+def save_endpoint_changed_triggers(service_names, rel_name='identity-service'):
+    """Save the enpoint triggers in  db so it can be tracked if they changed.
+
+    :param service_names: List of service name.
+    :type service_name: List
+    :param rel_name: Name of the relation to query
+    :type rel_name: str
+    """
+    with unitdata.HookData()() as t:
+        db = t[0]
+        notifications = get_endpoint_notifications(
+            service_names,
+            rel_name=rel_name)
+        for key, nonce in notifications.items():
+            db.set(key, nonce)
+
+
 def save_script_rc(script_path="scripts/scriptrc", **env_vars):
     """
     Write an rc file in the charm-delivered directory containing
@@ -571,7 +792,7 @@ def save_script_rc(script_path="scripts/scriptrc", **env_vars):
     juju_rc_path = "%s/%s" % (charm_dir(), script_path)
     if not os.path.exists(os.path.dirname(juju_rc_path)):
         os.mkdir(os.path.dirname(juju_rc_path))
-    with open(juju_rc_path, 'wb') as rc_script:
+    with open(juju_rc_path, 'wt') as rc_script:
         rc_script.write(
             "#!/bin/bash\n")
         [rc_script.write('export %s=%s\n' % (u, p))
@@ -587,24 +808,23 @@ def openstack_upgrade_available(package):
 
     :returns: bool:    : Returns True if configured installation source offers
                          a newer version of package.
-
     """
 
-    import apt_pkg as apt
     src = config('openstack-origin')
     cur_vers = get_os_version_package(package)
+    if not cur_vers:
+        # The package has not been installed yet do not attempt upgrade
+        return False
     if "swift" in package:
         codename = get_os_codename_install_source(src)
         avail_vers = get_os_version_codename_swift(codename)
     else:
-        avail_vers = get_os_version_install_source(src)
+        try:
+            avail_vers = get_os_version_install_source(src)
+        except Exception:
+            avail_vers = cur_vers
     apt.init()
-    if "swift" in package:
-        major_cur_vers = cur_vers.split('.', 1)[0]
-        major_avail_vers = avail_vers.split('.', 1)[0]
-        major_diff = apt.version_compare(major_avail_vers, major_cur_vers)
-        return avail_vers > cur_vers and (major_diff == 1 or major_diff == 0)
-    return apt.version_compare(avail_vers, cur_vers) == 1
+    return apt.version_compare(avail_vers, cur_vers) >= 1
 
 
 def ensure_block_device(block_device):
@@ -661,6 +881,7 @@ def clean_storage(block_device):
     else:
         zap_disk(block_device)
 
+
 is_ip = ip.is_ip
 ns_query = ip.ns_query
 get_host_ip = ip.get_host_ip
@@ -711,387 +932,6 @@ def os_requires_version(ostack_release, pkg):
             f(*args)
         return wrapped_f
     return wrap
-
-
-def git_install_requested():
-    """
-    Returns true if openstack-origin-git is specified.
-    """
-    return config('openstack-origin-git') is not None
-
-
-def git_os_codename_install_source(projects_yaml):
-    """
-    Returns OpenStack codename of release being installed from source.
-    """
-    if git_install_requested():
-        projects = _git_yaml_load(projects_yaml)
-
-        if projects in GIT_DEFAULT_BRANCHES.keys():
-            if projects == 'master':
-                return 'newton'
-            return projects
-
-        if 'release' in projects:
-            if projects['release'] == 'master':
-                return 'newton'
-            return projects['release']
-
-    return None
-
-
-def git_default_repos(projects_yaml):
-    """
-    Returns default repos if a default openstack-origin-git value is specified.
-    """
-    service = service_name()
-    core_project = service
-
-    for default, branch in GIT_DEFAULT_BRANCHES.iteritems():
-        if projects_yaml == default:
-
-            # add the requirements repo first
-            repo = {
-                'name': 'requirements',
-                'repository': GIT_DEFAULT_REPOS['requirements'],
-                'branch': branch,
-            }
-            repos = [repo]
-
-            # neutron-* and nova-* charms require some additional repos
-            if service in ['neutron-api', 'neutron-gateway',
-                           'neutron-openvswitch']:
-                core_project = 'neutron'
-                if service == 'neutron-api':
-                    repo = {
-                        'name': 'networking-hyperv',
-                        'repository': GIT_DEFAULT_REPOS['networking-hyperv'],
-                        'branch': branch,
-                    }
-                    repos.append(repo)
-                for project in ['neutron-fwaas', 'neutron-lbaas',
-                                'neutron-vpnaas', 'nova']:
-                    repo = {
-                        'name': project,
-                        'repository': GIT_DEFAULT_REPOS[project],
-                        'branch': branch,
-                    }
-                    repos.append(repo)
-
-            elif service in ['nova-cloud-controller', 'nova-compute']:
-                core_project = 'nova'
-                repo = {
-                    'name': 'neutron',
-                    'repository': GIT_DEFAULT_REPOS['neutron'],
-                    'branch': branch,
-                }
-                repos.append(repo)
-            elif service == 'openstack-dashboard':
-                core_project = 'horizon'
-
-            # finally add the current service's core project repo
-            repo = {
-                'name': core_project,
-                'repository': GIT_DEFAULT_REPOS[core_project],
-                'branch': branch,
-            }
-            repos.append(repo)
-
-            return yaml.dump(dict(repositories=repos, release=default))
-
-    return projects_yaml
-
-
-def _git_yaml_load(projects_yaml):
-    """
-    Load the specified yaml into a dictionary.
-    """
-    if not projects_yaml:
-        return None
-
-    return yaml.load(projects_yaml)
-
-
-requirements_dir = None
-
-
-def git_clone_and_install(projects_yaml, core_project):
-    """
-    Clone/install all specified OpenStack repositories.
-
-    The expected format of projects_yaml is:
-
-        repositories:
-          - {name: keystone,
-             repository: 'git://git.openstack.org/openstack/keystone.git',
-             branch: 'stable/icehouse'}
-          - {name: requirements,
-             repository: 'git://git.openstack.org/openstack/requirements.git',
-             branch: 'stable/icehouse'}
-
-        directory: /mnt/openstack-git
-        http_proxy: squid-proxy-url
-        https_proxy: squid-proxy-url
-
-    The directory, http_proxy, and https_proxy keys are optional.
-
-    """
-    global requirements_dir
-    parent_dir = '/mnt/openstack-git'
-    http_proxy = None
-
-    projects = _git_yaml_load(projects_yaml)
-    _git_validate_projects_yaml(projects, core_project)
-
-    old_environ = dict(os.environ)
-
-    if 'http_proxy' in projects.keys():
-        http_proxy = projects['http_proxy']
-        os.environ['http_proxy'] = projects['http_proxy']
-    if 'https_proxy' in projects.keys():
-        os.environ['https_proxy'] = projects['https_proxy']
-
-    if 'directory' in projects.keys():
-        parent_dir = projects['directory']
-
-    pip_create_virtualenv(os.path.join(parent_dir, 'venv'))
-
-    # Upgrade setuptools and pip from default virtualenv versions. The default
-    # versions in trusty break master OpenStack branch deployments.
-    for p in ['pip', 'setuptools']:
-        pip_install(p, upgrade=True, proxy=http_proxy,
-                    venv=os.path.join(parent_dir, 'venv'))
-
-    constraints = None
-    for p in projects['repositories']:
-        repo = p['repository']
-        branch = p['branch']
-        depth = '1'
-        if 'depth' in p.keys():
-            depth = p['depth']
-        if p['name'] == 'requirements':
-            repo_dir = _git_clone_and_install_single(repo, branch, depth,
-                                                     parent_dir, http_proxy,
-                                                     update_requirements=False)
-            requirements_dir = repo_dir
-            constraints = os.path.join(repo_dir, "upper-constraints.txt")
-            # upper-constraints didn't exist until after icehouse
-            if not os.path.isfile(constraints):
-                constraints = None
-            # use constraints unless project yaml sets use_constraints to false
-            if 'use_constraints' in projects.keys():
-                if not projects['use_constraints']:
-                    constraints = None
-        else:
-            repo_dir = _git_clone_and_install_single(repo, branch, depth,
-                                                     parent_dir, http_proxy,
-                                                     update_requirements=True,
-                                                     constraints=constraints)
-
-    os.environ = old_environ
-
-
-def _git_validate_projects_yaml(projects, core_project):
-    """
-    Validate the projects yaml.
-    """
-    _git_ensure_key_exists('repositories', projects)
-
-    for project in projects['repositories']:
-        _git_ensure_key_exists('name', project.keys())
-        _git_ensure_key_exists('repository', project.keys())
-        _git_ensure_key_exists('branch', project.keys())
-
-    if projects['repositories'][0]['name'] != 'requirements':
-        error_out('{} git repo must be specified first'.format('requirements'))
-
-    if projects['repositories'][-1]['name'] != core_project:
-        error_out('{} git repo must be specified last'.format(core_project))
-
-    _git_ensure_key_exists('release', projects)
-
-
-def _git_ensure_key_exists(key, keys):
-    """
-    Ensure that key exists in keys.
-    """
-    if key not in keys:
-        error_out('openstack-origin-git key \'{}\' is missing'.format(key))
-
-
-def _git_clone_and_install_single(repo, branch, depth, parent_dir, http_proxy,
-                                  update_requirements, constraints=None):
-    """
-    Clone and install a single git repository.
-    """
-    if not os.path.exists(parent_dir):
-        juju_log('Directory already exists at {}. '
-                 'No need to create directory.'.format(parent_dir))
-        os.mkdir(parent_dir)
-
-    juju_log('Cloning git repo: {}, branch: {}'.format(repo, branch))
-    repo_dir = install_remote(
-        repo, dest=parent_dir, branch=branch, depth=depth)
-
-    venv = os.path.join(parent_dir, 'venv')
-
-    if update_requirements:
-        if not requirements_dir:
-            error_out('requirements repo must be cloned before '
-                      'updating from global requirements.')
-        _git_update_requirements(venv, repo_dir, requirements_dir)
-
-    juju_log('Installing git repo from dir: {}'.format(repo_dir))
-    if http_proxy:
-        pip_install(repo_dir, proxy=http_proxy, venv=venv,
-                    constraints=constraints)
-    else:
-        pip_install(repo_dir, venv=venv, constraints=constraints)
-
-    return repo_dir
-
-
-def _git_update_requirements(venv, package_dir, reqs_dir):
-    """
-    Update from global requirements.
-
-    Update an OpenStack git directory's requirements.txt and
-    test-requirements.txt from global-requirements.txt.
-    """
-    orig_dir = os.getcwd()
-    os.chdir(reqs_dir)
-    python = os.path.join(venv, 'bin/python')
-    cmd = [python, 'update.py', package_dir]
-    try:
-        subprocess.check_call(cmd)
-    except subprocess.CalledProcessError:
-        package = os.path.basename(package_dir)
-        error_out("Error updating {} from "
-                  "global-requirements.txt".format(package))
-    os.chdir(orig_dir)
-
-
-def git_pip_venv_dir(projects_yaml):
-    """
-    Return the pip virtualenv path.
-    """
-    parent_dir = '/mnt/openstack-git'
-
-    projects = _git_yaml_load(projects_yaml)
-
-    if 'directory' in projects.keys():
-        parent_dir = projects['directory']
-
-    return os.path.join(parent_dir, 'venv')
-
-
-def git_src_dir(projects_yaml, project):
-    """
-    Return the directory where the specified project's source is located.
-    """
-    parent_dir = '/mnt/openstack-git'
-
-    projects = _git_yaml_load(projects_yaml)
-
-    if 'directory' in projects.keys():
-        parent_dir = projects['directory']
-
-    for p in projects['repositories']:
-        if p['name'] == project:
-            return os.path.join(parent_dir, os.path.basename(p['repository']))
-
-    return None
-
-
-def git_yaml_value(projects_yaml, key):
-    """
-    Return the value in projects_yaml for the specified key.
-    """
-    projects = _git_yaml_load(projects_yaml)
-
-    if key in projects.keys():
-        return projects[key]
-
-    return None
-
-
-def git_generate_systemd_init_files(templates_dir):
-    """
-    Generate systemd init files.
-
-    Generates and installs systemd init units and script files based on the
-    *.init.in files contained in the templates_dir directory.
-
-    This code is based on the openstack-pkg-tools package and its init
-    script generation, which is used by the OpenStack packages.
-    """
-    for f in os.listdir(templates_dir):
-        # Create the init script and systemd unit file from the template
-        if f.endswith(".init.in"):
-            init_in_file = f
-            init_file = f[:-8]
-            service_file = "{}.service".format(init_file)
-
-            init_in_source = os.path.join(templates_dir, init_in_file)
-            init_source = os.path.join(templates_dir, init_file)
-            service_source = os.path.join(templates_dir, service_file)
-
-            init_dest = os.path.join('/etc/init.d', init_file)
-            service_dest = os.path.join('/lib/systemd/system', service_file)
-
-            shutil.copyfile(init_in_source, init_source)
-            with open(init_source, 'a') as outfile:
-                template = '/usr/share/openstack-pkg-tools/init-script-template'
-                with open(template) as infile:
-                    outfile.write('\n\n{}'.format(infile.read()))
-
-            cmd = ['pkgos-gen-systemd-unit', init_in_source]
-            subprocess.check_call(cmd)
-
-            if os.path.exists(init_dest):
-                os.remove(init_dest)
-            if os.path.exists(service_dest):
-                os.remove(service_dest)
-            shutil.copyfile(init_source, init_dest)
-            shutil.copyfile(service_source, service_dest)
-            os.chmod(init_dest, 0o755)
-
-    for f in os.listdir(templates_dir):
-        # If there's a service.in file, use it instead of the generated one
-        if f.endswith(".service.in"):
-            service_in_file = f
-            service_file = f[:-3]
-
-            service_in_source = os.path.join(templates_dir, service_in_file)
-            service_source = os.path.join(templates_dir, service_file)
-            service_dest = os.path.join('/lib/systemd/system', service_file)
-
-            shutil.copyfile(service_in_source, service_source)
-
-            if os.path.exists(service_dest):
-                os.remove(service_dest)
-            shutil.copyfile(service_source, service_dest)
-
-    for f in os.listdir(templates_dir):
-        # Generate the systemd unit if there's no existing .service.in
-        if f.endswith(".init.in"):
-            init_in_file = f
-            init_file = f[:-8]
-            service_in_file = "{}.service.in".format(init_file)
-            service_file = "{}.service".format(init_file)
-
-            init_in_source = os.path.join(templates_dir, init_in_file)
-            service_in_source = os.path.join(templates_dir, service_in_file)
-            service_source = os.path.join(templates_dir, service_file)
-            service_dest = os.path.join('/lib/systemd/system', service_file)
-
-            if not os.path.exists(service_in_source):
-                cmd = ['pkgos-gen-systemd-unit', init_in_source]
-                subprocess.check_call(cmd)
-
-                if os.path.exists(service_dest):
-                    os.remove(service_dest)
-                shutil.copyfile(service_source, service_dest)
 
 
 def os_workload_status(configs, required_interfaces, charm_func=None):
@@ -1178,6 +1018,12 @@ def _determine_os_workload_status(
         message = "Unit is ready"
         juju_log(message, 'INFO')
 
+    try:
+        if config(POLICYD_CONFIG_NAME):
+            message = "{} {}".format(policyd_status_message_prefix(), message)
+    except Exception:
+        pass
+
     return state, message
 
 
@@ -1185,12 +1031,25 @@ def _ows_check_if_paused(services=None, ports=None):
     """Check if the unit is supposed to be paused, and if so check that the
     services/ports (if passed) are actually stopped/not being listened to.
 
-    if the unit isn't supposed to be paused, just return None, None
+    If the unit isn't supposed to be paused, just return None, None
+
+    If the unit is performing a series upgrade, return a message indicating
+    this.
 
     @param services: OPTIONAL services spec or list of service names.
     @param ports: OPTIONAL list of port numbers.
     @returns state, message or None, None
     """
+    if is_unit_upgrading_set():
+        state, message = check_actually_paused(services=services,
+                                               ports=ports)
+        if state is None:
+            # we're paused okay, so set maintenance and return
+            state = "blocked"
+            message = ("Ready for do-release-upgrade and reboot. "
+                       "Set complete when finished.")
+        return state, message
+
     if is_unit_paused_set():
         state, message = check_actually_paused(services=services,
                                                ports=ports)
@@ -1297,7 +1156,9 @@ def _ows_check_charm_func(state, message, charm_func_with_configs):
     """
     if charm_func_with_configs:
         charm_state, charm_message = charm_func_with_configs()
-        if charm_state != 'active' and charm_state != 'unknown':
+        if (charm_state != 'active' and
+                charm_state != 'unknown' and
+                charm_state is not None):
             state = workload_state_compare(state, charm_state)
             if message:
                 charm_message = charm_message.replace("Incomplete relations: ",
@@ -1527,27 +1388,24 @@ def do_action_openstack_upgrade(package, upgrade_callback, configs):
     """
     ret = False
 
-    if git_install_requested():
-        action_set({'outcome': 'installed from source, skipped upgrade.'})
-    else:
-        if openstack_upgrade_available(package):
-            if config('action-managed-upgrade'):
-                juju_log('Upgrading OpenStack release')
+    if openstack_upgrade_available(package):
+        if config('action-managed-upgrade'):
+            juju_log('Upgrading OpenStack release')
 
-                try:
-                    upgrade_callback(configs=configs)
-                    action_set({'outcome': 'success, upgrade completed.'})
-                    ret = True
-                except:
-                    action_set({'outcome': 'upgrade failed, see traceback.'})
-                    action_set({'traceback': traceback.format_exc()})
-                    action_fail('do_openstack_upgrade resulted in an '
-                                'unexpected error')
-            else:
-                action_set({'outcome': 'action-managed-upgrade config is '
-                                       'False, skipped upgrade.'})
+            try:
+                upgrade_callback(configs=configs)
+                action_set({'outcome': 'success, upgrade completed.'})
+                ret = True
+            except Exception:
+                action_set({'outcome': 'upgrade failed, see traceback.'})
+                action_set({'traceback': traceback.format_exc()})
+                action_fail('do_openstack_upgrade resulted in an '
+                            'unexpected error')
         else:
-            action_set({'outcome': 'no upgrade available.'})
+            action_set({'outcome': 'action-managed-upgrade config is '
+                                   'False, skipped upgrade.'})
+    else:
+        action_set({'outcome': 'no upgrade available.'})
 
     return ret
 
@@ -1569,7 +1427,7 @@ def remote_restart(rel_name, remote_service=None):
 
 
 def check_actually_paused(services=None, ports=None):
-    """Check that services listed in the services object and and ports
+    """Check that services listed in the services object and ports
     are actually closed (not listened to), to verify that the unit is
     properly paused.
 
@@ -1643,8 +1501,67 @@ def is_unit_paused_set():
             kv = t[0]
             # transform something truth-y into a Boolean.
             return not(not(kv.get('unit-paused')))
-    except:
+    except Exception:
         return False
+
+
+def manage_payload_services(action, services=None, charm_func=None):
+    """Run an action against all services.
+
+    An optional charm_func() can be called. It should raise an Exception to
+    indicate that the function failed. If it was succesfull it should return
+    None or an optional message.
+
+    The signature for charm_func is:
+    charm_func() -> message: str
+
+    charm_func() is executed after any services are stopped, if supplied.
+
+    The services object can either be:
+      - None : no services were passed (an empty dict is returned)
+      - a list of strings
+      - A dictionary (optionally OrderedDict) {service_name: {'service': ..}}
+      - An array of [{'service': service_name, ...}, ...]
+
+    :param action: Action to run: pause, resume, start or stop.
+    :type action: str
+    :param services: See above
+    :type services: See above
+    :param charm_func: function to run for custom charm pausing.
+    :type charm_func: f()
+    :returns: Status boolean and list of messages
+    :rtype: (bool, [])
+    :raises: RuntimeError
+    """
+    actions = {
+        'pause': service_pause,
+        'resume': service_resume,
+        'start': service_start,
+        'stop': service_stop}
+    action = action.lower()
+    if action not in actions.keys():
+        raise RuntimeError(
+            "action: {} must be one of: {}".format(action,
+                                                   ', '.join(actions.keys())))
+    services = _extract_services_list_helper(services)
+    messages = []
+    success = True
+    if services:
+        for service in services.keys():
+            rc = actions[action](service)
+            if not rc:
+                success = False
+                messages.append("{} didn't {} cleanly.".format(service,
+                                                               action))
+    if charm_func:
+        try:
+            message = charm_func()
+            if message:
+                messages.append(message)
+        except Exception as e:
+            success = False
+            messages.append(str(e))
+    return success, messages
 
 
 def pause_unit(assess_status_func, services=None, ports=None,
@@ -1677,26 +1594,16 @@ def pause_unit(assess_status_func, services=None, ports=None,
     @returns None
     @raises Exception(message) on an error for action_fail().
     """
-    services = _extract_services_list_helper(services)
-    messages = []
-    if services:
-        for service in services.keys():
-            stopped = service_pause(service)
-            if not stopped:
-                messages.append("{} didn't stop cleanly.".format(service))
-    if charm_func:
-        try:
-            message = charm_func()
-            if message:
-                messages.append(message)
-        except Exception as e:
-            message.append(str(e))
+    _, messages = manage_payload_services(
+        'pause',
+        services=services,
+        charm_func=charm_func)
     set_unit_paused()
     if assess_status_func:
         message = assess_status_func()
         if message:
             messages.append(message)
-    if messages:
+    if messages and not is_unit_upgrading_set():
         raise Exception("Couldn't pause: {}".format("; ".join(messages)))
 
 
@@ -1729,20 +1636,10 @@ def resume_unit(assess_status_func, services=None, ports=None,
     @returns None
     @raises Exception(message) on an error for action_fail().
     """
-    services = _extract_services_list_helper(services)
-    messages = []
-    if services:
-        for service in services.keys():
-            started = service_resume(service)
-            if not started:
-                messages.append("{} didn't start cleanly.".format(service))
-    if charm_func:
-        try:
-            message = charm_func()
-            if message:
-                messages.append(message)
-        except Exception as e:
-            message.append(str(e))
+    _, messages = manage_payload_services(
+        'resume',
+        services=services,
+        charm_func=charm_func)
     clear_unit_paused()
     if assess_status_func:
         message = assess_status_func()
@@ -1794,22 +1691,59 @@ def pausable_restart_on_change(restart_map, stopstart=False,
 
     see core.utils.restart_on_change() for more details.
 
+    Note restart_map can be a callable, in which case, restart_map is only
+    evaluated at runtime.  This means that it is lazy and the underlying
+    function won't be called if the decorated function is never called.  Note,
+    retains backwards compatibility for passing a non-callable dictionary.
+
     @param f: the function to decorate
-    @param restart_map: the restart map {conf_file: [services]}
+    @param restart_map: (optionally callable, which then returns the
+        restart_map) the restart map {conf_file: [services]}
     @param stopstart: DEFAULT false; whether to stop, start or just restart
     @returns decorator to use a restart_on_change with pausability
     """
     def wrap(f):
+        # py27 compatible nonlocal variable.  When py3 only, replace with
+        # nonlocal keyword
+        __restart_map_cache = {'cache': None}
+
         @functools.wraps(f)
         def wrapped_f(*args, **kwargs):
             if is_unit_paused_set():
                 return f(*args, **kwargs)
+            if __restart_map_cache['cache'] is None:
+                __restart_map_cache['cache'] = restart_map() \
+                    if callable(restart_map) else restart_map
             # otherwise, normal restart_on_change functionality
             return restart_on_change_helper(
-                (lambda: f(*args, **kwargs)), restart_map, stopstart,
-                restart_functions)
+                (lambda: f(*args, **kwargs)), __restart_map_cache['cache'],
+                stopstart, restart_functions)
         return wrapped_f
     return wrap
+
+
+def ordered(orderme):
+    """Converts the provided dictionary into a collections.OrderedDict.
+
+    The items in the returned OrderedDict will be inserted based on the
+    natural sort order of the keys. Nested dictionaries will also be sorted
+    in order to ensure fully predictable ordering.
+
+    :param orderme: the dict to order
+    :return: collections.OrderedDict
+    :raises: ValueError: if `orderme` isn't a dict instance.
+    """
+    if not isinstance(orderme, dict):
+        raise ValueError('argument must be a dict type')
+
+    result = OrderedDict()
+    for k, v in sorted(six.iteritems(orderme), key=lambda x: x[0]):
+        if isinstance(v, dict):
+            result[k] = ordered(v)
+        else:
+            result[k] = v
+
+    return result
 
 
 def config_flags_parser(config_flags):
@@ -1823,15 +1757,13 @@ def config_flags_parser(config_flags):
          example, a string in the format of 'key1=value1, key2=value2' will
          return a dict of:
 
-             {'key1': 'value1',
-              'key2': 'value2'}.
+             {'key1': 'value1', 'key2': 'value2'}.
 
       2. A string in the above format, but supporting a comma-delimited list
          of values for the same key. For example, a string in the format of
          'key1=value1, key2=value3,value4,value5' will return a dict of:
 
-             {'key1', 'value1',
-              'key2', 'value2,value3,value4'}
+             {'key1': 'value1', 'key2': 'value2,value3,value4'}
 
       3. A string containing a colon character (:) prior to an equal
          character (=) will be treated as yaml and parsed as such. This can be
@@ -1851,7 +1783,7 @@ def config_flags_parser(config_flags):
     equals = config_flags.find('=')
     if colon > 0:
         if colon < equals or equals < 0:
-            return yaml.safe_load(config_flags)
+            return ordered(yaml.safe_load(config_flags))
 
     if config_flags.find('==') >= 0:
         juju_log("config_flags is not in expected format (key=value)",
@@ -1864,7 +1796,7 @@ def config_flags_parser(config_flags):
     # split on '='.
     split = config_flags.strip(' =').split('=')
     limit = len(split)
-    flags = {}
+    flags = OrderedDict()
     for i in range(0, limit - 1):
         current = split[i]
         next = split[i + 1]
@@ -1889,3 +1821,553 @@ def config_flags_parser(config_flags):
         flags[key.strip(post_strippers)] = value.rstrip(post_strippers)
 
     return flags
+
+
+def os_application_version_set(package):
+    '''Set version of application for Juju 2.0 and later'''
+    application_version = get_upstream_version(package)
+    # NOTE(jamespage) if not able to figure out package version, fallback to
+    #                 openstack codename version detection.
+    if not application_version:
+        application_version_set(os_release(package))
+    else:
+        application_version_set(application_version)
+
+
+def os_application_status_set(check_function):
+    """Run the supplied function and set the application status accordingly.
+
+    :param check_function: Function to run to get app states and messages.
+    :type check_function: function
+    """
+    state, message = check_function()
+    status_set(state, message, application=True)
+
+
+def enable_memcache(source=None, release=None, package=None):
+    """Determine if memcache should be enabled on the local unit
+
+    @param release: release of OpenStack currently deployed
+    @param package: package to derive OpenStack version deployed
+    @returns boolean Whether memcache should be enabled
+    """
+    _release = None
+    if release:
+        _release = release
+    else:
+        _release = os_release(package)
+    if not _release:
+        _release = get_os_codename_install_source(source)
+
+    return CompareOpenStackReleases(_release) >= 'mitaka'
+
+
+def token_cache_pkgs(source=None, release=None):
+    """Determine additional packages needed for token caching
+
+    @param source: source string for charm
+    @param release: release of OpenStack currently deployed
+    @returns List of package to enable token caching
+    """
+    packages = []
+    if enable_memcache(source=source, release=release):
+        packages.extend(['memcached', 'python-memcache'])
+    return packages
+
+
+def update_json_file(filename, items):
+    """Updates the json `filename` with a given dict.
+    :param filename: path to json file (e.g. /etc/glance/policy.json)
+    :param items: dict of items to update
+    """
+    if not items:
+        return
+
+    with open(filename) as fd:
+        policy = json.load(fd)
+
+    # Compare before and after and if nothing has changed don't write the file
+    # since that could cause unnecessary service restarts.
+    before = json.dumps(policy, indent=4, sort_keys=True)
+    policy.update(items)
+    after = json.dumps(policy, indent=4, sort_keys=True)
+    if before == after:
+        return
+
+    with open(filename, "w") as fd:
+        fd.write(after)
+
+
+@cached
+def snap_install_requested():
+    """ Determine if installing from snaps
+
+    If openstack-origin is of the form snap:track/channel[/branch]
+    and channel is in SNAPS_CHANNELS return True.
+    """
+    origin = config('openstack-origin') or ""
+    if not origin.startswith('snap:'):
+        return False
+
+    _src = origin[5:]
+    if '/' in _src:
+        channel = _src.split('/')[1]
+    else:
+        # Handle snap:track with no channel
+        channel = 'stable'
+    return valid_snap_channel(channel)
+
+
+def get_snaps_install_info_from_origin(snaps, src, mode='classic'):
+    """Generate a dictionary of snap install information from origin
+
+    @param snaps: List of snaps
+    @param src: String of openstack-origin or source of the form
+        snap:track/channel
+    @param mode: String classic, devmode or jailmode
+    @returns: Dictionary of snaps with channels and modes
+    """
+
+    if not src.startswith('snap:'):
+        juju_log("Snap source is not a snap origin", 'WARN')
+        return {}
+
+    _src = src[5:]
+    channel = '--channel={}'.format(_src)
+
+    return {snap: {'channel': channel, 'mode': mode}
+            for snap in snaps}
+
+
+def install_os_snaps(snaps, refresh=False):
+    """Install OpenStack snaps from channel and with mode
+
+    @param snaps: Dictionary of snaps with channels and modes of the form:
+        {'snap_name': {'channel': 'snap_channel',
+                       'mode': 'snap_mode'}}
+        Where channel is a snapstore channel and mode is --classic, --devmode
+        or --jailmode.
+    @param post_snap_install: Callback function to run after snaps have been
+    installed
+    """
+
+    def _ensure_flag(flag):
+        if flag.startswith('--'):
+            return flag
+        return '--{}'.format(flag)
+
+    if refresh:
+        for snap in snaps.keys():
+            snap_refresh(snap,
+                         _ensure_flag(snaps[snap]['channel']),
+                         _ensure_flag(snaps[snap]['mode']))
+    else:
+        for snap in snaps.keys():
+            snap_install(snap,
+                         _ensure_flag(snaps[snap]['channel']),
+                         _ensure_flag(snaps[snap]['mode']))
+
+
+def set_unit_upgrading():
+    """Set the unit to a upgrading state in the local kv() store.
+    """
+    with unitdata.HookData()() as t:
+        kv = t[0]
+        kv.set('unit-upgrading', True)
+
+
+def clear_unit_upgrading():
+    """Clear the unit from a upgrading state in the local kv() store
+    """
+    with unitdata.HookData()() as t:
+        kv = t[0]
+        kv.set('unit-upgrading', False)
+
+
+def is_unit_upgrading_set():
+    """Return the state of the kv().get('unit-upgrading').
+
+    To help with units that don't have HookData() (testing)
+    if it excepts, return False
+    """
+    try:
+        with unitdata.HookData()() as t:
+            kv = t[0]
+            # transform something truth-y into a Boolean.
+            return not(not(kv.get('unit-upgrading')))
+    except Exception:
+        return False
+
+
+def series_upgrade_prepare(pause_unit_helper=None, configs=None):
+    """ Run common series upgrade prepare tasks.
+
+    :param pause_unit_helper: function: Function to pause unit
+    :param configs: OSConfigRenderer object: Configurations
+    :returns None:
+    """
+    set_unit_upgrading()
+    if pause_unit_helper and configs:
+        if not is_unit_paused_set():
+            pause_unit_helper(configs)
+
+
+def series_upgrade_complete(resume_unit_helper=None, configs=None):
+    """ Run common series upgrade complete tasks.
+
+    :param resume_unit_helper: function: Function to resume unit
+    :param configs: OSConfigRenderer object: Configurations
+    :returns None:
+    """
+    clear_unit_paused()
+    clear_unit_upgrading()
+    if configs:
+        configs.write_all()
+        if resume_unit_helper:
+            resume_unit_helper(configs)
+
+
+def is_db_initialised():
+    """Check leader storage to see if database has been initialised.
+
+    :returns: Whether DB has been initialised
+    :rtype: bool
+    """
+    db_initialised = None
+    if leader_get('db-initialised') is None:
+        juju_log(
+            'db-initialised key missing, assuming db is not initialised',
+            'DEBUG')
+        db_initialised = False
+    else:
+        db_initialised = bool_from_string(leader_get('db-initialised'))
+    juju_log('Database initialised: {}'.format(db_initialised), 'DEBUG')
+    return db_initialised
+
+
+def set_db_initialised():
+    """Add flag to leader storage to indicate database has been initialised.
+    """
+    juju_log('Setting db-initialised to True', 'DEBUG')
+    leader_set({'db-initialised': True})
+
+
+def is_db_maintenance_mode(relid=None):
+    """Check relation data from notifications of db in maintenance mode.
+
+    :returns: Whether db has notified it is in maintenance mode.
+    :rtype: bool
+    """
+    juju_log('Checking for maintenance notifications', 'DEBUG')
+    if relid:
+        r_ids = [relid]
+    else:
+        r_ids = relation_ids('shared-db')
+    rids_units = [(r, u) for r in r_ids for u in related_units(r)]
+    notifications = []
+    for r_id, unit in rids_units:
+        settings = relation_get(unit=unit, rid=r_id)
+        for key, value in settings.items():
+            if value and key in DB_MAINTENANCE_KEYS:
+                juju_log(
+                    'Unit: {}, Key: {}, Value: {}'.format(unit, key, value),
+                    'DEBUG')
+                try:
+                    notifications.append(bool_from_string(value))
+                except ValueError:
+                    juju_log(
+                        'Could not discern bool from {}'.format(value),
+                        'WARN')
+                    pass
+    return True in notifications
+
+
+@cached
+def container_scoped_relations():
+    """Get all the container scoped relations
+
+    :returns: List of relation names
+    :rtype: List
+    """
+    md = metadata()
+    relations = []
+    for relation_type in ('provides', 'requires', 'peers'):
+        for relation in md.get(relation_type, []):
+            if md[relation_type][relation].get('scope') == 'container':
+                relations.append(relation)
+    return relations
+
+
+def is_db_ready(use_current_context=False, rel_name=None):
+    """Check remote database is ready to be used.
+
+    Database relations are expected to provide a list of 'allowed' units to
+    confirm that the database is ready for use by those units.
+
+    If db relation has provided this information and local unit is a member,
+    returns True otherwise False.
+
+    :param use_current_context: Whether to limit checks to current hook
+                                context.
+    :type use_current_context: bool
+    :param rel_name: Name of relation to check
+    :type rel_name: string
+    :returns: Whether remote db is ready.
+    :rtype: bool
+    :raises: Exception
+    """
+    key = 'allowed_units'
+
+    rel_name = rel_name or 'shared-db'
+    this_unit = local_unit()
+
+    if use_current_context:
+        if relation_id() in relation_ids(rel_name):
+            rids_units = [(None, None)]
+        else:
+            raise Exception("use_current_context=True but not in {} "
+                            "rel hook contexts (currently in {})."
+                            .format(rel_name, relation_id()))
+    else:
+        rids_units = [(r_id, u)
+                      for r_id in relation_ids(rel_name)
+                      for u in related_units(r_id)]
+
+    for rid, unit in rids_units:
+        allowed_units = relation_get(rid=rid, unit=unit, attribute=key)
+        if allowed_units and this_unit in allowed_units.split():
+            juju_log("This unit ({}) is in allowed unit list from {}".format(
+                this_unit,
+                unit), 'DEBUG')
+            return True
+
+    juju_log("This unit was not found in any allowed unit list")
+    return False
+
+
+def is_expected_scale(peer_relation_name='cluster'):
+    """Query juju goal-state to determine whether our peer- and dependency-
+    relations are at the expected scale.
+
+    Useful for deferring per unit per relation housekeeping work until we are
+    ready to complete it successfully and without unnecessary repetiton.
+
+    Always returns True if version of juju used does not support goal-state.
+
+    :param peer_relation_name: Name of peer relation
+    :type rel_name: string
+    :returns: True or False
+    :rtype: bool
+    """
+    def _get_relation_id(rel_type):
+        return next((rid for rid in relation_ids(reltype=rel_type)), None)
+
+    Relation = namedtuple('Relation', 'rel_type rel_id')
+    peer_rid = _get_relation_id(peer_relation_name)
+    # Units with no peers should still have a peer relation.
+    if not peer_rid:
+        juju_log('Not at expected scale, no peer relation found', 'DEBUG')
+        return False
+    expected_relations = [
+        Relation(rel_type='shared-db', rel_id=_get_relation_id('shared-db'))]
+    if expect_ha():
+        expected_relations.append(
+            Relation(
+                rel_type='ha',
+                rel_id=_get_relation_id('ha')))
+    juju_log(
+        'Checking scale of {} relations'.format(
+            ','.join([r.rel_type for r in expected_relations])),
+        'DEBUG')
+    try:
+        if (len(related_units(relid=peer_rid)) <
+                len(list(expected_peer_units()))):
+            return False
+        for rel in expected_relations:
+            if not rel.rel_id:
+                juju_log(
+                    'Expected to find {} relation, but it is missing'.format(
+                        rel.rel_type),
+                    'DEBUG')
+                return False
+            # Goal state returns every unit even for container scoped
+            # relations but the charm only ever has a relation with
+            # the local unit.
+            if rel.rel_type in container_scoped_relations():
+                expected_count = 1
+            else:
+                expected_count = len(
+                    list(expected_related_units(reltype=rel.rel_type)))
+            if len(related_units(relid=rel.rel_id)) < expected_count:
+                juju_log(
+                    ('Not at expected scale, not enough units on {} '
+                     'relation'.format(rel.rel_type)),
+                    'DEBUG')
+                return False
+    except NotImplementedError:
+        return True
+    juju_log('All checks have passed, unit is at expected scale', 'DEBUG')
+    return True
+
+
+def get_peer_key(unit_name):
+    """Get the peer key for this unit.
+
+    The peer key is the key a unit uses to publish its status down the peer
+    relation
+
+    :param unit_name: Name of unit
+    :type unit_name: string
+    :returns: Peer key for given unit
+    :rtype: string
+    """
+    return 'unit-state-{}'.format(unit_name.replace('/', '-'))
+
+
+UNIT_READY = 'READY'
+UNIT_NOTREADY = 'NOTREADY'
+UNIT_UNKNOWN = 'UNKNOWN'
+UNIT_STATES = [UNIT_READY, UNIT_NOTREADY, UNIT_UNKNOWN]
+
+
+def inform_peers_unit_state(state, relation_name='cluster'):
+    """Inform peers of the state of this unit.
+
+    :param state: State of unit to publish
+    :type state: string
+    :param relation_name: Name of relation to publish state on
+    :type relation_name: string
+    """
+    if state not in UNIT_STATES:
+        raise ValueError(
+            "Setting invalid state {} for unit".format(state))
+    this_unit = local_unit()
+    for r_id in relation_ids(relation_name):
+        juju_log('Telling peer behind relation {} that {} is {}'.format(
+            r_id, this_unit, state), 'DEBUG')
+        relation_set(relation_id=r_id,
+                     relation_settings={
+                         get_peer_key(this_unit): state})
+
+
+def get_peers_unit_state(relation_name='cluster'):
+    """Get the state of all peers.
+
+    :param relation_name: Name of relation to check peers on.
+    :type relation_name: string
+    :returns: Unit states keyed on unit name.
+    :rtype: dict
+    :raises: ValueError
+    """
+    r_ids = relation_ids(relation_name)
+    rids_units = [(r, u) for r in r_ids for u in related_units(r)]
+    unit_states = {}
+    for r_id, unit in rids_units:
+        settings = relation_get(unit=unit, rid=r_id)
+        unit_states[unit] = settings.get(get_peer_key(unit), UNIT_UNKNOWN)
+        if unit_states[unit] not in UNIT_STATES:
+            raise ValueError(
+                "Unit in unknown state {}".format(unit_states[unit]))
+    return unit_states
+
+
+def are_peers_ready(relation_name='cluster'):
+    """Check if all peers are ready.
+
+    :param relation_name: Name of relation to check peers on.
+    :type relation_name: string
+    :returns: Whether all units are ready.
+    :rtype: bool
+    """
+    unit_states = get_peers_unit_state(relation_name).values()
+    juju_log('{} peers are in the following states: {}'.format(
+        relation_name, unit_states), 'DEBUG')
+    return all(state == UNIT_READY for state in unit_states)
+
+
+def inform_peers_if_ready(check_unit_ready_func, relation_name='cluster'):
+    """Inform peers if this unit is ready.
+
+    The check function should return a tuple (state, message). A state
+    of 'READY' indicates the unit is READY.
+
+    :param check_unit_ready_func: Function to run to check readiness
+    :type check_unit_ready_func: function
+    :param relation_name: Name of relation to check peers on.
+    :type relation_name: string
+    """
+    unit_ready, msg = check_unit_ready_func()
+    if unit_ready:
+        state = UNIT_READY
+    else:
+        state = UNIT_NOTREADY
+    juju_log('Telling peers this unit is: {}'.format(state), 'DEBUG')
+    inform_peers_unit_state(state, relation_name)
+
+
+def check_api_unit_ready(check_db_ready=True):
+    """Check if this unit is ready.
+
+    :param check_db_ready: Include checks of database readiness.
+    :type check_db_ready: bool
+    :returns: Whether unit state is ready and status message
+    :rtype: (bool, str)
+    """
+    unit_state, msg = get_api_unit_status(check_db_ready=check_db_ready)
+    return unit_state == WORKLOAD_STATES.ACTIVE, msg
+
+
+def get_api_unit_status(check_db_ready=True):
+    """Return a workload status and message for this unit.
+
+    :param check_db_ready: Include checks of database readiness.
+    :type check_db_ready: bool
+    :returns: Workload state and message
+    :rtype: (bool, str)
+    """
+    unit_state = WORKLOAD_STATES.ACTIVE
+    msg = 'Unit is ready'
+    if is_db_maintenance_mode():
+        unit_state = WORKLOAD_STATES.MAINTENANCE
+        msg = 'Database in maintenance mode.'
+    elif is_unit_paused_set():
+        unit_state = WORKLOAD_STATES.BLOCKED
+        msg = 'Unit paused.'
+    elif check_db_ready and not is_db_ready():
+        unit_state = WORKLOAD_STATES.WAITING
+        msg = 'Allowed_units list provided but this unit not present'
+    elif not is_db_initialised():
+        unit_state = WORKLOAD_STATES.WAITING
+        msg = 'Database not initialised'
+    elif not is_expected_scale():
+        unit_state = WORKLOAD_STATES.WAITING
+        msg = 'Charm and its dependencies not yet at expected scale'
+    juju_log(msg, 'DEBUG')
+    return unit_state, msg
+
+
+def check_api_application_ready():
+    """Check if this application is ready.
+
+    :returns: Whether application state is ready and status message
+    :rtype: (bool, str)
+    """
+    app_state, msg = get_api_application_status()
+    return app_state == WORKLOAD_STATES.ACTIVE, msg
+
+
+def get_api_application_status():
+    """Return a workload status and message for this application.
+
+    :returns: Workload state and message
+    :rtype: (bool, str)
+    """
+    app_state, msg = get_api_unit_status()
+    if app_state == WORKLOAD_STATES.ACTIVE:
+        if are_peers_ready():
+            msg = 'Application Ready'
+        else:
+            app_state = WORKLOAD_STATES.WAITING
+            msg = 'Some units are not ready'
+    juju_log(msg, 'DEBUG')
+    return app_state, msg
