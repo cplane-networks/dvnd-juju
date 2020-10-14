@@ -56,10 +56,10 @@ if config('cplane-version') == "1.3.5":
     del cplane_packages['cplane-neutronclient-extension']
     del cplane_packages['cplane-nova-extension']
 
-if config('cplane-version') == "1.3.7" or "1.3.8":
+if config('cplane-version') == "1.3.7" or "1.3.8" or "1.3.9":
     del cplane_packages['neutronclient']
 
-PACKAGES = ['neutron-plugin-ml2', 'crudini', 'python3-bitarray']
+PACKAGES = ['neutron-plugin-ml2', 'crudini', 'python-bitarray']
 
 CPLANE_URL = config('cp-package-url')
 
