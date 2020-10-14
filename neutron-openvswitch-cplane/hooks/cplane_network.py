@@ -54,8 +54,7 @@ def add_bridge(name, interface, gw=None):
                                                             read_only=False)
     extra_params['inet_type'] = 'manual'
     extra_params['bridge_name'] = name
-    extra_params = dict([(k, "".join(list(v))) for k, v in extra_params
-                         .iteritems()])
+    extra_params = dict([(k, "".join(list(v))) for k, v in list(extra_params.items())])
     network_configuration._write_net_config_bridged_iface_br(interface,
                                                              **extra_params)
 

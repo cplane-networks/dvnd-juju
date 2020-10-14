@@ -20,27 +20,51 @@ import re
 import six
 import time
 import urllib
+import urlparse
 
 import cinderclient.v1.client as cinder_client
-import glanceclient.v1.client as glance_client
+import cinderclient.v2.client as cinder_clientv2
+import glanceclient.v1 as glance_client
+import glanceclient.v2 as glance_clientv2
 import heatclient.v1.client as heat_client
-import keystoneclient.v2_0 as keystone_client
-from keystoneclient.auth.identity import v3 as keystone_id_v3
-from keystoneclient import session as keystone_session
+from keystoneclient.v2_0 import client as keystone_client
+from keystoneauth1.identity import (
+    v3,
+    v2,
+)
+from keystoneauth1 import session as keystone_session
 from keystoneclient.v3 import client as keystone_client_v3
+from novaclient import exceptions
 
 import novaclient.client as nova_client
+import novaclient
 import pika
 import swiftclient
 
+from charmhelpers.core.decorators import retry_on_exception
 from charmhelpers.contrib.amulet.utils import (
     AmuletUtils
 )
+from charmhelpers.core.host import CompareHostReleases
 
 DEBUG = logging.DEBUG
 ERROR = logging.ERROR
 
 NOVA_CLIENT_VERSION = "2"
+
+OPENSTACK_RELEASES_PAIRS = [
+    'trusty_icehouse', 'trusty_kilo', 'trusty_liberty',
+    'trusty_mitaka', 'xenial_mitaka',
+    'xenial_newton', 'yakkety_newton',
+    'xenial_ocata', 'zesty_ocata',
+    'xenial_pike', 'artful_pike',
+    'xenial_queens', 'bionic_queens',
+    'bionic_rocky', 'cosmic_rocky',
+    'bionic_stein', 'disco_stein',
+    'bionic_train', 'eoan_train',
+    'bionic_ussuri', 'focal_ussuri',
+    'focal_victoria', 'groovy_victoria',
+]
 
 
 class OpenStackAmuletUtils(AmuletUtils):
@@ -55,7 +79,34 @@ class OpenStackAmuletUtils(AmuletUtils):
         super(OpenStackAmuletUtils, self).__init__(log_level)
 
     def validate_endpoint_data(self, endpoints, admin_port, internal_port,
-                               public_port, expected):
+                               public_port, expected, openstack_release=None):
+        """Validate endpoint data. Pick the correct validator based on
+           OpenStack release. Expected data should be in the v2 format:
+           {
+               'id': id,
+               'region': region,
+               'adminurl': adminurl,
+               'internalurl': internalurl,
+               'publicurl': publicurl,
+               'service_id': service_id}
+
+           """
+        validation_function = self.validate_v2_endpoint_data
+        xenial_queens = OPENSTACK_RELEASES_PAIRS.index('xenial_queens')
+        if openstack_release and openstack_release >= xenial_queens:
+            validation_function = self.validate_v3_endpoint_data
+            expected = {
+                'id': expected['id'],
+                'region': expected['region'],
+                'region_id': 'RegionOne',
+                'url': self.valid_url,
+                'interface': self.not_null,
+                'service_id': expected['service_id']}
+        return validation_function(endpoints, admin_port, internal_port,
+                                   public_port, expected)
+
+    def validate_v2_endpoint_data(self, endpoints, admin_port, internal_port,
+                                  public_port, expected):
         """Validate endpoint data.
 
            Validate actual endpoint data vs expected endpoint data. The ports
@@ -84,7 +135,7 @@ class OpenStackAmuletUtils(AmuletUtils):
             return 'endpoint not found'
 
     def validate_v3_endpoint_data(self, endpoints, admin_port, internal_port,
-                                  public_port, expected):
+                                  public_port, expected, expected_num_eps=3):
         """Validate keystone v3 endpoint data.
 
         Validate the v3 endpoint data which has changed from v2.  The
@@ -130,10 +181,89 @@ class OpenStackAmuletUtils(AmuletUtils):
                 if ret:
                     return 'unexpected endpoint data - {}'.format(ret)
 
-        if len(found) != 3:
+        if len(found) != expected_num_eps:
             return 'Unexpected number of endpoints found'
 
-    def validate_svc_catalog_endpoint_data(self, expected, actual):
+    def convert_svc_catalog_endpoint_data_to_v3(self, ep_data):
+        """Convert v2 endpoint data into v3.
+
+           {
+               'service_name1': [
+                   {
+                       'adminURL': adminURL,
+                       'id': id,
+                       'region': region.
+                       'publicURL': publicURL,
+                       'internalURL': internalURL
+                   }],
+               'service_name2': [
+                   {
+                       'adminURL': adminURL,
+                       'id': id,
+                       'region': region.
+                       'publicURL': publicURL,
+                       'internalURL': internalURL
+                   }],
+           }
+          """
+        self.log.warn("Endpoint ID and Region ID validation is limited to not "
+                      "null checks after v2 to v3 conversion")
+        for svc in ep_data.keys():
+            assert len(ep_data[svc]) == 1, "Unknown data format"
+            svc_ep_data = ep_data[svc][0]
+            ep_data[svc] = [
+                {
+                    'url': svc_ep_data['adminURL'],
+                    'interface': 'admin',
+                    'region': svc_ep_data['region'],
+                    'region_id': self.not_null,
+                    'id': self.not_null},
+                {
+                    'url': svc_ep_data['publicURL'],
+                    'interface': 'public',
+                    'region': svc_ep_data['region'],
+                    'region_id': self.not_null,
+                    'id': self.not_null},
+                {
+                    'url': svc_ep_data['internalURL'],
+                    'interface': 'internal',
+                    'region': svc_ep_data['region'],
+                    'region_id': self.not_null,
+                    'id': self.not_null}]
+        return ep_data
+
+    def validate_svc_catalog_endpoint_data(self, expected, actual,
+                                           openstack_release=None):
+        """Validate service catalog endpoint data. Pick the correct validator
+           for the OpenStack version. Expected data should be in the v2 format:
+           {
+               'service_name1': [
+                   {
+                       'adminURL': adminURL,
+                       'id': id,
+                       'region': region.
+                       'publicURL': publicURL,
+                       'internalURL': internalURL
+                   }],
+               'service_name2': [
+                   {
+                       'adminURL': adminURL,
+                       'id': id,
+                       'region': region.
+                       'publicURL': publicURL,
+                       'internalURL': internalURL
+                   }],
+           }
+
+           """
+        validation_function = self.validate_v2_svc_catalog_endpoint_data
+        xenial_queens = OPENSTACK_RELEASES_PAIRS.index('xenial_queens')
+        if openstack_release and openstack_release >= xenial_queens:
+            validation_function = self.validate_v3_svc_catalog_endpoint_data
+            expected = self.convert_svc_catalog_endpoint_data_to_v3(expected)
+        return validation_function(expected, actual)
+
+    def validate_v2_svc_catalog_endpoint_data(self, expected, actual):
         """Validate service catalog endpoint data.
 
            Validate a list of actual service catalog endpoints vs a list of
@@ -302,120 +432,321 @@ class OpenStackAmuletUtils(AmuletUtils):
         self.log.debug('Checking if tenant exists ({})...'.format(tenant))
         return tenant in [t.name for t in keystone.tenants.list()]
 
-    def authenticate_cinder_admin(self, keystone_sentry, username,
-                                  password, tenant):
+    @retry_on_exception(num_retries=5, base_delay=1)
+    def keystone_wait_for_propagation(self, sentry_relation_pairs,
+                                      api_version):
+        """Iterate over list of sentry and relation tuples and verify that
+           api_version has the expected value.
+
+        :param sentry_relation_pairs: list of sentry, relation name tuples used
+                                      for monitoring propagation of relation
+                                      data
+        :param api_version: api_version to expect in relation data
+        :returns: None if successful.  Raise on error.
+        """
+        for (sentry, relation_name) in sentry_relation_pairs:
+            rel = sentry.relation('identity-service',
+                                  relation_name)
+            self.log.debug('keystone relation data: {}'.format(rel))
+            if rel.get('api_version') != str(api_version):
+                raise Exception("api_version not propagated through relation"
+                                " data yet ('{}' != '{}')."
+                                "".format(rel.get('api_version'), api_version))
+
+    def keystone_configure_api_version(self, sentry_relation_pairs, deployment,
+                                       api_version):
+        """Configure preferred-api-version of keystone in deployment and
+           monitor provided list of relation objects for propagation
+           before returning to caller.
+
+        :param sentry_relation_pairs: list of sentry, relation tuples used for
+                                      monitoring propagation of relation data
+        :param deployment: deployment to configure
+        :param api_version: value preferred-api-version will be set to
+        :returns: None if successful.  Raise on error.
+        """
+        self.log.debug("Setting keystone preferred-api-version: '{}'"
+                       "".format(api_version))
+
+        config = {'preferred-api-version': api_version}
+        deployment.d.configure('keystone', config)
+        deployment._auto_wait_for_status()
+        self.keystone_wait_for_propagation(sentry_relation_pairs, api_version)
+
+    def authenticate_cinder_admin(self, keystone, api_version=2):
         """Authenticates admin user with cinder."""
-        # NOTE(beisner): cinder python client doesn't accept tokens.
-        service_ip = \
-            keystone_sentry.relation('shared-db',
-                                     'mysql:shared-db')['private-address']
-        ept = "http://{}:5000/v2.0".format(service_ip.strip().decode('utf-8'))
-        return cinder_client.Client(username, password, tenant, ept)
+        self.log.debug('Authenticating cinder admin...')
+        _clients = {
+            1: cinder_client.Client,
+            2: cinder_clientv2.Client}
+        return _clients[api_version](session=keystone.session)
+
+    def authenticate_keystone(self, keystone_ip, username, password,
+                              api_version=False, admin_port=False,
+                              user_domain_name=None, domain_name=None,
+                              project_domain_name=None, project_name=None):
+        """Authenticate with Keystone"""
+        self.log.debug('Authenticating with keystone...')
+        if not api_version:
+            api_version = 2
+        sess, auth = self.get_keystone_session(
+            keystone_ip=keystone_ip,
+            username=username,
+            password=password,
+            api_version=api_version,
+            admin_port=admin_port,
+            user_domain_name=user_domain_name,
+            domain_name=domain_name,
+            project_domain_name=project_domain_name,
+            project_name=project_name
+        )
+        if api_version == 2:
+            client = keystone_client.Client(session=sess)
+        else:
+            client = keystone_client_v3.Client(session=sess)
+        # This populates the client.service_catalog
+        client.auth_ref = auth.get_access(sess)
+        return client
+
+    def get_keystone_session(self, keystone_ip, username, password,
+                             api_version=False, admin_port=False,
+                             user_domain_name=None, domain_name=None,
+                             project_domain_name=None, project_name=None):
+        """Return a keystone session object"""
+        ep = self.get_keystone_endpoint(keystone_ip,
+                                        api_version=api_version,
+                                        admin_port=admin_port)
+        if api_version == 2:
+            auth = v2.Password(
+                username=username,
+                password=password,
+                tenant_name=project_name,
+                auth_url=ep
+            )
+            sess = keystone_session.Session(auth=auth)
+        else:
+            auth = v3.Password(
+                user_domain_name=user_domain_name,
+                username=username,
+                password=password,
+                domain_name=domain_name,
+                project_domain_name=project_domain_name,
+                project_name=project_name,
+                auth_url=ep
+            )
+            sess = keystone_session.Session(auth=auth)
+        return (sess, auth)
+
+    def get_keystone_endpoint(self, keystone_ip, api_version=None,
+                              admin_port=False):
+        """Return keystone endpoint"""
+        port = 5000
+        if admin_port:
+            port = 35357
+        base_ep = "http://{}:{}".format(keystone_ip.strip().decode('utf-8'),
+                                        port)
+        if api_version == 2:
+            ep = base_ep + "/v2.0"
+        else:
+            ep = base_ep + "/v3"
+        return ep
+
+    def get_default_keystone_session(self, keystone_sentry,
+                                     openstack_release=None, api_version=2):
+        """Return a keystone session object and client object assuming standard
+           default settings
+
+           Example call in amulet tests:
+               self.keystone_session, self.keystone = u.get_default_keystone_session(
+                   self.keystone_sentry,
+                   openstack_release=self._get_openstack_release())
+
+           The session can then be used to auth other clients:
+               neutronclient.Client(session=session)
+               aodh_client.Client(session=session)
+               eyc
+        """
+        self.log.debug('Authenticating keystone admin...')
+        # 11 => xenial_queens
+        if api_version == 3 or (openstack_release and openstack_release >= 11):
+            client_class = keystone_client_v3.Client
+            api_version = 3
+        else:
+            client_class = keystone_client.Client
+        keystone_ip = keystone_sentry.info['public-address']
+        session, auth = self.get_keystone_session(
+            keystone_ip,
+            api_version=api_version,
+            username='admin',
+            password='openstack',
+            project_name='admin',
+            user_domain_name='admin_domain',
+            project_domain_name='admin_domain')
+        client = client_class(session=session)
+        # This populates the client.service_catalog
+        client.auth_ref = auth.get_access(session)
+        return session, client
 
     def authenticate_keystone_admin(self, keystone_sentry, user, password,
                                     tenant=None, api_version=None,
-                                    keystone_ip=None):
+                                    keystone_ip=None, user_domain_name=None,
+                                    project_domain_name=None,
+                                    project_name=None):
         """Authenticates admin user with the keystone admin endpoint."""
         self.log.debug('Authenticating keystone admin...')
-        unit = keystone_sentry
         if not keystone_ip:
-            keystone_ip = unit.relation('shared-db',
-                                        'mysql:shared-db')['private-address']
-        base_ep = "http://{}:35357".format(keystone_ip.strip().decode('utf-8'))
-        if not api_version or api_version == 2:
-            ep = base_ep + "/v2.0"
-            return keystone_client.Client(username=user, password=password,
-                                          tenant_name=tenant, auth_url=ep)
-        else:
-            ep = base_ep + "/v3"
-            auth = keystone_id_v3.Password(
-                user_domain_name='default',
-                username=user,
-                password=password,
-                domain_name='default',
-                auth_url=ep,
-            )
-            sess = keystone_session.Session(auth=auth)
-            return keystone_client_v3.Client(session=sess)
+            keystone_ip = keystone_sentry.info['public-address']
+
+        # To support backward compatibility usage of this function
+        if not project_name:
+            project_name = tenant
+        if api_version == 3 and not user_domain_name:
+            user_domain_name = 'admin_domain'
+        if api_version == 3 and not project_domain_name:
+            project_domain_name = 'admin_domain'
+        if api_version == 3 and not project_name:
+            project_name = 'admin'
+
+        return self.authenticate_keystone(
+            keystone_ip, user, password,
+            api_version=api_version,
+            user_domain_name=user_domain_name,
+            project_domain_name=project_domain_name,
+            project_name=project_name,
+            admin_port=True)
 
     def authenticate_keystone_user(self, keystone, user, password, tenant):
         """Authenticates a regular user with the keystone public endpoint."""
         self.log.debug('Authenticating keystone user ({})...'.format(user))
         ep = keystone.service_catalog.url_for(service_type='identity',
-                                              endpoint_type='publicURL')
-        return keystone_client.Client(username=user, password=password,
-                                      tenant_name=tenant, auth_url=ep)
+                                              interface='publicURL')
+        keystone_ip = urlparse.urlparse(ep).hostname
 
-    def authenticate_glance_admin(self, keystone):
+        return self.authenticate_keystone(keystone_ip, user, password,
+                                          project_name=tenant)
+
+    def authenticate_glance_admin(self, keystone, force_v1_client=False):
         """Authenticates admin user with glance."""
         self.log.debug('Authenticating glance admin...')
         ep = keystone.service_catalog.url_for(service_type='image',
-                                              endpoint_type='adminURL')
-        return glance_client.Client(ep, token=keystone.auth_token)
+                                              interface='adminURL')
+        if not force_v1_client and keystone.session:
+            return glance_clientv2.Client("2", session=keystone.session)
+        else:
+            return glance_client.Client(ep, token=keystone.auth_token)
 
     def authenticate_heat_admin(self, keystone):
         """Authenticates the admin user with heat."""
         self.log.debug('Authenticating heat admin...')
         ep = keystone.service_catalog.url_for(service_type='orchestration',
-                                              endpoint_type='publicURL')
-        return heat_client.Client(endpoint=ep, token=keystone.auth_token)
+                                              interface='publicURL')
+        if keystone.session:
+            return heat_client.Client(endpoint=ep, session=keystone.session)
+        else:
+            return heat_client.Client(endpoint=ep, token=keystone.auth_token)
 
     def authenticate_nova_user(self, keystone, user, password, tenant):
         """Authenticates a regular user with nova-api."""
         self.log.debug('Authenticating nova user ({})...'.format(user))
         ep = keystone.service_catalog.url_for(service_type='identity',
-                                              endpoint_type='publicURL')
-        return nova_client.Client(NOVA_CLIENT_VERSION,
-                                  username=user, api_key=password,
-                                  project_id=tenant, auth_url=ep)
+                                              interface='publicURL')
+        if keystone.session:
+            return nova_client.Client(NOVA_CLIENT_VERSION,
+                                      session=keystone.session,
+                                      auth_url=ep)
+        elif novaclient.__version__[0] >= "7":
+            return nova_client.Client(NOVA_CLIENT_VERSION,
+                                      username=user, password=password,
+                                      project_name=tenant, auth_url=ep)
+        else:
+            return nova_client.Client(NOVA_CLIENT_VERSION,
+                                      username=user, api_key=password,
+                                      project_id=tenant, auth_url=ep)
 
     def authenticate_swift_user(self, keystone, user, password, tenant):
         """Authenticates a regular user with swift api."""
         self.log.debug('Authenticating swift user ({})...'.format(user))
         ep = keystone.service_catalog.url_for(service_type='identity',
-                                              endpoint_type='publicURL')
-        return swiftclient.Connection(authurl=ep,
-                                      user=user,
-                                      key=password,
-                                      tenant_name=tenant,
-                                      auth_version='2.0')
+                                              interface='publicURL')
+        if keystone.session:
+            return swiftclient.Connection(session=keystone.session)
+        else:
+            return swiftclient.Connection(authurl=ep,
+                                          user=user,
+                                          key=password,
+                                          tenant_name=tenant,
+                                          auth_version='2.0')
 
-    def create_cirros_image(self, glance, image_name):
-        """Download the latest cirros image and upload it to glance,
-        validate and return a resource pointer.
+    def create_flavor(self, nova, name, ram, vcpus, disk, flavorid="auto",
+                      ephemeral=0, swap=0, rxtx_factor=1.0, is_public=True):
+        """Create the specified flavor."""
+        try:
+            nova.flavors.find(name=name)
+        except (exceptions.NotFound, exceptions.NoUniqueMatch):
+            self.log.debug('Creating flavor ({})'.format(name))
+            nova.flavors.create(name, ram, vcpus, disk, flavorid,
+                                ephemeral, swap, rxtx_factor, is_public)
 
-        :param glance: pointer to authenticated glance connection
+    def glance_create_image(self, glance, image_name, image_url,
+                            download_dir='tests',
+                            hypervisor_type=None,
+                            disk_format='qcow2',
+                            architecture='x86_64',
+                            container_format='bare'):
+        """Download an image and upload it to glance, validate its status
+        and return an image object pointer. KVM defaults, can override for
+        LXD.
+
+        :param glance: pointer to authenticated glance api connection
         :param image_name: display name for new image
+        :param image_url: url to retrieve
+        :param download_dir: directory to store downloaded image file
+        :param hypervisor_type: glance image hypervisor property
+        :param disk_format: glance image disk format
+        :param architecture: glance image architecture property
+        :param container_format: glance image container format
         :returns: glance image pointer
         """
-        self.log.debug('Creating glance cirros image '
-                       '({})...'.format(image_name))
+        self.log.debug('Creating glance image ({}) from '
+                       '{}...'.format(image_name, image_url))
 
-        # Download cirros image
-        http_proxy = os.getenv('AMULET_HTTP_PROXY')
-        self.log.debug('AMULET_HTTP_PROXY: {}'.format(http_proxy))
+        # Download image
+        http_proxy = os.getenv('OS_TEST_HTTP_PROXY')
+        self.log.debug('OS_TEST_HTTP_PROXY: {}'.format(http_proxy))
         if http_proxy:
             proxies = {'http': http_proxy}
             opener = urllib.FancyURLopener(proxies)
         else:
             opener = urllib.FancyURLopener()
 
-        f = opener.open('http://download.cirros-cloud.net/version/released')
-        version = f.read().strip()
-        cirros_img = 'cirros-{}-x86_64-disk.img'.format(version)
-        local_path = os.path.join('tests', cirros_img)
-
-        if not os.path.exists(local_path):
-            cirros_url = 'http://{}/{}/{}'.format('download.cirros-cloud.net',
-                                                  version, cirros_img)
-            opener.retrieve(cirros_url, local_path)
-        f.close()
+        abs_file_name = os.path.join(download_dir, image_name)
+        if not os.path.exists(abs_file_name):
+            opener.retrieve(image_url, abs_file_name)
 
         # Create glance image
-        with open(local_path) as f:
-            image = glance.images.create(name=image_name, is_public=True,
-                                         disk_format='qcow2',
-                                         container_format='bare', data=f)
+        glance_properties = {
+            'architecture': architecture,
+        }
+        if hypervisor_type:
+            glance_properties['hypervisor_type'] = hypervisor_type
+        # Create glance image
+        if float(glance.version) < 2.0:
+            with open(abs_file_name) as f:
+                image = glance.images.create(
+                    name=image_name,
+                    is_public=True,
+                    disk_format=disk_format,
+                    container_format=container_format,
+                    properties=glance_properties,
+                    data=f)
+        else:
+            image = glance.images.create(
+                name=image_name,
+                visibility="public",
+                disk_format=disk_format,
+                container_format=container_format)
+            glance.images.upload(image.id, open(abs_file_name, 'rb'))
+            glance.images.update(image.id, **glance_properties)
 
         # Wait for image to reach active status
         img_id = image.id
@@ -430,23 +761,67 @@ class OpenStackAmuletUtils(AmuletUtils):
         self.log.debug('Validating image attributes...')
         val_img_name = glance.images.get(img_id).name
         val_img_stat = glance.images.get(img_id).status
-        val_img_pub = glance.images.get(img_id).is_public
         val_img_cfmt = glance.images.get(img_id).container_format
         val_img_dfmt = glance.images.get(img_id).disk_format
+
+        if float(glance.version) < 2.0:
+            val_img_pub = glance.images.get(img_id).is_public
+        else:
+            val_img_pub = glance.images.get(img_id).visibility == "public"
+
         msg_attr = ('Image attributes - name:{} public:{} id:{} stat:{} '
                     'container fmt:{} disk fmt:{}'.format(
                         val_img_name, val_img_pub, img_id,
                         val_img_stat, val_img_cfmt, val_img_dfmt))
 
         if val_img_name == image_name and val_img_stat == 'active' \
-                and val_img_pub is True and val_img_cfmt == 'bare' \
-                and val_img_dfmt == 'qcow2':
+                and val_img_pub is True and val_img_cfmt == container_format \
+                and val_img_dfmt == disk_format:
             self.log.debug(msg_attr)
         else:
-            msg = ('Volume validation failed, {}'.format(msg_attr))
+            msg = ('Image validation failed, {}'.format(msg_attr))
             amulet.raise_status(amulet.FAIL, msg=msg)
 
         return image
+
+    def create_cirros_image(self, glance, image_name, hypervisor_type=None):
+        """Download the latest cirros image and upload it to glance,
+        validate and return a resource pointer.
+
+        :param glance: pointer to authenticated glance connection
+        :param image_name: display name for new image
+        :param hypervisor_type: glance image hypervisor property
+        :returns: glance image pointer
+        """
+        # /!\ DEPRECATION WARNING
+        self.log.warn('/!\\ DEPRECATION WARNING:  use '
+                      'glance_create_image instead of '
+                      'create_cirros_image.')
+
+        self.log.debug('Creating glance cirros image '
+                       '({})...'.format(image_name))
+
+        # Get cirros image URL
+        http_proxy = os.getenv('OS_TEST_HTTP_PROXY')
+        self.log.debug('OS_TEST_HTTP_PROXY: {}'.format(http_proxy))
+        if http_proxy:
+            proxies = {'http': http_proxy}
+            opener = urllib.FancyURLopener(proxies)
+        else:
+            opener = urllib.FancyURLopener()
+
+        f = opener.open('http://download.cirros-cloud.net/version/released')
+        version = f.read().strip()
+        cirros_img = 'cirros-{}-x86_64-disk.img'.format(version)
+        cirros_url = 'http://{}/{}/{}'.format('download.cirros-cloud.net',
+                                              version, cirros_img)
+        f.close()
+
+        return self.glance_create_image(
+            glance,
+            image_name,
+            cirros_url,
+            hypervisor_type=hypervisor_type)
 
     def delete_image(self, glance, image):
         """Delete the specified image."""
@@ -461,7 +836,7 @@ class OpenStackAmuletUtils(AmuletUtils):
         """Create the specified instance."""
         self.log.debug('Creating instance '
                        '({}|{}|{})'.format(instance_name, image_name, flavor))
-        image = nova.images.find(name=image_name)
+        image = nova.glance.find_image(image_name)
         flavor = nova.flavors.find(name=flavor)
         instance = nova.servers.create(name=instance_name, image=image,
                                        flavor=flavor)
@@ -498,12 +873,24 @@ class OpenStackAmuletUtils(AmuletUtils):
             self.log.debug('Keypair ({}) already exists, '
                            'using it.'.format(keypair_name))
             return _keypair
-        except:
+        except Exception:
             self.log.debug('Keypair ({}) does not exist, '
                            'creating it.'.format(keypair_name))
 
         _keypair = nova.keypairs.create(name=keypair_name)
         return _keypair
+
+    def _get_cinder_obj_name(self, cinder_object):
+        """Retrieve name of cinder object.
+
+        :param cinder_object: cinder snapshot or volume object
+        :returns: str cinder object name
+        """
+        # v1 objects store name in 'display_name' attr but v2+ use 'name'
+        try:
+            return cinder_object.display_name
+        except AttributeError:
+            return cinder_object.name
 
     def create_cinder_volume(self, cinder, vol_name="demo-vol", vol_size=1,
                              img_id=None, src_vol_id=None, snap_id=None):
@@ -555,6 +942,13 @@ class OpenStackAmuletUtils(AmuletUtils):
                                             source_volid=src_vol_id,
                                             snapshot_id=snap_id)
             vol_id = vol_new.id
+        except TypeError:
+            vol_new = cinder.volumes.create(name=vol_name,
+                                            imageRef=img_id,
+                                            size=vol_size,
+                                            source_volid=src_vol_id,
+                                            snapshot_id=snap_id)
+            vol_id = vol_new.id
         except Exception as e:
             msg = 'Failed to create volume: {}'.format(e)
             amulet.raise_status(amulet.FAIL, msg=msg)
@@ -569,7 +963,7 @@ class OpenStackAmuletUtils(AmuletUtils):
 
         # Re-validate new volume
         self.log.debug('Validating volume attributes...')
-        val_vol_name = cinder.volumes.get(vol_id).display_name
+        val_vol_name = self._get_cinder_obj_name(cinder.volumes.get(vol_id))
         val_vol_boot = cinder.volumes.get(vol_id).bootable
         val_vol_stat = cinder.volumes.get(vol_id).status
         val_vol_size = cinder.volumes.get(vol_id).size
@@ -680,6 +1074,9 @@ class OpenStackAmuletUtils(AmuletUtils):
                                cmd, code, output))
             amulet.raise_status(amulet.FAIL, msg=msg)
 
+        # For mimic ceph osd lspools output
+        output = output.replace("\n", ",")
+
         # Example output: 0 data,1 metadata,2 rbd,3 cinder,4 glance,
         for pool in str(output).split(','):
             pool_id_name = pool.split(' ')
@@ -717,9 +1114,12 @@ class OpenStackAmuletUtils(AmuletUtils):
         :returns: List of pool name, object count, kb disk space used
         """
         df = self.get_ceph_df(sentry_unit)
-        pool_name = df['pools'][pool_id]['name']
-        obj_count = df['pools'][pool_id]['stats']['objects']
-        kb_used = df['pools'][pool_id]['stats']['kb_used']
+        for pool in df['pools']:
+            if pool['id'] == pool_id:
+                pool_name = pool['name']
+                obj_count = pool['stats']['objects']
+                kb_used = pool['stats']['kb_used']
+
         self.log.debug('Ceph {} pool (ID {}): {} objects, '
                        '{} kb used'.format(pool_name, pool_id,
                                            obj_count, kb_used))
@@ -1125,3 +1525,70 @@ class OpenStackAmuletUtils(AmuletUtils):
         else:
             msg = 'No message retrieved.'
             amulet.raise_status(amulet.FAIL, msg)
+
+    def validate_memcache(self, sentry_unit, conf, os_release,
+                          earliest_release=5, section='keystone_authtoken',
+                          check_kvs=None):
+        """Check Memcache is running and is configured to be used
+
+        Example call from Amulet test:
+
+            def test_110_memcache(self):
+                u.validate_memcache(self.neutron_api_sentry,
+                                    '/etc/neutron/neutron.conf',
+                                    self._get_openstack_release())
+
+        :param sentry_unit: sentry unit
+        :param conf: OpenStack config file to check memcache settings
+        :param os_release: Current OpenStack release int code
+        :param earliest_release: Earliest Openstack release to check int code
+        :param section: OpenStack config file section to check
+        :param check_kvs: Dict of settings to check in config file
+        :returns: None
+        """
+        if os_release < earliest_release:
+            self.log.debug('Skipping memcache checks for deployment. {} <'
+                           'mitaka'.format(os_release))
+            return
+        _kvs = check_kvs or {'memcached_servers': 'inet6:[::1]:11211'}
+        self.log.debug('Checking memcached is running')
+        ret = self.validate_services_by_name({sentry_unit: ['memcached']})
+        if ret:
+            amulet.raise_status(amulet.FAIL, msg='Memcache running check'
+                                'failed {}'.format(ret))
+        else:
+            self.log.debug('OK')
+        self.log.debug('Checking memcache url is configured in {}'.format(
+            conf))
+        if self.validate_config_data(sentry_unit, conf, section, _kvs):
+            message = "Memcache config error in: {}".format(conf)
+            amulet.raise_status(amulet.FAIL, msg=message)
+        else:
+            self.log.debug('OK')
+        self.log.debug('Checking memcache configuration in '
+                       '/etc/memcached.conf')
+        contents = self.file_contents_safe(sentry_unit, '/etc/memcached.conf',
+                                           fatal=True)
+        ubuntu_release, _ = self.run_cmd_unit(sentry_unit, 'lsb_release -cs')
+        if CompareHostReleases(ubuntu_release) <= 'trusty':
+            memcache_listen_addr = 'ip6-localhost'
+        else:
+            memcache_listen_addr = '::1'
+        expected = {
+            '-p': '11211',
+            '-l': memcache_listen_addr}
+        found = []
+        for key, value in expected.items():
+            for line in contents.split('\n'):
+                if line.startswith(key):
+                    self.log.debug('Checking {} is set to {}'.format(
+                        key,
+                        value))
+                    assert value == line.split()[-1]
+                    self.log.debug(line.split()[-1])
+                    found.append(key)
+        if sorted(found) == sorted(expected.keys()):
+            self.log.debug('OK')
+        else:
+            message = "Memcache config error in: /etc/memcached.conf"
+            amulet.raise_status(amulet.FAIL, msg=message)

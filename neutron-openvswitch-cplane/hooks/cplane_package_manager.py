@@ -1,12 +1,12 @@
 import os
 import logging
 from optparse import OptionParser
-import urllib
-import urllib2
+import urllib.request, urllib.parse, urllib.error
+import urllib.request, urllib.error, urllib.parse
 import json
 import hashlib
-import urlparse
-import commands
+import urllib.parse
+import subprocess
 
 from charmhelpers.core.host import (
     mkdir,
@@ -60,19 +60,19 @@ class CPlanePackageManager:
             proxies['https'] = config('https-proxy')
         try:
             if not proxies:
-                response = urllib.urlopen(url)
+                response = urllib.request.urlopen(url) 
             else:
-                proxy = urllib2.ProxyHandler(proxies)
-                opener = urllib2.build_opener(proxy)
-                urllib2.install_opener(opener)
-                response = urllib2.urlopen(url)
+                proxy = urllib.request.ProxyHandler(proxies)
+                opener = urllib.request.build_opener(proxy)
+                urllib.request.install_opener(opener)
+                response = urllib.request.urlopen(url)
         except IOError:
             msg = "Invalid URL: URL metioned for Cplane binaries is not valid"
             status_set('blocked', msg)
             raise ErrorException(msg)
 
         logging.info("Package url:%s" % url)
-        data = self._validate_json(response.read())
+        data = self._validate_json(response.read().decode('utf-8'))
         if not data.get("{}".format(config("cplane-version"))):
             msg = "Invalid Cplane version: Invallid Cplane \
 version {}".format(config("cplane-version"))
@@ -152,7 +152,7 @@ package {}".format(version, package_name)
             raise ErrorException(msg)
 
         mkdir(CHARM_LIB_DIR)
-        filename = urlparse.urlsplit(package_dwnld_link).path
+        filename = urllib.parse.urlsplit(package_dwnld_link).path 
         dwnld_package_name = os.path.join(CHARM_LIB_DIR,
                                           os.path.basename(filename))
         proxies = {}
@@ -161,12 +161,12 @@ package {}".format(version, package_name)
         if config('https-proxy'):
             proxies['https'] = config('https-proxy')
         if not proxies:
-            urllib.urlretrieve(package_dwnld_link, dwnld_package_name)
+            urllib.request.urlretrieve(package_dwnld_link, dwnld_package_name) 
         else:
-            proxy = urllib2.ProxyHandler(proxies)
-            opener = urllib2.build_opener(proxy)
-            urllib2.install_opener(opener)
-            dwnldfile = urllib2.urlopen(package_dwnld_link)
+            proxy = urllib.request.ProxyHandler(proxies)
+            opener = urllib.request.build_opener(proxy)
+            urllib.request.install_opener(opener)
+            dwnldfile = urllib.request.urlopen(package_dwnld_link)
             with open(dwnld_package_name, 'wb') as output:
                 output.write(dwnldfile.read())
 
@@ -182,7 +182,7 @@ mismatch".format(dwnld_package_name)
         return dwnld_package_name
 
     def get_os_release(self):
-        ubuntu_release = commands.getoutput('lsb_release -r')
+        ubuntu_release = subprocess.getoutput('lsb_release -r')
         return ubuntu_release.split()[1]
 
 

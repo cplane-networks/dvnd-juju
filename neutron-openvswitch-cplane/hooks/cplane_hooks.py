@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 from charmhelpers.core.hookenv import (
     Hooks,
     UnregisteredHookError,

@@ -140,7 +140,7 @@ class UbuntuIntfMgmt(object):
             fp_o.write("    ovs_type OVSBridge\n")
             fp_o.write("    ovs_ports {ports}\n"
                        .format(ports=kwargs['source_intf']))
-            for key, value in kwargs.iteritems():
+            for key, value in list(kwargs.items()):
                 if key != 'intf_file' and key != 'source_intf' and \
                    key != 'defroute' and key != 'inet_type':
                     if key == 'gateway' and not defroute:
@@ -175,7 +175,7 @@ class UbuntuIntfMgmt(object):
             fp_o.write("    ovs_type OVSPort\n")
             fp_o.write("    ovs_bridge {bridge}\n"
                        .format(bridge=kwargs['bridge_name']))
-            for key, value in kwargs.iteritems():
+            for key, value in list(kwargs.items()):
                 if key != 'inet_type' and key != 'address':
                     if type(value) is list:
                         fp_o.write("    {key} {value}\n"
@@ -228,7 +228,7 @@ class UbuntuIntfMgmt(object):
             fp_o.write("    ovs_type OVSPort\n")
             fp_o.write("    ovs_bridge {bridge}\n"
                        .format(bridge=kwargs['bridge_name']))
-            for key, value in kwargs.iteritems():
+            for key, value in list(kwargs.items()):
                 if key != 'intf_file' and key != 'source_intf' and \
                    key != 'defroute' and key != 'inet_type':
                     if key == 'gateway' and not defroute:
@@ -273,7 +273,7 @@ class UbuntuIntfMgmt(object):
                 fp_o.write("    netmask {mask}\n".format(mask=mask))
                 if defroute is True:
                     fp_o.write("    gateway {gw}\n".format(gw=gw))
-                for key, value in kwargs.iteritems():
+                for key, value in list(kwargs.items()):
                     if key != 'intf_file' and key != 'source_intf' and \
                        key != 'defroute' and key != 'inet_type':
                         if key == 'gateway' and not defroute:
@@ -400,7 +400,7 @@ class UbuntuIntfMgmt(object):
                                                      'lro',
                                                      '{}'.format(value)]
 
-                for key, value in self.config_params.iteritems():
+                for key, value in list(self.config_params.items()):
                     if type(value) is list:
                         if key == 'tso' or key == 'gso' or key == 'rx' or \
                            key == 'tx' or key == 'sg' or key == 'ufo' or \

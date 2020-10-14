@@ -1,5 +1,4 @@
 import subprocess
-import commands
 
 from charmhelpers.contrib.openstack.utils import os_release
 from charmhelpers.contrib.openstack import templating
@@ -107,7 +106,7 @@ def register_configs(release=None):
     release = os_release('neutron-common')
     configs = templating.OSConfigRenderer(templates_dir=TEMPLATES,
                                           openstack_release=release)
-    for cfg, rscs in resources.iteritems():
+    for cfg, rscs in list(resources.items()):
         configs.register(cfg, rscs['contexts'])
     return configs
 
@@ -145,14 +144,14 @@ def crudini_set(_file, section, key, value):
 
 
 def cplane_config(data, config_file, section):
-    for key, value in data.items():
+    for key, value in list(data.items()):
         crudini_set(config_file, section, key, value)
 
 
 def install_cplane_packages():
 
     cp_package = CPlanePackageManager(CPLANE_URL)
-    for key, value in cplane_packages.items():
+    for key, value in list(cplane_packages.items()):
         filename = cp_package.download_package(key, value)
         if key == 'dpdk':
             cmd = ['tar', '-xvzf', filename, '-C', '/usr/src']
@@ -290,7 +289,7 @@ def assess_status_func(configs):
 class FakeOSConfigRenderer(object):
     def complete_contexts(self):
         interfaces = []
-        for key, values in REQUIRED_INTERFACES.items():
+        for key, values in list(REQUIRED_INTERFACES.items()):
             for value in values:
                 for rid in relation_ids(value):
                     for unit in related_units(rid):
@@ -306,7 +305,7 @@ def fake_register_configs():
 
 
 def get_os_release():
-    ubuntu_release = commands.getoutput('lsb_release -r')
+    ubuntu_release = subprocess.getoutput('lsb_release -r')
     return ubuntu_release.split()[1]
 
 
@@ -316,25 +315,26 @@ def get_arch():
 
 
 def set_dpdk_env():
-    newenv = None
-    pipe = subprocess.Popen(". /etc/profile.d/dpdk_env.sh; python -c 'import os; \
-                            print \"newenv = %r\" % os.environ'",
-                            stdout=subprocess.PIPE, shell=True)
-    exec(pipe.communicate()[0])
-    os.environ.update(newenv)
+    if os.path.exists("/etc/profile.d/dpdk_env.sh"):
+        pipe = subprocess.Popen(". /etc/profile.d/dpdk_env.sh; env",
+                                stdout=subprocess.PIPE, shell=True)
+        output = pipe.communicate()[0].decode('utf-8')
+        env = dict((line.split("=", 1) for line in output.splitlines()))
+        os.environ.update(env)
 
-    cmd = 'modprobe vfio-pci'
-    os.system(cmd)
-    cmd = 'chmod a+x /dev/vfio'
-    os.system(cmd)
-    cmd = 'chmod 0666 /dev/vfio/*'
-    os.system(cmd)
 
-    if not os.path.exists("/mnt/huge"):
-        cmd = 'mkdir /mnt/huge'
+        cmd = 'modprobe vfio-pci'
         os.system(cmd)
-    cmd = 'mount -t hugetlbfs -o pagesize=1G none /mnt/huge'
-    os.system(cmd)
+        cmd = 'chmod a+x /dev/vfio'
+        os.system(cmd)
+        cmd = 'chmod 0666 /dev/vfio/*'
+        os.system(cmd)
+
+        if not os.path.exists("/mnt/huge"):
+            cmd = 'mkdir /mnt/huge'
+            os.system(cmd)
+        cmd = 'mount -t hugetlbfs -o pagesize=1G none /mnt/huge'
+        os.system(cmd)
 
 
 def install_dpdk():
