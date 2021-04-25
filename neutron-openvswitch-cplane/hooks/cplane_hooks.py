@@ -122,7 +122,7 @@ def config_changed():
     set_dpdk_env()
     set_cp_agent()
     cplane_config(system_config, SYSTEM_CONF, '')
-    if get_os_release() == '16.04':
+    if get_os_release() == '16.04' or get_os_release() == '18.04':
         cmd = ['modprobe', 'br_netfilter']
         subprocess.check_call(cmd)
     cmd = ['sysctl', '-p']

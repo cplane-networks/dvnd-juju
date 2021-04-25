@@ -171,7 +171,7 @@ def register_configs(release=None):
 
 
 def determine_packages():
-    if get_os_release() == '16.04':
+    if get_os_release() == '16.04' or get_os_release() == '18.04':
         PACKAGES.extend(['bc', 'unixodbc'])
     return PACKAGES
 
@@ -197,7 +197,7 @@ def download_cplane_installer():
 
 def oracle_configure_init():
     import pexpect
-    if get_os_release() == '16.04':
+    if get_os_release() == '16.04' or get_os_release() == '18.04':
         cmd = "sed -i 's/memory_target=*/#memory_target=/g' \
 /u01/app/oracle/product/11.2.0/xe/config/scripts/init.ora"
         os.system(cmd)

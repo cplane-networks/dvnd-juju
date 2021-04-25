@@ -39,6 +39,7 @@ TEMPLATES = 'templates/'
 
 cplane_packages = OrderedDict([
     ('cplane-neutron-plugin', -1),
+    ('openvswitch-lib', -1),
     ('openvswitch-common', -1),
     ('openvswitch-datapath-dkms', -1),
     ('openvswitch-switch', -1),
@@ -67,7 +68,7 @@ neutron_config = {
 NEUTRON_CONF = '/etc/neutron/neutron.conf'
 
 PACKAGES = ['neutron-metadata-agent', 'neutron-plugin-ml2', 'crudini',
-            'dkms', 'iputils-arping', 'dnsmasq', 'libnuma-dev']
+            'dkms', 'iputils-arping', 'dnsmasq', 'libnuma-dev', 'libelf-dev']
 
 
 REQUIRED_INTERFACES = {
@@ -124,7 +125,7 @@ def is_neutron_api_ready():
 
 
 def determine_packages():
-    if get_os_release() == '16.04':
+    if get_os_release() == '16.04' or get_os_release() == '18.04':
         PACKAGES.extend(['bc'])
     return PACKAGES
 

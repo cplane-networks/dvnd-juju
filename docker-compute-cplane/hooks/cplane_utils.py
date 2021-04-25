@@ -66,7 +66,7 @@ system_config = OrderedDict([
 
 
 def determine_packages():
-    if get_os_release() == '16.04':
+    if get_os_release() == '16.04' or get_os_release() == '18.04':
         PACKAGES.extend(['bc'])
     return PACKAGES
 
