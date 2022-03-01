@@ -1,0 +1,23 @@
+[designate]
+url = {{ designate_endpoint }}/v2
+{% if api_version == "3" -%}
+auth_uri = {{ service_protocol }}://{{ service_host }}:{{ service_port }}
+auth_url = {{ auth_protocol }}://{{ auth_host }}:{{ auth_port }}
+auth_type = password
+project_domain_name = {{ admin_domain_name }}
+user_domain_name = {{ admin_domain_name }}
+project_name = {{ admin_tenant_name }}
+username = {{ admin_user }}
+password = {{ admin_password }}
+signing_dir = {{ signing_dir }}
+{% else -%}
+admin_auth_url = {{ auth_protocol }}://{{ auth_host }}:{{ auth_port }}
+admin_username = {{ admin_user }}
+admin_password = {{ admin_password }}
+admin_tenant_name = {{ admin_tenant_name }}
+{% endif -%}
+allow_reverse_dns_lookup = {{ allow_reverse_dns_lookup }}
+{% if allow_reverse_dns_lookup -%}
+ipv4_ptr_zone_prefix_size = {{ ipv4_ptr_zone_prefix_size }}
+ipv6_ptr_zone_prefix_size = {{ ipv6_ptr_zone_prefix_size }}
+{% endif -%}

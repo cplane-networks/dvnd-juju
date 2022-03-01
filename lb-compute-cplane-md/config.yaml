@@ -1,0 +1,81 @@
+options:
+  debug:
+    default: False
+    type: boolean
+    description: Enable debug logging.
+  verbose:
+    default: False
+    type: boolean
+    description: Enable verbose logging.
+  rabbit-user:
+    type: string
+    default: "neutron"
+    description: "Neutron rabbit user name"
+  rabbit-vhost:
+    type: string
+    default: "openstack"
+    description: "Nova rabbit vhost"
+  neutron-user:
+    type: string
+    default: "neutron"
+    description: "Neutron user"
+  neutron-password:
+    type: string
+    default: "neutron"
+    description: "Neutron password"
+  nova-user:
+    type: string
+    default: "nova"
+    description: "Nova user"
+  nova-password:
+    type: string
+    default: "openstack"
+    description: "Nova password"
+  neutron-plugin:
+    type: string
+    default: ml2
+    description: |
+      Neutron plugin to use for network management; supports
+  overlay-network-type:
+    default: gre
+    type: string
+    description: |
+      Overlay network types to use, valid options include:
+      .
+        gre
+        vxlan
+      .
+      Multiple types can be provided - field is space delimited. 
+  neutron-security-groups:
+    type: boolean
+    default: True 
+    description: |
+      Use quantum for security group management.
+  flat-network-providers:
+    type: string
+    default:
+    description: |
+      Space-delimited list of Neutron flat network providers.
+  physical-intf-mappings:
+    type: string
+    default: physnet1:eth1, physnet2:eth2, physnet3:eth3
+    description: |
+      Space-delimited list of <physnet>:<actual interface> 
+  vlan-ranges:
+    type: string
+    default: physnet1:200:201 
+    description: |
+      Space-delimited list of <physical_network>:<vlan_min>:<vlan_max> or
+      <physical_network> specifying physical_network names usable for VLAN
+      provider and tenant networks, as well as ranges of VLAN tags on each
+      available for allocation to tenant networks.
+  database-user:
+    default: neutron
+    type: string
+    description: Username for Neutron database access (if enabled)
+  database:
+    default: neutron
+    type: string
+    description: |
+      Database name for Neutron (if enabled)
+

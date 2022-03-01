@@ -1,0 +1,31 @@
+# Overview
+
+The OGR compute node is a special type of OpenStack Compute specifically designed to run the CPLANE NETWORKS’s Overlay Gateway Router (OGR).   The OGR is a Virtual Network Function(VNF) that performs bridging between VXLAN based overlay networks and underlay networks. Further it  provides route advertisement throgh the BGP protocol. The OGRs are spawned on the OGR compute nodes via CPLANE Multi-Site Manager or directly from Nova. The OGR Compute nodes uses the Linux bridge neutron plugin to extend 3 networks to each OGR.  The OpenStack management and data networks are extended the OGR along with an outbound facing
+peering network interface.
+
+CPLANE's software-only solution automates creation of WAN and LAN network services with a highly intelligent SDN platform. Through advanced discovery, modeling and service orchestration, CPLANE automates not only the low-level infrastructure configuration and management of data center and wide area networks, but also the higher-level, value-add functions such as network virtualization, routing, policy and QoS. CPLANE delivers network services faster and more reliably on existing network infrastructure. Since CPLANE is a software-only solution with no vendor-specific dependencies, it offers the added advantage of providing a
+path to new network architectures and technologies, and away from vendor lock-in.
+For more information see [http://www.cplanenetworks.com/]
+
+# Usage
+
+This charm is subordinate to the **cplane-compute** charm, which is a **nova-compute** charm , deployed with a different name. It also requires the deployment of the **cplane-controller** charm and the **neutron-api-cplane** charm, which is subordinate to neutron-api charm. It eliminates the need for the neutron-gateway charm as L3 routing is now handled by the compute tier.
+
+The ogr-compute-cplane charm has several core functions:
+
+- Configure the cplane-compute component
+- Install and configure neutron-metadata-agent
+- Install and configure neutron-plugin-linuxbridge-agent
+
+Instruction for deploying the CPlane openstack bundle is as follows:
+Note: This bundle will install some components of Openstack as well as CPlane charms.
+
+    juju deploy cplane_openstack.yaml
+
+# Configuration
+ - ***openstack-controller-ip***: IP of the Neutron-api-cplane nodes.
+
+# Contact Information
+
+www.cplanenetworks.com
+info@cplanenetworks.com

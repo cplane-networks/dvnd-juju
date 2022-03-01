@@ -1,0 +1,3 @@
+ETCD_PROXY=on
+ETCD_INITIAL_CLUSTER={{ cluster }}
+ETCD_DATA_DIR=/var/lib/etcd

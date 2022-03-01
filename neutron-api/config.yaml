@@ -1,0 +1,802 @@
+options:
+  debug:
+    type: boolean
+    default: False
+    description: Enable debug logging.
+  verbose:
+    type: boolean
+    default: False
+    description: Enable verbose logging.
+  use-syslog:
+    type: boolean
+    default: False
+    description: |
+      Setting this to True will allow supporting services to log to syslog.
+  enable-security-group-logging:
+    type: boolean
+    default: False
+    description: |
+      Setting this to True will enable logging for Security Groups. (Available from Queens)
+      WARNING: Enabling this may affect your disk I/O performance since this
+      will log ALL traffic being passed via NSG. Logging configuration
+      such as thresholds and a destination log file are available in the neutron-openvswitch charm.
+      Also, an neutron-openvswitch charm config option "firewall-driver" should be explicitly
+      set to "openvswitch", since security group logging works only with OVS firewall driver now.
+  enable-fwaas:
+    type: boolean
+    default: True
+    description: |
+      Setting this to True will enable FWaasS (FWaaSv2 from Stein onwards).
+      This feature is disabled from Victoria onwards and will have no effect.
+      .
+      NOTE: Neutron FWaaS has been deprecated as of the OpenStack Ussuri
+      release and will be removed during the W cycle.
+  enable-firewall-group-logging:
+    type: boolean
+    default: False
+    description: |
+      Setting this to True will enable logging for FWaaSv2. (Available from Stein)
+      WARNING: Enabling this may affect your disk I/O performance since this
+      may log ALL traffic being passed via gateway. Logging configuration
+      such as thresholds and a destination log file are available in the neutron-gateway charm.
+      .
+      NOTE: Neutron FWaaS has been deprecated as of the OpenStack Ussuri
+      release and will be removed during the W cycle.
+  enable-port-forwarding:
+    type: boolean
+    default: False
+    description: |
+      Setting this to True will enable port forwarding (Rocky and later).
+  openstack-origin:
+    type: string
+    default: distro
+    description: |
+      Repository from which to install. May be one of the following:
+      distro (default), ppa:somecustom/ppa, a deb url sources entry,
+      or a supported Ubuntu Cloud Archive e.g.
+      .
+      cloud:<series>-<openstack-release>
+      cloud:<series>-<openstack-release>/updates
+      cloud:<series>-<openstack-release>/staging
+      cloud:<series>-<openstack-release>/proposed
+      .
+      See https://wiki.ubuntu.com/OpenStack/CloudArchive for info on which
+      cloud archives are available and supported.
+      .
+      NOTE: updating this setting to a source that is known to provide
+      a later version of OpenStack will trigger a software upgrade unless
+      action-managed-upgrade is set to True.
+  extra-key:
+    type: string
+    default:
+    description: Optional key for archive containing additional packages.
+  extra-source:
+    type: string
+    default:
+    description: Optional source for archive containing additional packages.
+  action-managed-upgrade:
+    type: boolean
+    default: False
+    description: |
+      If True enables openstack upgrades for this charm via juju actions.
+      You will still need to set openstack-origin to the new repository but
+      instead of an upgrade running automatically across all units, it will
+      wait for you to execute the openstack-upgrade action for this charm on
+      each unit. If False it will revert to existing behavior of upgrading
+      all units on config change.
+  harden:
+    default:
+    type: string
+    description: |
+      Apply system hardening. Supports a space-delimited list of modules
+      to run. Supported modules currently include os, ssh, apache and mysql.
+  rabbit-user:
+    type: string
+    default: neutron
+    description: Username used to access rabbitmq queue.
+  rabbit-vhost:
+    type: string
+    default: openstack
+    description: Rabbitmq vhost name.
+  database-user:
+    type: string
+    default: neutron
+    description: Username for Neutron database access (if enabled).
+  database:
+    type: string
+    default: neutron
+    description: Database name for Neutron (if enabled).
+  region:
+    type: string
+    default: RegionOne
+    description: OpenStack region name.
+  use-internal-endpoints:
+    type: boolean
+    default: False
+    description: |
+      Openstack mostly defaults to using public endpoints for internal
+      communication between services. If set to True this option will
+      configure services to use internal endpoints where possible.
+  neutron-security-groups:
+    type: boolean
+    default: False
+    description: Use Neutron for security group management.
+  neutron-external-network:
+    type: string
+    default: ext_net
+    description: |
+      Name of the external network for floating IP addresses provided by
+      Neutron.
+  network-device-mtu:
+    type: int
+    default:
+    description: |
+      The MTU size for interfaces managed by neutron. If unset or set to
+      0, no value will be applied. This value will be provided to
+      neutron-plugin-api relations.
+      .
+      NOTE: This option is deprecated and will be removed in Newton.
+      Please use the system-wide global-physnet-mtu setting which the
+      agents will take into account when wiring VIFs.
+  neutron-plugin:
+    type: string
+    default: ovs
+    description: |
+      Neutron plugin to use for network management; supports
+      .
+        ovs - OpenvSwitch Plugin
+        vsp - Nuage Networks VSP
+        nsx - VMWare NSX
+        Calico - Project Calico Networking
+        midonet - MidoNet
+        plumgrid - PLUMgrid
+      .
+  overlay-network-type:
+    type: string
+    default: gre
+    description: |
+      Overlay network types to use, valid options include:
+      .
+        gre
+        vxlan
+      .
+      Multiple types can be provided - field is space delimited. To disable
+      overlay networks set to the empty string ''
+  flat-network-providers:
+    type: string
+    default:
+    description: |
+      Space-delimited list of Neutron flat network providers.
+  vlan-ranges:
+    type: string
+    default: "physnet1:1000:2000"
+    description: |
+      Space-delimited list of <physical_network>:<vlan_min>:<vlan_max> or
+      <physical_network> specifying physical_network names usable for VLAN
+      provider and tenant networks, as well as ranges of VLAN tags on each
+      available for allocation to tenant networks.
+  vni-ranges:
+    type: string
+    default: "1001:2000"
+    description: |
+      Space-delimited list of <vxlan_min>:<vxlan_max> for VXLAN provider.
+  enable-ml2-port-security:
+    type: boolean
+    default: False
+    description: Enable port security extension for ML2 plugin (>= kilo).
+  enable-ml2-dns:
+    type: boolean
+    default: False
+    description: |
+      Enables the Neutron DNS extension driver (>= mitaka). When enabled,
+      ports attached to Nova instances will have DNS names assigned based
+      on the instance name.
+  haproxy-server-timeout:
+    type: int
+    default:
+    description: |
+      Server timeout configuration in ms for haproxy, used in HA
+      configurations. If not provided, default value of 90000ms is used.
+  haproxy-client-timeout:
+    type: int
+    default:
+    description: |
+      Client timeout configuration in ms for haproxy, used in HA
+      configurations. If not provided, default value of 90000ms is used.
+  haproxy-queue-timeout:
+    type: int
+    default:
+    description: |
+      Queue timeout configuration in ms for haproxy, used in HA
+      configurations. If not provided, default value of 9000ms is used.
+  haproxy-connect-timeout:
+    type: int
+    default:
+    description: |
+      Connect timeout configuration in ms for haproxy, used in HA
+      configurations. If not provided, default value of 9000ms is used.
+  enable-sriov:
+    type: boolean
+    default: False
+    description: |
+      Enable SR-IOV networking support across Neutron and Nova.
+  enable-hardware-offload:
+    type: boolean
+    default: False
+    description: |
+      Enable OVS hardware offload support across Neutron and Nova.
+  supported-pci-vendor-devs:
+    type: string
+    default:
+    description: |
+      NOTE: Required for OpenStack versions Kilo, Liberty and Mitaka. Ignored
+      for OpenStack Newton and newer.
+      .
+      Space-delimited list of supported Vendor PCI Devices, in format
+      vendor_id:product_id
+      .
+      Example: 15b3:1004 8086:10ca
+      .
+      This must be set to match available hardware on nova-compute units.
+      Neutron will refuse to bind ports to hardware with Vendor PCI IDs not
+      in this list. (Use lspci -nn to get IDs)
+      .
+      NOTE: The vendor_id:product_id of the PFs and VFs differ. Make sure to
+      enter the correct one for your use case.
+  midonet-origin:
+    type: string
+    default: midonet-2015.06
+    description: |
+      'mem-1.8', 'mem-1.9',
+      'midonet-2015.06'
+      .
+      NOTE: updating this setting to a source that is known to provide a later
+            version of MidoNet (do not change between MEM and MidoNet) will
+            trigger a software upgrade.
+  mem-username:
+    type: string
+    default:
+    description: |
+      The Midokura Enterprise MidoNet username credentials to access the
+      repository.
+  mem-password:
+    type: string
+    default:
+    description: |
+      The Midokura Enterprise MidoNet password credentials to access the
+      repository.
+  config-flags:
+    type: string
+    default:
+    description: |
+      Comma-separated list of key=value config flags. These values will be
+      placed in the neutron.conf [DEFAULT] section.
+      .
+      WARNING: this is not the recommended way to configure the underlying
+      services that this charm installs and is used at the user's own risk.
+      This option is mainly provided as a stop-gap for users that either
+      want to test the effect of modifying some config or who have found
+      a critical bug in the way the charm has configured their services
+      and need it fixed immediately. We ask that whenever this is used,
+      that the user consider opening a bug on this charm at
+      https://bugs.launchpad.net/charm-neutron-api providing an explanation of
+      why the config was needed so that we may consider it for inclusion as a
+      natively supported config in the charm.
+  default-tenant-network-type:
+    type: string
+    default:
+    description: |
+      The default type for a tenant network e.g. vxlan, vlan, gre etc
+  global-physnet-mtu:
+    type: int
+    default: 1500
+    description: |
+      MTU of the underlying physical network. Neutron uses this value to
+      calculate MTU for all virtual network components. For flat and
+      VLAN networks, neutron uses this value without modification. For
+      overlay networks such as VXLAN, neutron automatically subtracts
+      the overlay protocol overhead from this value.
+      .
+      NOTE: This options is available starting from Mitaka release.
+  path-mtu:
+    type: int
+    default:
+    description: |
+      Maximum size of an IP packet (MTU) that can traverse the
+      underlying physical network infrastructure without fragmentation
+      when using an overlay/tunnel protocol. This option allows
+      specifying a physical network MTU value that differs from the
+      default global-physnet-mtu value.
+  physical-network-mtus:
+     type: string
+     default:
+     description: |
+      Space-delimited list of <physical_network>:<mtu> pairs specifying MTU for
+      individual physical networks.
+      .
+      Use this if a subset of your flat or VLAN provider networks have a MTU
+      that differ with what is set in global-physnet-mtu.
+  dns-domain:
+    type: string
+    default: openstack.example.
+    description: |
+      Specifies the dns domain name that should be used for building instance
+      hostnames. An empty option or the value of 'openstacklocal' will cause
+      the dhcp agents to broadcast the default domain of openstacklocal and
+      will not enable internal cloud dns resolution. This value should end
+      with a '.', e.g. 'cloud.example.org.'.
+  l2-population:
+    type: boolean
+    default: True
+    description: |
+      Populate the forwarding tables of virtual switches (LinuxBridge or OVS),
+      to decrease broadcast traffics inside the physical networks fabric while
+      using overlays networks (VXLan, GRE).
+
+      WARNING: Care should be taken when changing this configuration at runtime
+      as there will be a temporary data-plane outage while the network adapters are
+      reconfigured.
+  manage-neutron-plugin-legacy-mode:
+    type: boolean
+    default:
+    description: |
+      If False plugin is chosen through the deployment of a subordinate charm
+      and relating it to the neutron-api application.
+
+      If True the network management plugin is chosen via the
+      ``neutron-plugin`` configuration option.
+
+      The default value for this configuration option for new deployments is
+      False for OpenStack Ussuri (or newer), and True when deploying or
+      upgrading from prior versions.
+  enable-dvr:
+    type: boolean
+    default: False
+    description: |
+      Enable Distributed Virtual Routing (juno and above).
+  enable-l3ha:
+    type: boolean
+    default: False
+    description: |
+      Enable L3 HA (juno and above).
+  max-l3-agents-per-router:
+    type: int
+    default: 2
+    description: |
+      Maximum number of l3 agents to host a router. Only used when enable-l3ha
+      is True.
+  min-l3-agents-per-router:
+    default: 2
+    type: int
+    description: |
+      Minimum number of l3 agents to host a router. Only used when enable-l3ha
+      is True.
+      .
+      NOTE: This option was deprecated in Newton and removed in Ocata so will
+      have no effect from then onwards.
+  allow-automatic-l3agent-failover:
+    type: boolean
+    default: False
+    description: |
+      Automatically reschedule routers from offline L3 agents to online L3
+      agents. Note that it is advised to set this to true even when
+      Distributed Virtual routing is enabled, since SNAT for nodes without
+      floating IPs is set up centrally on an L3 agent. For DVR the SNAT
+      namespace will be rescheduled only to L3 agents running in the 'dvr_snat'
+      mode, while l3 agents in the 'dvr' mode will only host qrouter and fip
+      namespaces.
+  router-scheduler-driver:
+    type: string
+    default: 'neutron.scheduler.l3_agent_scheduler.AZLeastRoutersScheduler'
+    description: |
+      The driver to use for router scheduling. In case of distributed routers
+      this will affect snat namespace scheduling.
+  allow-automatic-dhcp-failover:
+    type: boolean
+    default: True
+    description: |
+      Automatically remove networks from offline DHCP agents and reschedule
+      them to online DHCP agents. This option can be used in conjunction with
+      dhcp-agents-per-network as a single network can be maintained by multiple
+      dhcp agents. Practically, rescheduling involves creating a dhcp network
+      namespace and starting a DHCP agent like the default dnsmasq one in that
+      network namespace. If availability zone information is propagated to
+      neutron-openvswitch and neutron-gateway units from the underlying Juju
+      provider (e.g. MAAS), it may also affect rescheduling.
+  dhcp-agents-per-network:
+    type: int
+    default: 1
+    description: |
+      The number of dhcp agents to be deployed per network. Note that if the
+      Calico plugin is being used, this option has no effect.
+  worker-multiplier:
+    type: float
+    default:
+    description: |
+      The CPU core multiplier to use when configuring worker processes for
+      this service. By default, the number of workers for each daemon is
+      set to twice the number of CPU cores a service unit has. This default
+      value will be capped to 4 workers unless this configuration option
+      is set.
+  polling-interval:
+    type: int
+    default: 2
+    description: |
+      The number of seconds the agent will wait between polling for local device changes.
+      Used by neutron l2 agents.
+  rpc-response-timeout:
+    type: int
+    default: 60
+    description: |
+      Seconds to wait for a response from a call.
+      Used by all neutron agents (includes l2 agents and other types of agents).
+  report-interval:
+    type: int
+    default: 30
+    description: |
+      Seconds between nodes reporting state to server; should be less than agent_down_time,
+      best if it is half or less than agent_down_time.
+      Used by all neutron agents (includes l2 agents and other types of agents).
+  enable-qos:
+    type: boolean
+    default: False
+    description: |
+      Enable QoS (assuming the plug-in or ml2 mechanism driver can support it)
+  enable-vlan-trunking:
+    type: boolean
+    default: False
+    description: |
+      Enable VLAN trunking or a VLAN aware VM. Neutron extension to access
+      lots of neutron networks over a single vNIC as tagged/encapsulated traffic.
+  # Quota config
+  quota-security-group:
+    type: int
+    default: 10
+    description: |
+      Number of security groups allowed per tenant. A negative value means
+      unlimited.
+  quota-security-group-rule:
+    type: int
+    default: 100
+    description: |
+      Number of security group rules allowed per tenant. A negative value means
+      unlimited
+  quota-network:
+    type: int
+    default: 10
+    description: |
+      Number of networks allowed per tenant. A negative value means unlimited.
+  quota-subnet:
+    type: int
+    default: 10
+    description: |
+      Number of subnets allowed per tenant. A negative value means unlimited.
+  quota-port:
+    type: int
+    default: 50
+    description: |
+      Number of ports allowed per tenant. A negative value means unlimited.
+  quota-vip:
+    type: int
+    default: 10
+    description: |
+      Number of vips allowed per tenant. A negative value means unlimited.
+  quota-pool:
+    type: int
+    default: 10
+    description: |
+      Number of pools allowed per tenant. A negative value means unlimited.
+  quota-member:
+    type: int
+    default: -1
+    description: |
+      Number of pool members allowed per tenant. A negative value means
+      unlimited. The default is unlimited because a member is not a real
+      resource consumer on Openstack. However, on back-end, a member is a
+      resource consumer and that is the reason why quota is possible.
+  quota-health-monitors:
+    type: int
+    default: -1
+    description: |
+      Number of health monitors allowed per tenant. A negative value means
+      unlimited.
+      The default is unlimited because a health monitor is not a real resource
+      consumer on Openstack. However, on back-end, a member is a resource
+      consumer and that is the reason why quota is possible.
+  quota-router:
+    default: 10
+    type: int
+    description: |
+      Number of routers allowed per tenant. A negative value means unlimited.
+  quota-floatingip:
+    type: int
+    default: 50
+    description: |
+      Number of floating IPs allowed per tenant. A negative value means
+      unlimited.
+  # HA config
+  dns-ha:
+    type: boolean
+    default: False
+    description: |
+      Use DNS HA with MAAS 2.0. Note if this is set do not set vip* settings.
+  vip:
+    type: string
+    default:
+    description: |
+      Virtual IP(s) to use to front API services in HA configuration.
+      .
+      If multiple networks are being used, a VIP should be provided for each
+      network, separated by spaces.
+  vip_iface:
+    type: string
+    default: eth0
+    description: |
+      Default network interface to use for HA vip when it cannot be
+      automatically determined.
+  vip_cidr:
+    type: int
+    default: 24
+    description: |
+      Default CIDR netmask to use for HA vip when it cannot be automatically
+      determined.
+  ha-bindiface:
+    type: string
+    default: eth0
+    description: |
+      Default network interface on which HA cluster will bind to communication
+      with the other members of the HA Cluster.
+  ha-mcastport:
+    type: int
+    default: 5424
+    description: |
+      Default multicast port number that will be used to communicate between
+      HA Cluster nodes.
+  # Network config (by default all access is over 'private-address')
+  os-admin-network:
+    type: string
+    default:
+    description: |
+      The IP address and netmask of the OpenStack Admin network (e.g.
+      192.168.0.0/24)
+      .
+      This network will be used for admin endpoints.
+  os-internal-network:
+    type: string
+    default:
+    description: |
+      The IP address and netmask of the OpenStack Internal network (e.g.
+      192.168.0.0/24)
+      .
+      This network will be used for internal endpoints.
+  os-public-network:
+    type: string
+    default:
+    description: |
+      The IP address and netmask of the OpenStack Public network (e.g.
+      192.168.0.0/24)
+      .
+      This network will be used for public endpoints.
+  os-public-hostname:
+    type: string
+    default:
+    description: |
+      The hostname or address of the public endpoints created for neutron-api
+      in the keystone identity provider.
+      .
+      This value will be used for public endpoints. For example, an
+      os-public-hostname set to 'neutron-api.example.com' with ssl enabled
+      will create the following endpoint for neutron-api:
+      .
+      https://neutron-api.example.com:9696/
+  os-internal-hostname:
+    type: string
+    default:
+    description: |
+      The hostname or address of the internal endpoints created for neutron-api
+      in the keystone identity provider.
+      .
+      This value will be used for internal endpoints. For example, an
+      os-internal-hostname set to 'neutron-api.internal.example.com' with ssl
+      enabled will create a internal endpoint for neutron-api:
+      .
+      https://neutron-api.internal.example.com:9696/
+  os-admin-hostname:
+    type: string
+    default:
+    description: |
+      The hostname or address of the admin endpoints created for neutron-api
+      in the keystone identity provider.
+      .
+      This value will be used for admin endpoints. For example, an
+      os-admin-hostname set to 'neutron-api.admin.example.com' with ssl enabled
+      will create a internal endpoint for neutron-api:
+      .
+      https://neutron-api.admin.example.com:9696/
+  ssl_cert:
+    type: string
+    default:
+    description: |
+      SSL certificate to install and use for API ports. Setting this value
+      and ssl_key will enable reverse proxying, point Neutron's entry in the
+      Keystone catalog to use https, and override any certificate and key
+      issued by Keystone (if it is configured to do so).
+  ssl_key:
+    type: string
+    default:
+    description: SSL key to use with certificate specified as ssl_cert.
+  ssl_ca:
+    type: string
+    default:
+    description: |
+      SSL CA to use with the certificate and key provided - this is only
+      required if you are providing a privately signed ssl_cert and ssl_key.
+  prefer-ipv6:
+    type: boolean
+    default: False
+    description: |
+      If True enables IPv6 support. The charm will expect network interfaces
+      to be configured with an IPv6 address. If set to False (default) IPv4
+      is expected.
+      .
+      NOTE: these charms do not currently support IPv6 privacy extension. In
+      order for this charm to function correctly, the privacy extension must be
+      disabled and a non-temporary address must be configured/available on
+      your network interface.
+  # Monitoring config
+  nagios_context:
+    type: string
+    default: "juju"
+    description: |
+      Used by the nrpe-external-master subordinate charm. A string that will
+      be prepended to instance name to set the host name in nagios. So for
+      instance the hostname would be something like 'juju-myservice-0'. If
+      you are running multiple environments with the same services in them
+      this allows you to differentiate between them.
+  nagios_servicegroups:
+    type: string
+    default: ""
+    description: |
+      A comma-separated list of nagios servicegroups. If left empty, the
+      nagios_context will be used as the servicegroup
+  # Nuage plugin (VSD) config
+  nuage-packages:
+    type: string
+    default: "nuage-openstack-neutron nuagenetlib"
+    description: |
+      Its [nuage-openstack-neutron nuagenetlib] for Nuage VSP >=3.2R4 & KILO
+      and [nuage-neutron python-nuagenetlib] of Nuage VSP <=3.0 & JUNO
+  vsd-cms-id:
+    type: string
+    default:
+    description: |
+      CMS ID is used as an authentication token from VSD to CMS.
+      This value is being generated via nuage scripts and can be set pre/post
+      deployment.
+  vsd-cms-name:
+    type: string
+    default:
+    description: |
+      This is required only for 3.2 R4 and above releases of Nuage and Kilo.
+      Please give Maas env id so that it is unique per openstack cluster. This
+      name is used to create th CMS ID on Nuage-VSD which should be unique per
+      OSP cluster. Your Deployment will fail if this config is not provided.
+  vsd-server:
+    type: string
+    default:
+    description: Nuage VSD Server
+  vsd-auth:
+    type: string
+    default: "csproot:csproot"
+    description: Username Password to connect to Nuage VSD Server
+  vsd-organization:
+    type: string
+    default: csp
+    description: Name of the organization in Nuage VSD
+  vsd-auth-ssl:
+    type: boolean
+    default: True
+    description: SSL authentication of the Nuage VSD Server
+  vsd-base-uri:
+    type: string
+    default: "/nuage/api/v3_0"
+    description: Nuage VSD API endpoint URI
+  vsd-auth-resource:
+    type: string
+    default: "/me"
+    description: Nuage VSD authentication resource
+  vsd-netpart-name:
+    type: string
+    default: juju-enterprise
+    description: Name of the Organization or Enterprise to create in Nuage VSD
+  # VMware NSX plugin config
+  nsx-controllers:
+    type: string
+    default:
+    description: Space delimited addresses of NSX controllers
+  nsx-username:
+    type: string
+    default: admin
+    description: Username to connect to NSX controllers with
+  nsx-password:
+    type: string
+    default: admin
+    description: Password to connect to NSX controllers with
+  nsx-tz-uuid:
+    type: string
+    default:
+    description: |
+      This is uuid of the default NSX Transport zone that will be used for
+      creating tunneled isolated Neutron networks. It needs to be created in
+      NSX before starting Neutron with the nsx plugin.
+  nsx-l3-uuid:
+    type: string
+    default:
+    description: This is uuid of the default NSX L3 Gateway Service.
+  # PLUMgrid Plugin config
+  plumgrid-username:
+    type: string
+    default: plumgrid
+    description: Username to access PLUMgrid Director
+  plumgrid-password:
+    type: string
+    default: plumgrid
+    description: Password to access PLUMgrid Director
+  plumgrid-virtual-ip:
+    type: string
+    default:
+    description: IP address of PLUMgrid Director
+  # Calico plugin config
+  calico-origin:
+    type: string
+    default:
+    description: |
+      Repository from which to install Calico packages. If set, must be
+      a PPA URL, of the form ppa:somecustom/ppa. Changing this value
+      after installation will force an immediate software upgrade.
+  reverse-dns-lookup:
+    type: boolean
+    default: False
+    description: |
+      A boolean value specifying whether to enable or not the creation of
+      reverse lookup (PTR) records.
+      .
+      NOTE: Use only when relating neutron-api charm to designate charm.
+  ipv4-ptr-zone-prefix-size:
+    type: int
+    default: 24
+    description: |
+      The size in bits of the prefix for the IPv4 reverse lookup (PTR) zones.
+      Valid size has to be multiple of 8, with maximum value of 24 and minimum
+      value of 8.
+      .
+      NOTE: Use only when "reverse-dns-lookup" option is set to "True".
+  ipv6-ptr-zone-prefix-size:
+    type: int
+    default: 64
+    description: |
+      The size in bits of the prefix for the IPv6 reverse lookup (PTR) zones.
+      Valid size has to be multiple of 4, with maximum value of 124 and minimum
+      value of 4.
+      .
+      NOTE: Use only when "reverse-dns-lookup" option is set to "True".
+  dhcp-load-type:
+    type: string
+    default: 'networks'
+    description: |
+      Sets the resource type used in weight calculations during
+      AZ-aware scheduling (networks, subnets or ports).
+  use-policyd-override:
+    type: boolean
+    default: False
+    description: |
+      If True then use the resource file named 'policyd-override' to install
+      override YAML files in the service's policy.d directory.  The resource
+      file should be a ZIP file containing at least one yaml file with a .yaml
+      or .yml extension.  If False then remove the overrides.
+  enable-igmp-snooping:
+    type: boolean
+    default: False
+    description: |
+      If True, on Ussuri or later, igmp snooping will be set on OVS and OVN
+      control plane will learn about multicast traffic going on in the cluster.

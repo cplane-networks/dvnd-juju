@@ -1,0 +1,12 @@
+{% if auth_host -%}
+auth_uri = {{ service_protocol }}://{{ service_host }}:{{ service_port }}
+auth_url = {{ auth_protocol }}://{{ auth_host }}:{{ auth_port }}
+auth_plugin = password
+project_domain_id = default
+user_domain_id = default
+project_name = {{ service_tenant }}
+username = {{ service_username }}
+password = {{ service_password }}
+auth_region = {{ auth_region }}
+{% endif -%}
+

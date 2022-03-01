@@ -1,0 +1,29 @@
+name: lb-compute-cplane
+summary: Cplane lb compute for Openstack 
+maintainer: amarendra <info@cplanenetworks.com>
+description: |
+      The Linux bridge compute node is a special type of OpenStack Compute specifically designed to run the CPLANE NETWORKS’s  
+
+tags:
+  - openstack
+  - networking
+extra-bindings:
+  public:
+  admin:
+  internal:
+subordinate: true
+provides:
+  neutron-plugin:
+    interface: neutron-plugin
+    scope: container
+requires:
+  container:
+    interface: juju-info
+    scope: container
+  cloud-controller:
+    interface: nova 
+  amqp:
+    interface: rabbitmq
+  neutron-plugin-api:
+    interface: neutron-plugin-api
+
