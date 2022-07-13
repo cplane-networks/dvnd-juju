@@ -18,7 +18,6 @@ from charmhelpers.fetch import (
 
 from cplane_context import (
     get_shared_secret,
-    nova_metadata_requirement,
 )
 
 from cplane_utils import (
@@ -62,8 +61,6 @@ def neutron_plugin_relation_joined(rid=None):
 
 @hooks.hook('neutron-plugin-relation-changed')
 def neutron_plugin_changed():
-#    enable_nova_metadata, _ = nova_metadata_requirement()
-#    if enable_nova_metadata:
     CONFIGS.write(METADATA_AGENT_INI)
 
 

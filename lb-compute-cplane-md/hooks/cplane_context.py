@@ -81,19 +81,6 @@ def get_shared_secret():
             secret = secret_file.read().strip()
     return secret
 
-def nova_metadata_requirement():
-    enable = False
-    secret = None
-    for rid in relation_ids('neutron-plugin'):
-        for unit in related_units(rid):
-            rdata = relation_get(rid=rid, unit=unit)
-            if 'metadata-shared-secret' in rdata:
-                secret = rdata['metadata-shared-secret']
-                enable = True
-            if bool_from_string(rdata.get('enable-metadata', 'False')):
-                enable = True
-    return enable, secret
-
 
 def get_controller_ip():
     for rid in relation_ids('neutron-plugin'):
@@ -103,11 +90,9 @@ def get_controller_ip():
 
 class SharedSecretContext(context.OSContextGenerator):
     def __call__(self):
-        ctxt = {}
-        _, secret = nova_metadata_requirement()
-        if secret:
-            ctxt['metadata_shared_secret'] = secret
-        ctxt['controller'] = get_controller_ip()
+        ctxt = {
+            'metadata_shared_secret': get_shared_secret(),
+        }
         return ctxt
 
 class DhcpContext(context.OSContextGenerator):
